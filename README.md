@@ -147,6 +147,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 ## Limits
 
 - It doesn't change the design. Proportions, faces, poses and folds come from the source.
+- Parts are not always right the first time. Clean cel pictures settle within two rounds of hints; semi-realistic paintings, dense patterns and black on black are harder. When the parts will not come right, the agent asks you for one sentence about what is wrong and fixes the hints itself. Failing that, it merges parts, finishes only the parts that are right, or uses a finish that needs no parts ([subject-file.md](skills/refinish/references/subject-file.md)).
 - Soft airbrushed shading gives the flat cel finishes less to work with; the paint finishes cope better. [source-spec.md](skills/refinish/references/source-spec.md) explains how to ask an image model for a picture that finishes well.
 - Cut-outs have hard edges. A veil, a lens or smoke comes out as wholly figure or wholly background.
 - It doesn't hide where a picture came from. A generated picture is still generated after any finish here, the de-AI ones included, and none of them is tuned against any detector.

@@ -147,6 +147,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 ## 局限
 
 - 不改设计。比例、脸、姿势和衣褶都来自原图。
+- 部位不一定一次就拆对。干净的赛璐璐图在两轮提示点内大多会正确；半写实、密集花纹、黑上黑这类比较难。拆不好时，agent 会请你用一句话说明哪里不对，再自己修改提示点；还是不行，就合并部位、只完稿拆对的部分，或改用不需要部位的完稿（[subject-file.md](skills/refinish/references/subject-file.md)）。
 - 柔和的喷枪上色让平涂类的赛璐璐完稿较难处理，绘画类完稿更能应付。[source-spec.md](skills/refinish/references/source-spec.md) 说明了怎样让图像模型画出容易完稿的图。
 - 抠图是硬边。面纱、镜片、烟雾，要么整块算角色，要么整块算背景。
 - 不会隐藏图片的来源。AI 生成的图经过任何完稿（包括去 AI 感）仍然是 AI 生成的，这些完稿也没有针对任何检测工具做调整。

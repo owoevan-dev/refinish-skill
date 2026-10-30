@@ -54,7 +54,7 @@ A subject file says what each part of the picture is (skin, hair, each garment) 
   - a rough box per part, generous round arms, forearms and thighs;
   - boxes round the eyes and the mouth.
 
-  Then run `auto_parts.py --hints` again. Two rounds settle most pictures.
+  Then run `auto_parts.py --hints` again. Two rounds settle most pictures. When they do not, change the approach rather than the points: [subject-file.md](references/subject-file.md), "When the parts will not come right", lists what to try.
 - **Backgrounds**: `python scripts/scene_subject.py IMAGE.png subject.json` finds the scene's areas by colour and guesses their kinds (sky, far hills, foliage, ground, ...). A painted background takes `deai-light` or a scene style, not a cel style: flat tones break its gradients into blotches (presets.md, Scenes).
 - **No parts needed**: the de-AI and duotone styles run on the draft as it is.
 

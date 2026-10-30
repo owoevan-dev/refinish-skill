@@ -131,6 +131,20 @@ With `--like other_subject.json` the names and kinds of another picture of the s
 
 A part that owns regions keeps them in its `regions` list. To move a region, move its number. A polygon added to such a part takes every pixel inside it.
 
+## When the parts will not come right
+
+Two rounds of hints settle most clean cel pictures. When a third round would only move the same mistakes around, change the approach instead of the points. Try these in order:
+
+1. **Ask for one sentence.** Show the person the parts sheet and ask what is wrong, in their words (step 4 above). A sentence about the picture is surer than another round of points read off a grid.
+2. **Name fewer, larger parts.** Black on black, white on white and two materials of one colour are told apart only by the lines between them. Where those lines are faint, one part painted from one colour model looks better than two that trade pixels along a guessed border.
+3. **One part for a dense pattern.** A garment of many small motifs is one part with the rule `"model": "regions"`, so each region its lines enclose keeps its own flat colour.
+4. **Eyes the face reading missed.** When the draft reads no eyes (glasses, closed eyes, a stylised eye), the eye boxes given are used as they are, so draw them tightly round each eye. An iris that still lands in the skin or the hair moves with their colours; check P2 says so. Give it a part of its own, of kind `eyes`, with a point on the iris and a tight box.
+5. **Finish only the parts that are right.** A recipe with `"base": "source"` re-finishes the parts its layers name and leaves the rest of the picture as drawn ([recipes.md](recipes.md)).
+6. **Use a finish that needs no parts.** The de-AI and duotone styles run on the draft as it is.
+7. **Start from a source that can be split.** Soft airbrushed shading and an outline missing on the lit side are made at generation, and no hint repairs them. `scripts/check_input.py` grades both. Where the picture can be generated again, [source-spec.md](source-spec.md) says what to ask for.
+
+Tell the person which of these you used and why. A part merged, or left as drawn, is a choice they should know about.
+
 ## How each pixel finds its part (hand-made subjects)
 
 1. Each pixel goes to the nearest colour family **among the families with a part allowed where it lies** (a polygon, or anywhere for a part without one). A lock of hair beside the cheek may be nearest in colour to the tights; the tights may not be there, so it goes to the hair instead of falling through to the skin.
