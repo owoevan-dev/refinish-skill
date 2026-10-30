@@ -1,0 +1,33 @@
+name: A finish you would like
+description: Ask for a technique the bundled styles do not cover yet.
+labels: ["style request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Styles are named after their technique, never after an artist, a studio or a title.
+        Please link reference pictures instead of uploading pictures you did not make.
+  - type: input
+    id: technique
+    attributes:
+      label: Technique
+      placeholder: risograph in three inks, 1980s anime cel, paper cutting...
+    validations:
+      required: true
+  - type: textarea
+    id: looks
+    attributes:
+      label: What makes it that technique?
+      description: The lines, the shadows, the colours, the paper or the print. The more concrete, the better.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to pictures or articles that show the technique.
+  - type: textarea
+    id: use
+    attributes:
+      label: What would you use it for?
+      description: Sprites, a background set, a poster, a game's menus...

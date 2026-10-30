@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide and issue forms (issues are open, outside pull requests are not).
+
 - **Subjects**:
   - automatic parts for a figure (`auto_parts.py`): trapped-ball regions, the face and its eyes and mouth found in the skin, hint points and boxes grown by LazyBrush-style claiming, marker watershed and GrabCut, the box limit kept last;
   - doubts for boxes drawn too small, for two materials of one colour touching, for eye boxes used as given (glasses), and for one region holding two colours far apart (a gap in a line);
@@ -37,6 +39,18 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Adjusting guide** (`references/adjusting.md`): for each common problem, its cause, the setting that moves it, and how to check the change. The guide favours a setting chosen for the picture over a change to the scripts.
 - `auto_deblotch` (off by default): the broader reading of the shading, only for parts whose own cut comes out ragged and whose two tones lie close.
 
+
+### Known issues
+
+All 37 finishes were run on 16 characters the code had never seen (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure. These did not, and are not fixed yet:
+
+- **Manga screentone** prints darker skin as paper or a light tone.
+- **Pop art** leaves boxes round the eyes and the mouth.
+- **The ukiyo-e print** lightens tan and olive skin nearly to paper. Deep brown skin is kept.
+- **Soft airbrushed sources** break into ragged shadow edges under the flat-tone finishes. `check_input.py` warns on them.
+- **duotone-auto** can break a dark face into specks.
+- **When the face finder reads no eyes**, the hint boxes become whole rectangles of iris and mouth. A doubt says so; check the eye boxes on the face sheet.
+- **The look checks miss most of these.** O7 flagged 1 of 57 skin failures, O8 8 of 15 box seams.
 ### Fixed
 
 - A darker skin is no longer printed pale by the woodblock styles, nor left paper and broken into boxes by the manga screentone, nor turned to pale dots by the pop art.

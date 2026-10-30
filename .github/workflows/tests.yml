@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install the dependencies
+        run: pip install numpy scipy opencv-python-headless pillow pytest
+      - name: Compile every script
+        run: python -m py_compile skills/refinish/scripts/*.py tests/*.py
+      - name: Run the tests
+        run: python -m pytest -q tests

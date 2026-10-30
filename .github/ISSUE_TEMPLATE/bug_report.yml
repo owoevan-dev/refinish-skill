@@ -1,0 +1,49 @@
+name: Something came out wrong
+description: A finish, a check or a script that did not do what the docs say.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Only attach pictures you have the right to share; a crop of the problem is often enough.
+        English, 中文, 日本語 and 한국어 are all fine.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where did it go wrong?
+      options:
+        - A style's finish
+        - Parts (auto_parts.py, hints)
+        - Cutting a figure out of a scene (cutout.py)
+        - Backgrounds and compositing
+        - A check or its report
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: style
+    attributes:
+      label: Style
+      placeholder: tv-cel
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The command you ran and the JSON it printed.
+      render: shell
+  - type: textarea
+    id: pictures
+    attributes:
+      label: Pictures
+      description: The source, or a crop of it, and the result. Drag them in here.
+  - type: input
+    id: setup
+    attributes:
+      label: Python, OpenCV and system
+      placeholder: Python 3.12, opencv-python 4.12, Windows 11

@@ -1,66 +1,105 @@
 <p align="center">
-  <a href="README.md">English</a> · <strong>繁體中文</strong>
+  <img src="assets/brand/logo-1200.png" alt="Refinish 重新完稿" width="440">
 </p>
 
-# refinish-skill
+<p align="center">
+  <a href="README.md">English</a> ·
+  <strong>繁體中文</strong> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.ja.md">日本語</a> ·
+  <a href="README.ko.md">한국어</a>
+</p>
 
-**不要重新生成，重新完稿。**
+<p align="center">
+  <a href="https://github.com/owoevan-dev/refinish-skill/actions/workflows/tests.yml"><img src="https://github.com/owoevan-dev/refinish-skill/actions/workflows/tests.yml/badge.svg" alt="測試"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-1f1c1a" alt="授權：MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-1f1c1a" alt="Python 3.10 以上">
+</p>
 
-一個 [Agent Skill](https://agentskills.io)：用程式把角色圖或背景換成另一種畫風，而不是重新生成。
+<p align="center"><strong>不重新生成，只重新完稿。</strong></p>
 
-- 線稿、姿勢、設計完全不變，只換「完成方式」；
-- 就像動畫的完稿部門、版畫工房或像素畫師會做的那樣。
+Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖重新完稿。畫的本身（線稿、姿勢、臉、服裝）保持不動，重畫的是完稿：陰影的形狀、線條的墨色、配色和媒材。內建 37 種完稿方式，從電視動畫賽璐璐、水彩，到浮世繪木版、漫畫網點和像素圖。
 
-重新生成來換畫風，得到的是另一個角色：臉不同、手不同、服裝會跑掉。重新完稿則保留角色本身。
-- 整組立繪可以共用同一種完成方式；
-- 很晚才改畫風，也不必重畫。
+全部用 Python（NumPy 與 OpenCV）處理，不經過任何影像生成模型，所以出來的角色，就是放進去的那個角色。
 
-## 功能
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="同一個角色的六個版本：原圖、水彩、浮世繪木版、漫畫網點、彩繪玻璃、像素圖">
+</p>
 
-- **37 種內建畫風**，分八個家族。每種都附前置建議與已知限制：
+## 為什麼不直接重新生成？
 
-  | 家族 | 畫風 |
-  |---|---|
-  | 動畫賽璐璐 | TV 賽璐璐、濃厚、粗墨線、底片日常、底片夜景、粉彩底片、90 年代、夜景、夕陽 |
-  | 去 AI 味 | 輕度、重度：保留原圖的顏色與線條，去掉算圖雜訊與噴槍漸層 |
-  | 雙色調與少色印刷 | 原圖自身兩色、藏青雙色、雙色印刷、棕褐、藍曬、Riso |
-  | 繪畫 | 水彩、不透明水彩、厚塗 |
-  | 印刷與線稿 | 漫畫網點、動畫原畫、網版印刷 |
-  | 特殊 | 水墨、浮世繪木版、Ben-Day 普普網點、霓虹燈、彩繪玻璃、剪紙、炭筆、粉彩、模切貼紙 |
-  | 像素 | 96 px 角色、192 px 半身 |
-  | 場景 | 木版、水墨、水彩風景 |
+請影像模型用新畫風重畫一個角色，得到的會是有點不一樣的角色：臉變了一點，手重畫過，服裝細節也跟著跑掉。單張插圖也許無所謂，但一整組必須對得上的立繪就不行。
 
-- **以部位上色，不是逐像素。**
-  - 主體檔記錄圖中每個部位是什麼（皮膚、頭髮、各件衣服），每種材質由自己的色指定上色；
-  - 主體檔自動打草稿，再用幾個指點修正；
-  - 上色前，同材質防護會把標錯的像素還給原本的材質；
-  - 每張成品都會和原圖比對檢查。
-- **照參考圖複製**：`fit_style.py` 量測參考圖的完成方式（線條深淺、彩度、平塗程度、邊緣軟硬、顆粒），一輪輪擬合出畫風。參考圖只量測、不複製。
-- **用形容詞微調**：`tweak_style.py` 把「陰影柔一點」「更鮮豔」「softer shadows」「線を太く」轉成參數調整，並註明每個詞應該讓哪個量測值改變。
-- **換時段**：
-  - 依白天的色指定，在線性光裡換成夜景或夕陽色指定；
-  - 也有依電影夜景劇照量測擬合出的夜景調色。
-- **合成**：`composite.py` 把角色疊到背景上，並加上：
-  - 線性光裡的景深與散景；
-  - 光線包覆；
-  - 分區調色、光暈、顆粒。
-- **混搭與局部處理**：`recipe.py` 依部位把多種完成方式疊在同一張圖上，可設混合模式與不透明度。例如衣服用水彩、臉用 TV 賽璐璐；網點用色彩增值疊在水彩上；濃厚賽璐璐上疊 30% 的電影感。
-- **修復原圖**：`repair.py` 不改畫風、只修原圖瑕疵：去背殘留的光暈、雜點、線稿斷口、材質交界的滲色。
-- **從場景摳出角色**：`cutout.py` 依一圈大概的外框，把角色從帶背景的圖裡摳出來。精確的邊緣由顏色決定（GrabCut），挖空多邊形去掉縫隙，背景也補好角色背後的位置。兩者可以各自完稿，再把角色原位放回。
+重新完稿反過來做：畫固定不動，只換完稿。整組角色可以共用同一種風格，到了專案後期要換風格，也不必重畫任何一張。
 
-## 量測過，不是猜的
+## 改什麼、不改什麼
 
-兩批程式從未見過的新圖，每批都在打開圖之前先凍結程式：
-- **自動部位加 agent 指點**：兩輪內標對 19/21，第二批 20/20（合計 39/41）。
-- **去 AI 味**（同一批圖）：
-  - 輕度 21/21，第二批 17/20（合計 38/41）；
-  - 重度 19/21，第二批 16/20（合計 35/41）。
-  - 不合格的情形：草稿在眼鏡後找不到臉、頸部柔和陰影被切成階梯。
-- **木版、水彩、水墨引擎**：和博物館公有領域掃描比對了紙色、最深的墨、平塗比例與邊緣積色。
+| | |
+|---|---|
+| **會改** | 線條的粗細、顏色與質感；陰影的形狀與階數；高光；配色與光線，包括夜晚與夕陽；媒材（顏料、紙、墨、網點、像素） |
+| **不改** | 比例、眼睛的畫法、姿勢、衣褶、構圖 |
 
-## 需求
+第二列是刻意的。如果你想要的是「照另一位畫師的方式畫臉」，這不是那種工具；如果你想讓自己的圖，用動畫上色部門、版畫工房或像素畫師的方式完稿，那就是。
 
-Python 3.10 以上，安裝 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。不需要影像模型、網路或 GPU。
+## 完稿方式
+
+<p align="center">
+  <img src="docs/images/styles.jpg" alt="範例角色的 34 種完稿，依類別排列：動畫賽璐璐、乾淨的完稿、雙色印刷、繪畫、版畫與線稿、像素、特殊技法">
+</p>
+
+| 類別 | 完稿方式 |
+|---|---|
+| 動畫賽璐璐 | 電視動畫、濃厚、粗墨線、電影日常、電影夜景、粉彩電影、90 年代、電視夜景、電視夕陽 |
+| 乾淨的完稿 | 去 AI 味（輕、重）：保留原圖的顏色與線條，去掉渲染雜訊與噴槍漸層 |
+| 雙色與少色印刷 | 原圖自己的兩色、深藍雙色、雙色印刷、棕褐、藍曬、Riso 孔版 |
+| 繪畫 | 水彩、不透明水彩、厚塗 |
+| 版畫與線稿 | 漫畫網點、動畫原畫、絹印 |
+| 特殊技法 | 水墨、浮世繪木版、普普藝術網點、霓虹燈、彩繪玻璃、剪紙、炭筆、粉彩、貼紙 |
+| 像素 | 96 px 角色、192 px 頭像 |
+| 風景 | 木版、水墨、水彩風景 |
+
+每種完稿在 [presets.md](skills/refinish/references/presets.md) 都有說明：需要什麼、原圖怎麼準備最好、做不到的地方。
+
+## 背景與場景
+
+背景的處理方式不同。手繪背景線條少，大多是長漸層（天空、霧氣、慢慢暗下去的室內），平塗的賽璐璐色階會把這些漸層切成一塊一塊。動畫本來也不用賽璐璐塗背景：賽璐璐是角色，疊在手繪的背景上。
+
+所以背景用乾淨的去 AI 味完稿或風景完稿，角色用賽璐璐完稿疊在上面。`composite.py` 負責把兩者合起來，加上景深、光線包覆，以及讓兩者落在同一種光線裡的調色。
+
+<p align="center">
+  <img src="docs/images/scene.jpg" alt="範例角色以電視動畫賽璐璐完稿，站在以去 AI 味（輕）完稿的街景中">
+</p>
+
+畫在場景裡的角色，可以先用 `cutout.py` 摳出來：畫一圈大概的外框，精確的邊緣交給顏色判斷，同時拿回補好角色位置的背景，可以另外完稿。
+
+## 不只是濾鏡
+
+- **以部位為單位，不是以像素。** 主體檔（subject file）標出圖裡每個部位是什麼：皮膚、頭髮、每件衣服。每種材質用它自己的顏色上色，紅色緞帶不會滲進旁邊的皮膚。主體檔會自動起草，再用幾個提示點修正。
+- **每張結果都會檢查。** 每次完稿都和原圖比對：部位、顏色、外框、消失的五官細節、被印成別的顏色的皮膚、臉部周圍的方框、深色布料上的斑塊。每個警告都會指出位置和可能的原因。
+- **對照參考圖。** `fit_style.py` 量測參考圖的完稿（線條深淺、彩度、平塗程度、邊緣柔和度、顆粒），一輪一輪調出相符的風格。參考圖只量測，不複製。
+- **用文字調整。** `tweak_style.py` 把「陰影柔一點」「再鮮豔一點」「線を太く」這類說法轉成參數步驟，並告訴你哪個量測值應該跟著變。
+- **改變時段。** 夜晚與夕陽由白天的顏色在線性光中推算，或套用電影夜景的調色。
+- **混合完稿。** `recipe.py` 依部位疊加完稿：衣服用水彩、臉用賽璐璐，或在水彩上以色彩增值疊一層網點。
+- **修復原圖。** `repair.py` 修正去背留下的邊、雜點、線稿斷口、跨過材質邊界的滲色，而且不改畫風。
+
+## 實際表現
+
+每項修改都用程式沒看過的圖驗證：開圖前先凍結程式、寫好合格標準；看過的圖之後只用於開發。
+
+- **部位。** 在兩組新角色上，搭配 agent 的提示點，41 張中有 39 張在兩輪內每個部位都正確。
+- **37 種完稿套用在 16 個新角色上**（10 個膚色較深，4 個是柔和的噴槍上色），21 種完稿通過所有量測：
+  - 除了夕陽與 90 年代以外的所有賽璐璐完稿；
+  - 兩種去 AI 味完稿；
+  - 繪畫類完稿；
+  - 彩繪玻璃、剪紙與貼紙。
+
+  所有完稿都沒有在深色布料上留下斑塊。
+- **還沒做好的地方。** 以下都列在[更新紀錄](CHANGELOG.md)中，尚待修正：
+  - 漫畫網點會把較深的膚色印得太淺；
+  - 普普藝術仍會在臉周圍留下方框；
+  - 浮世繪木版會把小麥色皮膚印淡；
+  - 柔和噴槍上色的原圖，在所有平塗類完稿下陰影邊緣都會破碎。
+- **與真品比對。** 木版、水彩、水墨完稿與博物館的公有領域掃描圖比對過紙色、最深墨色、平塗面積與邊緣加深。
 
 ## 安裝
 
@@ -73,30 +112,59 @@ Python 3.10 以上，安裝 `numpy`、`opencv-python`、`scipy`（`Pillow` 可�
 
 **其他 agent**
 
-把 `skills/refinish` 複製或連結到 agent 的 skills 資料夾，或用 [skills.sh](https://skills.sh)：
+把 `skills/refinish` 複製或連結到 agent 的 skills 資料夾，或使用 [skills.sh](https://skills.sh)：
 
 ```
 npx skills add owoevan-dev/refinish-skill
 ```
 
-## 快速開始
+腳本需要 Python 3.10 以上，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。不需要 GPU、網路，也不用下載模型。
+
+## 使用方式
+
+裝好 skill 後，直接用平常的話請 agent 處理：
+
+> 把 `sprites/` 裡的圖都改成電視動畫賽璐璐，每張風格要一致。
+
+> 這張立繪 AI 味太重，幫我清乾淨，但顏色保持原樣。
+
+> 把 `street.png` 裡的女孩摳出來，改成 90 年代賽璐璐，再放回原位。
+
+agent 會照 [SKILL.md](skills/refinish/SKILL.md) 的流程：先檢查原圖、建立主體檔、套用完稿，自己看過結果才交給你。腳本也可以單獨使用：
 
 ```bash
+python skills/refinish/scripts/check_input.py source.png
 python skills/refinish/scripts/prep.py source.png image.png --scale 2
 python skills/refinish/scripts/auto_parts.py image.png subject.json --upscaled 2
-python skills/refinish/scripts/refinish.py subject.json skills/refinish/styles/tv-cel.json out.png
+python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 ```
 
-然後把 `out.png` 和原圖並排看，也看檢查輸出的檢視圖。完整流程（含提升部位準確度的指點）見 [skills/refinish/SKILL.md](skills/refinish/SKILL.md)。
+## 限制
 
-## 不做的事
+- 不改設計。比例、臉、姿勢與衣褶都來自原圖。
+- 柔和的噴槍上色讓平塗類的賽璐璐完稿較難處理，繪畫類完稿比較能應付。[source-spec.md](skills/refinish/references/source-spec.md) 說明怎麼請影像模型畫出容易完稿的圖。
+- 去背是硬邊。面紗、鏡片、煙霧，不是整塊算角色，就是整塊算背景。
+- 不會隱藏圖片的來源。AI 生成的圖經過任何完稿（包括去 AI 味）都仍然是 AI 生成的，這些完稿也沒有針對任何偵測工具調整。
 
-- 不改設計：比例、臉、姿勢、皺褶都來自原圖。
-- 不隱藏圖的來源：
-  - 生成的圖套用任何畫風後仍是生成的圖，去 AI 味也一樣；
-  - 那是完稿處理，沒有針對任何偵測器調整。
-- 不附任何取自作品的參考圖、紋理或筆觸：紙紋與顆粒都由程式產生，畫風檔只存數字。
+## 文件
+
+| | |
+|---|---|
+| [SKILL.md](skills/refinish/SKILL.md) | agent 依循的流程，以及每支腳本 |
+| [presets.md](skills/refinish/references/presets.md) | 全部 37 種完稿：各自需要什麼、怎麼準備、有哪些限制 |
+| [subject-file.md](skills/refinish/references/subject-file.md) | 部位、提示點，以及實測到的失敗情況 |
+| [adjusting.md](skills/refinish/references/adjusting.md) | 看起來不對時該改什麼 |
+| [cutout.md](skills/refinish/references/cutout.md) | 從場景摳出角色，再放回原位 |
+| [compositing.md](skills/refinish/references/compositing.md) | 背景、景深與光線包覆 |
+| [style-format.md](skills/refinish/references/style-format.md) | 撰寫或修改風格檔 |
+| [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 畫風與著作權，以及 Steam 和 pixiv 的要求 |
+
+文件本身以英文撰寫。
+
+## 參與貢獻
+
+歡迎用 [Issues](https://github.com/owoevan-dev/refinish-skill/issues) 回報問題或許願新的完稿方式。目前不接受外部的 pull request，原因與替代做法寫在 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 授權
 
-MIT
+[MIT](LICENSE)。上方圖片中的範例角色與街景，是為這份 README 用影像模型生成的；圖中所有完稿都是這個 skill 的輸出。

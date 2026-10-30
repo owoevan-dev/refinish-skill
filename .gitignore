@@ -12,6 +12,7 @@ evals/results/
 *.jpg
 *.webp
 !docs/**/*.png
+!docs/**/*.jpg
 !skills/refinish/evals/*/files/*.png
 !assets/brand/*.png
 

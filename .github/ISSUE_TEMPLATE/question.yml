@@ -1,0 +1,11 @@
+name: Question or idea
+description: How to do something, or an idea that is not a new style.
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question or idea
+      description: Say what you are trying to make and what you have tried.
+    validations:
+      required: true

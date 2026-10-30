@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: How to use the skill
+    url: https://github.com/owoevan-dev/refinish-skill/blob/main/skills/refinish/SKILL.md
+    about: The workflow, every script and where each reference is.
