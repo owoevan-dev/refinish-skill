@@ -24,7 +24,7 @@ Pull requests from outside the project are closed for now; only collaborators ca
 ## Running the tests
 
 ```bash
-pip install numpy scipy opencv-python-headless pillow pytest
+pip install numpy scipy opencv-python-headless pillow pyyaml pytest
 python -m pytest -q tests
 ```
 

@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install the dependencies
-        run: pip install numpy scipy opencv-python-headless pillow pytest
+        run: pip install numpy scipy opencv-python-headless pillow pyyaml pytest
       - name: Compile every script
         run: python -m py_compile skills/refinish/scripts/*.py tests/*.py
       - name: Run the tests

@@ -89,7 +89,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 
 ## How well it works
 
-Every change is tested on pictures the code has never seen. The code is frozen and the pass marks are written down before the pictures are opened, and a set that has been looked at is used for development only.
+The figures below come from runs on pictures the code had never seen. The code is frozen and the pass marks are written down before the pictures are opened, and a set that has been looked at is used for development only.
 
 - **Parts.** On two sets of new characters, parts drafted with an agent's hints were right for 39 of 41 within two rounds.
 - **All 37 finishes on 16 new characters** (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure:
@@ -171,4 +171,4 @@ Bug reports and requests for new finishes are welcome as [issues](https://github
 
 ## Licence
 
-[MIT](LICENSE). The sample character and the street in the pictures above were made with an image model for this README; every finish shown is this skill's output.
+[MIT](LICENSE). The sample character in the pictures above was made with an image model for this README; every finish shown is this skill's output.

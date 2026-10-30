@@ -5,7 +5,7 @@ __pycache__/
 
 # Eval workspaces and run outputs never belong in the repo
 *-workspace/
-evals/results/
+**/evals/results/
 
 # Pictures a user works on stay out of the repo; the eval cases' inputs are drawn by code and ship
 *.png

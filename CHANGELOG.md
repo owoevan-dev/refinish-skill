@@ -2,12 +2,9 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-10-30
 
 ### Added
-
-- **Brand**: a light and a dark version of the logo, the README showing the one that suits the reader's theme; the logo and the social preview are English only.
-- **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide and issue forms (issues are open, outside pull requests are not).
 
 - **Subjects**:
   - automatic parts for a figure (`auto_parts.py`): trapped-ball regions, the face and its eyes and mouth found in the skin, hint points and boxes grown by LazyBrush-style claiming, marker watershed and GrabCut, the box limit kept last;
@@ -15,7 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - hint points cut a region where its lines fail: a part's own shading edge counts for little, and the line art goes with the fill nearest it;
   - hint tools (`hints.py check | points | pick`);
   - what to try when the parts will not come right after two rounds (`references/subject-file.md`): one sentence from the person, fewer and larger parts, one part for a dense pattern, tight eye boxes and an `eyes` part for a missed iris, finishing only the parts that are right, a finish that needs no parts, a source that can be split; the READMEs say so in their limits;
-  - a colour-based subject for backgrounds (`scene_subject.py`) with guessed kinds, and advice on which styles suit a painted background (de-AI light; not the cel styles, which break its gradients into blotches); `check_input.py` tells a figure in a scene from a background on its own.
+  - a colour-based subject for backgrounds (`scene_subject.py`) with guessed kinds, and advice on which styles suit a painted background (de-AI light; not the cel styles, which break its gradients into blotches); `check_input.py` tells a figure in a scene from a background on its own;
   - a cut-out from a picture with a background (`cutout.py`): a rough outline with holes for the gaps it goes round, GrabCut deciding the edge within a band, local keep and drop points, a painted trimap, small holes only filled, the edge's colour taken from inside; the background written with the figure's place filled, for finishing apart and putting the figure back; doubts where the colours either side of the cut are close or an area well inside the outline went to the background.
 - **Engines**:
   - cel, paint, de-AI, duotone, pixel, manga tone, screen print, woodblock, wash (watercolour and ink) and pencil (an animator's key drawing);
@@ -40,7 +37,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Look checks** O7 to O9 on every engine's own result, the duotones included: a skin printed another colour, a box round the features, mottled darks.
 - **Adjusting guide** (`references/adjusting.md`): for each common problem, its cause, the setting that moves it, and how to check the change. The guide favours a setting chosen for the picture over a change to the scripts.
 - `auto_deblotch` (off by default): the broader reading of the shading, only for parts whose own cut comes out ragged and whose two tones lie close.
-
+- **Brand**: a light and a dark version of the logo, the README showing the one that suits the reader's theme; the logo and the social preview are English only; a plugin icon.
+- **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide, a security policy and issue forms (issues are open, outside pull requests are not).
 
 ### Known issues
 
@@ -62,7 +60,7 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
   - The woodblock styles leave a line inside a block printed nearly as dark as the sumi uncut (白抜き), so the paper shows along it.
   - Short flecks of fold stay dark in both; only lines of some length turn white.
 - The woodblock styles printed every dark part in sumi, a navy skirt or brown shoes like black cloth. Dark cloth with a colour now prints in its own pigment at full strength (indigo, brown, red); hair keeps the prints' sumi, and anything darker than the sumi itself still takes it.
-- A darker skin is no longer printed pale by the woodblock styles, nor left paper and broken into boxes by the manga screentone, nor turned to pale dots by the pop art.
+- The woodblock styles no longer print deep brown skin pale. Tan and olive skin under them, and darker skin under the screentone, are still open (above).
 - The features' boxes keep only the features: lightness counts half against the skin, and hair or cloth that runs into a box from outside is painted with its part.
 - Engines that lay one colour per piece:
   - a skin-coloured run of an accessory's part, grown from a rough box, goes back to the skin;
@@ -72,3 +70,5 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - Neon draws the face in paler, finer tubes instead of one glowing mass.
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.
+
+[0.1.0]: https://github.com/owoevan-dev/refinish-skill/releases/tag/v0.1.0

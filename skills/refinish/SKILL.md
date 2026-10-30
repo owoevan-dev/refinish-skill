@@ -1,9 +1,10 @@
 ---
 name: refinish
-description: Re-finishes an existing character picture or background in another art style by code, never by regenerating it: the drawing stays, only the finish changes. 37 bundled styles: TV anime cel and its heavy, bold-ink, film, night, sunset, pastel, 90s variants; a cleaner de-AI finish; duotone, sepia, cyanotype, risograph; watercolour, gouache, thick paint; manga screentone, key drawing, screen print; ink wash, woodblock, pop art, neon, stained glass, paper cut, charcoal, pastel, stickers; pixel sprites; landscapes. Also matches the finish of reference pictures by measurement, tweaks a style from words ("softer shadows"), relights for night or sunset, mixes finishes by part, and composites figures into scenes. Use it whenever the user wants a picture in a technique's style, an anime look, a less AI-looking finish, a manga, watercolour, woodblock, pixel or retro version, a night version, consistent sprites or a figure in a scene, even if they only say "make this look hand-drawn" or "it looks too AI".
+description: "Re-finishes an existing character picture or background in another style by code, never by regenerating it: the drawing stays, only the finish changes. 37 styles: TV anime cel and its heavy, bold-ink, film, night, sunset, pastel, 90s variants; a cleaner de-AI finish; duotone, sepia, cyanotype, risograph; watercolour, gouache, thick paint; manga screentone, key drawing, screen print; ink wash, woodblock, pop art, neon, stained glass, paper cut, charcoal, pastel, stickers; pixel sprites; landscapes. Also matches the finish of reference pictures by measurement, tweaks a style from words ('softer shadows'), relights for night or sunset, mixes finishes by part, cuts out figures and composites them into scenes. Use it whenever the user wants a picture in a technique's style, an anime look, a less AI-looking finish, a manga, watercolour, woodblock, pixel or retro version, a night version, consistent sprites or a figure in a scene, even if they only say 'make this look hand-drawn' or 'it looks too AI'."
 license: MIT
 compatibility: Python 3.10+ with numpy, opencv-python and scipy (Pillow optional, for reading PNG notes). No image model, no network, no GPU.
 metadata:
+  author: "owoevan-dev"
   version: "0.1.0"
 ---
 
@@ -19,7 +20,7 @@ What it can and cannot do (tell the user before starting):
 
 Copy this checklist and tick it off. Each step ends on its done-criterion.
 
-- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds.
+- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not, install them by their package names: `python -m pip install numpy scipy opencv-python`.
 - [ ] **1. Source**: `scripts/check_input.py` graded the picture; a figure is a cut-out (transparent background), or was cut out of its scene with `scripts/cutout.py`; below 2000 px tall it was enlarged with `scripts/prep.py`.
 - [ ] **2. Subject**: a subject file whose parts are right on the parts sheet (`scripts/auto_parts.py`, with a hints file for the cel, paint and print styles), or `scripts/scene_subject.py` for a background.
 - [ ] **3. Style**: chosen from [references/presets.md](references/presets.md) with the user, or written or measured (steps 7–8).

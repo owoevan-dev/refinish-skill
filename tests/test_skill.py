@@ -24,13 +24,17 @@ def run(script, *args):
 # ---------------------------------------------------------------------------------------------------------- packaging
 
 def test_skill_frontmatter():
+    yaml = pytest.importorskip("yaml")
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     assert m, "SKILL.md starts with a YAML frontmatter"
-    front = dict(re.findall(r"^(\w+): (.*)$", m.group(1), re.M))
+    # a strict parser, as the agents' skill loaders use: an unquoted value holding ": " does not load
+    front = yaml.safe_load(m.group(1))
     assert front["name"] == SKILL.name and re.fullmatch(r"[a-z0-9-]{1,64}", front["name"])
     assert 0 < len(front["description"]) <= 1024
     assert "<" not in front["description"] and ">" not in front["description"]
+    assert len(front.get("compatibility", "")) <= 500
+    assert all(isinstance(v, str) for v in front.get("metadata", {}).values())
     assert len(text.splitlines()) < 500
 
 
@@ -38,6 +42,8 @@ def test_plugin_manifest():
     pj = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     for path in pj["skills"]:
         assert (ROOT / path / "SKILL.md").is_file()
+    if "icon" in pj:
+        assert (ROOT / pj["icon"]).is_file()
 
 
 def test_references_linked_from_skill_exist():
