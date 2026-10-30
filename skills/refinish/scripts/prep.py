@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import die, emit, load_rgba, over, resize_premultiplied, save_rgba  # noqa: E402
+from _core import die, emit, load_rgba, over, resize_premultiplied, save_rgba, write_image  # noqa: E402
 
 
 def grid(bgr, step=100):
@@ -70,7 +70,7 @@ def main():
            "upscaled": a.scale}
     if a.grid:
         gp = str(Path(a.out).with_name(Path(a.out).stem + "_grid.jpg"))
-        cv2.imwrite(gp, grid(over(img, alpha)), [cv2.IMWRITE_JPEG_QUALITY, 90])
+        write_image(gp, grid(over(img, alpha)), [cv2.IMWRITE_JPEG_QUALITY, 90])
         res["grid"] = gp
     emit(res)
 

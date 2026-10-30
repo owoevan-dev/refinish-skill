@@ -8,13 +8,15 @@ publishing.
 
 - **United States:** 17 U.S.C. §102(b): copyright never extends to an idea, procedure, process, system, method of
   operation, concept or principle.
-- **Japan:** the Agency for Cultural Affairs' 2024 paper *General Understanding on AI and Copyright* (AIと著作権に関する
-  考え方について) treats a style of painting (作風・画風) as an idea, outside protection. An output infringes when it
-  shares another work's creative expression (similarity, 類似性) and relied on it (reliance, 依拠性): the usual test.
-  The paper has no legal force of its own.
+- **Japan:** the Agency for Cultural Affairs' 2024 paper *General Understanding on AI and Copyright in Japan*
+  (AIと著作権に関する考え方について) treats a style of painting (作風・画風) as an idea, outside protection. An output
+  infringes when it shares another work's creative expression (similarity, 類似性) and relied on it (reliance, 依拠性):
+  the usual test. The paper has no legal force of its own.
 - **Taiwan:** the Copyright Act (著作權法), §10-1, protects a work's expression only, not the ideas, concepts or
-  principles in it. The courts compare concrete features (the strokes' direction, the lines' waves and weights, the
-  layout); a shared concept or school of painting is not infringement on its own.
+  principles in it. In a 2024 ruling on a provisional measure, the Intellectual Property and Commercial Court compared
+  two one-stroke drawings by their concrete features (the strokes' direction; the lines' undulation, weight and
+  crossings; the layout) and doubted that sharing a concept ("one-stroke drawing") or a school's mood made them
+  substantially similar.
 
 What this skill measures and writes into a style file is the finish:
 - line darkness;
@@ -46,8 +48,8 @@ way to pass a generated picture off as hand-made, and they are not tuned against
 
 | platform | rule (as of October 2026) |
 |---|---|
-| Steam | the AI content disclosure on the store page covers **pre-generated** content that ships with the game or appears in its marketing (art, sound, text made with AI tools) and **live-generated** content made while the game runs (with its guardrails described). Tools used behind the scenes for efficiency need no disclosure. |
-| pixiv | a work made with generative AI is set as 「AI生成作品」 when posted; leaving it unset is a guideline violation, and AI works are not allowed on pixiv Requests or FANBOX. |
+| Steam | the content survey asks about AI used to make content that ships with the game for players (art, sound, narrative, localization): **pre-generated** content made with AI tools during development, and **live-generated** content made while the game runs, with the guardrails that keep it lawful. AI tools used only for efficiency are not what it asks about. The review compares the build and the store page with the answers. |
+| pixiv | a work in which all or most of the production process is carried out by AI is set as AI-generated (「AI生成作品」) when posted, whatever software was used. The guidelines' example includes a generated picture posted after light processing or changes, which covers a generated picture re-finished here. A setting that does not match the work breaks the guidelines, and pixiv may change it. pixiv Requests takes no AI-generated work (since 29 May 2023), and the pixivFANBOX terms prohibit content pixiv defines as AI-generated. |
 | others | itch.io, Booth, X and the major stores have their own tags and rules. Look them up for each release. |
 
 ## Metadata
@@ -61,9 +63,8 @@ signed Content Credentials signs its final assets with a C2PA tool of its own.
 
 ## Sources
 
-- U.S. Copyright Act, 17 U.S.C. §102(b).
-- Agency for Cultural Affairs, Japan: *General Understanding on AI and Copyright* (文化庁「AIと著作権に関する考え方について」, 2024).
-- Taiwan Copyright Act §10-1 (Laws & Regulations Database, 全國法規資料庫); Intellectual Property and Commercial Court,
-  ruling 113 Min-Zan-Zi No. 14 (智慧財產法院 113 年度民暫字第 14 號裁定, the one-stroke drawing case).
-- Steamworks documentation, content survey (AI disclosure).
-- pixiv guidelines and help on AI-generated works.
+- U.S. Copyright Act, [17 U.S.C. §102(b)](https://www.copyright.gov/title17/92chap1.html#102).
+- Agency for Cultural Affairs, Japan: 「[AIと著作権に関する考え方について](https://www.bunka.go.jp/seisaku/bunkashingikai/chosakuken/pdf/94037901_01.pdf)」 (15 March 2024), and its English overview, [*General Understanding on AI and Copyright in Japan*](https://www.bunka.go.jp/english/policy/copyright/pdf/94055801_01.pdf).
+- Taiwan: [Copyright Act §10-1](https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=J0070017&flno=10-1) (Laws & Regulations Database, 全國法規資料庫); Intellectual Property and Commercial Court, [ruling 113 Min-Zan-Zi No. 14](https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id=IPCV,113,%E6%B0%91%E6%9A%AB,14,20241231,1) (智慧財產及商業法院 113 年度民暫字第 14 號民事裁定, 31 December 2024, the one-stroke drawing case).
+- Steamworks documentation: [Content Survey](https://partner.steamgames.com/doc/gettingstarted/contentsurvey).
+- pixiv: [Guidelines](https://www.pixiv.net/terms/?page=guideline); Help Center, [What is AI-generated work?](https://www.pixiv.help/hc/en-us/articles/13276278766489) and [the AI-generated work settings in the request terms](https://www.pixiv.help/hc/en-us/articles/18935333107737); [pixivFANBOX Terms of Use](https://policies.pixiv.net/en.html#fanbox).

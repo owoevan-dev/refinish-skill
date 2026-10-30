@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, emit, load_rgba  # noqa: E402
+from _core import Units, emit, load_rgba, write_image  # noqa: E402
 from _parts import misfits, part_map  # noqa: E402
 from _style import load_subject, subject_path  # noqa: E402
 
@@ -34,7 +34,7 @@ def parts_path(sj):
 def build(sj):
     img, alpha = load_rgba(subject_path(sj, sj["image"]))
     parts = part_map(sj, img, alpha)
-    cv2.imwrite(str(parts_path(sj)), parts)
+    write_image(str(parts_path(sj)), parts)
     return img, alpha, parts
 
 
@@ -64,7 +64,7 @@ def review(sj, img, alpha, parts, out):
         cv2.rectangle(vis, (8, 8 + j * 22), (26, 24 + j * 22), tuple(int(v) for v in pal[j]), -1)
         cv2.putText(vis, p["name"], (32, 22 + j * 22), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1)
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(out), vis, [cv2.IMWRITE_JPEG_QUALITY, 88])
+    write_image(str(out), vis, [cv2.IMWRITE_JPEG_QUALITY, 88])
 
 
 def main():

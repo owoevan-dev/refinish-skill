@@ -19,7 +19,7 @@ picture can point at them.
 import cv2
 import numpy as np
 
-from _core import lab
+from _core import lab, write_image
 from _parts import misfits
 from _style import kind_of
 
@@ -440,4 +440,4 @@ def review(out_rgb, out_alpha, found, path):
     for i, f in enumerate(found[:60], start=1):
         cv2.putText(key, f"{i} {f['id']} {f['level']} {f['part']}"[:60], (8, 22 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
                     (30, 30, 30), 1)
-    cv2.imwrite(str(path), np.hstack([vis, key]), [cv2.IMWRITE_JPEG_QUALITY, 88])
+    write_image(str(path), np.hstack([vis, key]), [cv2.IMWRITE_JPEG_QUALITY, 88])

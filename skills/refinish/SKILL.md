@@ -76,7 +76,7 @@ Show the user two or three candidates on their own picture rather than describin
 python scripts/refinish.py subject.json styles/tv-cel.json out.png
 ```
 
-`--hour night|sunset|dusk|film-night` relights any style for another hour. The script prints JSON:
+`--hour night|sunset|dusk|film-night` relights a style for another hour; the pixel, sticker and neon styles change the picture's size and refuse it. The script prints JSON:
 - the style and engine;
 - what the same-material guard moved (pixels the part map put in the wrong part, given back to their material before painting);
 - the check:
@@ -173,7 +173,7 @@ A style file is numbers only: shadows, lines, palette, touches, texture, the eng
 
 ## Scripts
 
-All print JSON on stdout; exit code 0 means done, 1 done with doubts or failures to look at, 2 bad input.
+All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check's FAIL to look at; 2 bad input, or a request the script cannot take.
 
 | script | use |
 |---|---|
@@ -185,7 +185,7 @@ All print JSON on stdout; exit code 0 means done, 1 done with doubts or failures
 | `scene_subject.py IMAGE.png SUBJECT.json` | the subject file for a background |
 | `parts.py SUBJECT.json` | rebuild and check a part map |
 | `refinish.py SUBJECT.json STYLE.json OUT.png [--hour H]` | re-finish, with the guard and the checks |
-| `check_output.py SUBJECT.json OUT.png` | check a result on its own |
+| `check_output.py SUBJECT.json OUT.png [--style S]` | check a result on its own (with its style, as refinish.py does) |
 | `measure_style.py ...` | measure a finish, compare two measurements |
 | `fit_style.py SUBJECT.json REF.png ... --out STYLE.json` | fit a style to references |
 | `tweak_style.py STYLE.json OUT.json "words"` | change a style by words |

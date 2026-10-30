@@ -69,27 +69,47 @@ def bgr8_of(lab8_img):
 
 # ------------------------------------------------------------------------------------------------------------- files
 
+def unit_range(im):
+    """An 8- or 16-bit picture's values as float32 in 0..1."""
+    if im.dtype == np.uint8:
+        return im.astype(np.float32) / 255.0
+    if im.dtype == np.uint16:
+        return im.astype(np.float32) / 65535.0
+    die(f"pictures with {im.dtype} pixels are not read: save it as an 8- or 16-bit PNG")
+
+
 def load_rgba(path):
-    """A picture as (rgb 0..1, alpha 0..1). A picture without alpha is opaque."""
+    """A picture as (rgb 0..1, alpha 0..1), from 8 or 16 bits a channel. A picture without alpha is opaque."""
     im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if im is None:
         die(f"cannot read the image {path}")
     if im.ndim == 2:
         im = cv2.cvtColor(im, cv2.COLOR_GRAY2BGR)
     if im.shape[2] == 4:
-        alpha = im[..., 3].astype(np.float32) / 255.0
+        alpha = unit_range(im[..., 3])
         bgr = im[..., :3]
     else:
         alpha = np.ones(im.shape[:2], np.float32)
         bgr = im
-    return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0, alpha
+    return cv2.cvtColor(unit_range(bgr), cv2.COLOR_BGR2RGB), alpha
+
+
+def write_image(path, img, params=()):
+    """Write a picture, its folder made first. A picture that cannot be written stops the script: it never reports a
+    file that is not there."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ok = cv2.imwrite(str(path), img, list(params))
+    except cv2.error:
+        ok = False
+    if not ok:
+        die(f"cannot write {path}")
 
 
 def save_rgba(path, rgb_img, alpha):
     rgba = np.dstack([np.clip(rgb_img, 0, 1), np.clip(alpha, 0, 1)])
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    if not cv2.imwrite(str(path), cv2.cvtColor((rgba * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGBA2BGRA)):
-        die(f"cannot write {path}")
+    write_image(path, cv2.cvtColor((rgba * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGBA2BGRA))
 
 
 def over(rgb_img, alpha, bg=(228, 228, 228)):

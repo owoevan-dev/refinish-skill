@@ -33,12 +33,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Recipes**: `recipe.py` mixes finishes by part, kind or area (the face, the lines) with paint-program blend modes and opacity.
 - **Repairs**: `repair.py` fixes a source without restyling it: a cut-out's fringe, specks (dark dots only off a known face), line gaps (thinned, pruned, tips joined), colour run across a part's edge.
 - **Compositing**: `composite.py`, a camera pass over figures and a background (depth of field and bokeh in linear light, light wrap, a region grade, bloom, grain).
-- **Disclosure**: `png_note.py` writes a plain note into a PNG (tEXt, or iTXt for any language); a guide to style and copyright and to platform disclosure.
+- **Disclosure**: `png_note.py` writes a plain note into a PNG (tEXt, or iTXt for any language); a guide to style and copyright and to platform disclosure, with a link to each source.
 - **Look checks** O7 to O9 on every engine's own result, the duotones included: a skin printed another colour, a box round the features, mottled darks.
 - **Adjusting guide** (`references/adjusting.md`): for each common problem, its cause, the setting that moves it, and how to check the change. The guide favours a setting chosen for the picture over a change to the scripts.
 - `auto_deblotch` (off by default): the broader reading of the shading, only for parts whose own cut comes out ragged and whose two tones lie close.
 - **Brand**: a light and a dark version of the logo, the README showing the one that suits the reader's theme; the logo and the social preview are English only; a plugin icon.
-- **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide, a security policy and issue forms (issues are open, outside pull requests are not).
+- **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide, a security policy and issue forms (issues are open, outside pull requests are not); the licence also inside the skill's folder, which is often copied on its own.
 
 ### Known issues
 
@@ -54,6 +54,14 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 
 ### Fixed
 
+- Nothing fails in silence:
+  - `composite.py` makes the output's folder, and stops with an error when a picture cannot be written instead of reporting a file it never wrote; every script writes its pictures that way.
+  - `composite.py` lays a layer's own soft alpha as it is (a glow, a cast shadow, a half-opaque layer). Clearing an image model's faint halo is a choice per layer (`clear_halo`).
+  - `--hour`, and a style's post layers, are refused for the pixel, sticker and neon finishes, which change the picture's size, instead of being skipped.
+  - 16-bit pictures are read at their own depth instead of coming out white.
+  - `refinish.py` and `recipe.py` exit 1 when a check FAILs, as SKILL.md says. `check_output.py` and `recipe.py` run the look checks O7 to O9 too, the duotones in a recipe included, and `check_output.py --style` gives refinish.py's verdict.
+- The ink-wash mist was blended twice over. It is laid once, on the curve the two blends made, so the scenes look as they did by day; a night sky is no longer misted along its edges.
+- The checks guide no longer says that every real defect is caught: the nine known mistakes are, and new pictures show the checks' limits.
 - Black shapes that overlap no longer merge into one, as crossed legs in black tights did.
   - The cel finishes laid every line at one darkness, which nearly vanishes on black cloth or hair. A line is now always darker than the paint beside it (`lines.own.gap`, 9), so the finishes built on a cel base, stained glass among them, see it too.
   - Manga screentone draws the lines inside solid black in white (ホワイト), as a manga artist does.

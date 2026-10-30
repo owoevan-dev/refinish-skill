@@ -31,6 +31,7 @@ All sizes are pixels of the frame. Paths are relative to the scene file.
 | `layers[].blur` | that layer's own distance from the focus: 0 sharp, a near shoulder far out of focus 30 or more. Blurred with its alpha, so its silhouette softens too. |
 | `layers[].wrap` | light wrap: the light of what lies behind reaching a little way over the layer's edge (`wrap_width` px). 0.15 to 0.25 for a lit background; little or none against a dark one. |
 | `layers[].sharpen` | a fine unsharp mask on the lines only, for a cut-out enlarged a little (the flat paint stays smooth). |
+| `layers[].clear_halo` | `true` first clears an image model's faint halo round a cut-out: the alpha more than 4 px from the opaque figure. Off by default, since a layer's own soft alpha (a glow, a cast shadow, a half-opaque veil) is meant to show. |
 | `layers[].grade` | the same grade keys, on the layer alone (a figure warmed toward a fire). |
 | `camera.bokeh` | the aperture's shape (`disk`, or `polygon` with `blades` and `rotation`), and how far the brightest lights are pushed above white before the blur (`hot` times, from `knee`), so they open into bright discs instead of grey smears. |
 | `camera.bloom` | a soft glow round the frame's brightest lights. |

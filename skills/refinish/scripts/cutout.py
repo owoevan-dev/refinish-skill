@@ -52,7 +52,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import die, emit, load_rgba, save_rgba  # noqa: E402
+from _core import die, emit, load_rgba, save_rgba, write_image  # noqa: E402
 from _lines import meanshift  # noqa: E402
 from auto_parts import disk, nearest  # noqa: E402
 
@@ -145,7 +145,7 @@ def review(img, out_dir, rough, fig, alpha, doubts):
         col = np.pad(col, ((0, H - col.shape[0]), (0, 0), (0, 0)), constant_values=255)
         row = np.hstack([row, gap, col])
     path = out_dir / "review.jpg"
-    cv2.imwrite(str(path), cv2.cvtColor(row, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 88])
+    write_image(str(path), cv2.cvtColor(row, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 88])
     return path
 
 

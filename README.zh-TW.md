@@ -89,7 +89,7 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 
 ## 實際表現
 
-下面的數字來自程式沒看過的圖：開圖前先凍結程式、寫好合格標準；看過的圖之後只用於開發。
+下面的數字來自專案自己的測試，用的是程式沒看過的圖（這些圖不在 repo 裡）：開圖前先凍結程式、寫好合格標準；看過的圖之後只用於開發。
 
 - **部位。** 在兩組新角色上，搭配 agent 的提示點，41 張中有 39 張在兩輪內每個部位都正確。
 - **37 種完稿套用在 16 個新角色上**（10 個膚色較深，4 個是柔和的噴槍上色），21 種完稿通過所有量測：
@@ -173,4 +173,4 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 
 ## 授權
 
-[MIT](LICENSE)。上方圖片中的範例角色，是為這份 README 用影像模型生成的；圖中所有完稿都是這個 skill 的輸出。
+[MIT](LICENSE)。上方圖片中的範例角色，是為這份 README 用影像模型生成的；圖中所有完稿都是這個 skill 的輸出。skill 的 `evals` 資料夾裡的測試圖是程式畫的；標誌的字是 Noto Serif TC（SIL Open Font License）轉成的外框。

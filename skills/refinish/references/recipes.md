@@ -113,8 +113,8 @@ colour as it is.
 
 ## Gotchas
 
-- The checks run on each finish, not on the mix. A mix inherits the mistakes of its finishes: fix the subject file,
-  not the recipe.
+- The checks run on each finish, not on the mix, and a FAIL in any of them makes `recipe.py` exit 1. A mix inherits
+  the mistakes of its finishes: fix the subject file, not the recipe.
 - Two finishes with different lines (a cel's coloured trace, a watercolour's faint pencil) meet at the mask's
   edge. Mask by whole parts, so the seam falls on a drawn line; a `feather` of 1 to 3 u hides the rest.
 - `opacity` below 1 over a finish with other lines doubles the lines faintly. To mix two looks everywhere, prefer

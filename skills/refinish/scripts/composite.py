@@ -16,15 +16,17 @@ SCENE.json (paths relative to it):
                   "grade": {"chroma": 0.55, "lift": 0.0, "regions": [{"hue": [200, 290], "chroma_min": 8,
                             "L": 8.0}, {"rest": true, "L": 18.0}]}},
    "layers": [{"image": "figure.png", "place": [x0, y_bottom, scale], "blur": 0.0, "wrap": 0.22,
-               "sharpen": 0.0, "grade": {...}}],
+               "sharpen": 0.0, "grade": {...}, "clear_halo": false}],
    "camera": {"bokeh": {"shape": "disk", "hot": 3.0, "knee": 0.75}, "bloom": {"threshold": 0.72,
               "radius": 14.0, "amount": 0.25}, "vignette": 0.0, "grain": 0.006}}
 
 Everything is in pixels of the frame. Layers are listed back to front; each layer's `blur` is its own distance from
 the focus (0 sharp, a foreground shoulder far out of focus 30 or more). The background is resized to cover the frame
 (`zoom` > 1 crops in, a longer lens: everything behind the figure larger and closer). --raw lays the layers on the
-background with nothing else, the plain paste-up, to compare with.
+background with nothing else, the plain paste-up, to compare with. A layer's alpha is used as it is; `clear_halo`
+first clears a generator's faint halo (alpha more than 4 px from the opaque figure) on a cut-out that has one.
 Prints JSON: the output and what each grade did.
+Exit codes: 0 done, 2 bad input or an output that cannot be written.
 """
 import argparse
 import json
@@ -35,7 +37,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import emit, lab, rgb  # noqa: E402
+from _core import die, emit, lab, rgb, unit_range, write_image  # noqa: E402
 
 
 def to_lin(c):
@@ -145,15 +147,17 @@ def bloom(img, threshold=0.72, radius=14.0, amount=0.25):
     return np.clip(to_srgb(lin + cv2.GaussianBlur(hi, (0, 0), radius) * amount), 0, 1)
 
 
-def load_layer(path, place, W, H):
-    """A cut-out (RGBA) placed on the frame: [x0, y_bottom, scale]. The generator's faint halo (alpha far from the
-    figure) is cleared first."""
+def load_layer(path, place, W, H, clear_halo=False):
+    """A cut-out (RGBA, 8 or 16 bits) placed on the frame: [x0, y_bottom, scale]. Its alpha is used as it is (a glow,
+    a cast shadow, a half-opaque veil); `clear_halo` first clears a generator's faint halo, the alpha more than 4 px
+    from the opaque figure."""
     fig = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if fig is None or fig.ndim < 3 or fig.shape[2] != 4:
-        raise ValueError(f"{path}: a layer must be an RGBA cut-out")
-    fa = fig[..., 3].astype(np.float32) / 255.0
-    fa[cv2.dilate((fa > 0.8).astype(np.uint8), np.ones((9, 9), np.uint8)) == 0] = 0
-    fr = cv2.cvtColor(fig[..., :3], cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        die(f"{path}: a layer must be an RGBA cut-out")
+    fa = unit_range(fig[..., 3])
+    if clear_halo:
+        fa[cv2.dilate((fa > 0.8).astype(np.uint8), np.ones((9, 9), np.uint8)) == 0] = 0
+    fr = cv2.cvtColor(unit_range(fig[..., :3]), cv2.COLOR_BGR2RGB)
     x0, yb, s = (float(v) for v in place)
     w2, h2 = max(1, int(round(fig.shape[1] * s))), max(1, int(round(fig.shape[0] * s)))
     interp = cv2.INTER_AREA if s < 1 else cv2.INTER_LANCZOS4
@@ -190,7 +194,7 @@ def main():
     bk = sc.get("background", {})
     bg = cv2.imread(str(sp.parent / bk["image"]), cv2.IMREAD_COLOR)
     if bg is None:
-        raise SystemExit(f"cannot read the background {bk['image']}")
+        die(f"cannot read the background {bk['image']}")
     bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     z = bk.get("zoom", 1.0)
     if z > 1:
@@ -207,7 +211,7 @@ def main():
         bg = lens_blur(bg, bk.get("blur", 0.0), bokeh=cam.get("bokeh"))
     out = bg.copy()
     for i, ly in enumerate(sc.get("layers", [])):
-        fr, fa = load_layer(sp.parent / ly["image"], ly["place"], W, H)
+        fr, fa = load_layer(sp.parent / ly["image"], ly["place"], W, H, ly.get("clear_halo", False))
         if a.raw:
             out = out * (1 - fa[..., None]) + fr * fa[..., None]
             continue
@@ -240,7 +244,7 @@ def main():
             rng = np.random.default_rng(cam.get("seed", 11))
             g = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 0.6) * gr
             out = out + g[..., None]
-    cv2.imwrite(a.out, cv2.cvtColor((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR))
+    write_image(a.out, cv2.cvtColor((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR))
     emit({"out": a.out, "frame": [W, H], **report})
 
 

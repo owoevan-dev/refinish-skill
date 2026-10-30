@@ -30,7 +30,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import die, emit, lab, load_rgba  # noqa: E402
+from _core import die, emit, lab, load_rgba, write_image  # noqa: E402
 
 KINDS = ("sky", "far", "water", "foliage", "ground", "wood", "roof", "stone", "wall", "cloth")
 
@@ -192,7 +192,7 @@ def main():
     rp = sub_path.with_name(f"{sub_path.stem}.regions.png")
     if n > 65535:
         die("more than 65535 areas: raise the floor with --detail below 1")
-    cv2.imwrite(str(rp), full.astype(np.uint16))
+    write_image(str(rp), full.astype(np.uint16))
     try:
         image_rel = os.path.relpath(Path(a.image).resolve(), sub_path.resolve().parent).replace("\\", "/")
     except ValueError:

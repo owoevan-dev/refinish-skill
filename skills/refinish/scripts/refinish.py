@@ -21,11 +21,13 @@ inks; pixel, tone (manga screentone), print (screen print), woodblock, wash
 (watercolour and ink wash), pencil (an animator's key drawing), sticker (a die-cut sticker, the picture grown by its
 border), pop (pop art in Ben-Day dots), neon (glowing tubes, the picture grown by the glow), glass (stained glass), papercut (layers of cut
 paper) and drawing (charcoal or soft pastel) start from a cel finish of it, the style's `base`. The style's `post` layers (references/style-format.md) are laid over the result; --hour adds the
-light of another hour to any style. A cel or paint result in the day's light is checked for the mistakes a reviewer
-looks for first (scripts/check_output.py; --no-check skips it); an engine built on a cel finish has that finish
-checked; the de-AI engine has its own check (H1).
+light of another hour to any style that keeps the picture's size (pixel, sticker and neon change it, and refuse both).
+A cel or paint result in the day's light is checked for the mistakes a reviewer looks for first
+(scripts/check_output.py; --no-check skips it); an engine built on a cel finish has that finish checked; the de-AI
+engine has its own check (H1); every engine's own result has the look checks O7 to O9.
 Prints JSON: the output, the engine, the unit's size in pixels and the engine's own report.
-Exit codes: 0 done, 2 bad input.
+Exit codes: 0 done, the checks passed or only warn; 1 done, with a FAIL to look at; 2 bad input, or a request the style
+cannot take.
 """
 import argparse
 import sys
@@ -35,11 +37,12 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, emit, save_rgba  # noqa: E402
+from _core import Units, die, emit, save_rgba  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
 from parts import load_or_build  # noqa: E402
 
 CHECKED = ("cel", "paint")                         # the engines whose results the checks were made for
+RESIZING = ("pixel", "sticker", "neon")            # the engines whose result is not the picture's size
 
 
 def finish(sj, st, img, alpha, parts, U, a):
@@ -85,6 +88,35 @@ def finish(sj, st, img, alpha, parts, U, a):
     return out, info.pop("alpha", alpha), {**info, "_cel": cel}
 
 
+def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base):
+    """The checks on one finish, the same for refinish.py and recipe.py: (findings, what they read, the picture and
+    alpha to box them on).
+    - cel and paint: the result against the source;
+    - an engine built on a cel finish: that finish (a part painted in another's colour stays wrong in every print or
+      wash made from it);
+    - de-AI: its own colour-shift check (H1);
+    and on every engine's own result, the duotones too, the look checks O7 to O9."""
+    from _check import look_checks
+    from check_output import run_checks
+    engine = st["engine"]
+    if engine == "deai":
+        import _deai
+        found = _deai.check(img, alpha, engine_out, U, sj.get("upscaled", 1), st.get("deai", {}).get("chroma", 1.0))
+        on, shown = None, (engine_out, out_alpha)
+    elif engine in CHECKED:
+        found = run_checks(sj, img, alpha, parts, engine_out, out_alpha)
+        on, shown = None, (engine_out, out_alpha)
+    elif cel_base is not None:
+        found = run_checks(sj, img, alpha, parts, cel_base, alpha)
+        on, shown = "the cel base (style '%s'); O7 to O9 on the result" % st.get("base", "tv-cel"), (cel_base, alpha)
+    else:
+        found, on = [], "the result: O7 to O9 only"
+        shown = (engine_out if engine_out.shape[:2] == alpha.shape else np.zeros(alpha.shape + (3,), np.float32), alpha)
+    # the engine's own look on its own result: the skin, boxes round the features, mottled darks (O7 to O9)
+    found += look_checks(sj, img, alpha, parts, engine_out, U, engine)
+    return found, on, shown
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1], formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("subject")
@@ -99,6 +131,9 @@ def main():
     t0 = time.time()
     sj = load_subject(a.subject)
     st = load_style(resolve_style(a.style))
+    if st["engine"] in RESIZING and (a.hour or st.get("post")):
+        die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
+            "relight a style that keeps the size, or leave --hour out")
     img, alpha, parts = load_or_build(sj)
     U = Units(alpha, sj.get("head_px"))
     guard = {}
@@ -111,7 +146,9 @@ def main():
     cel_base = info.pop("_cel", None)               # the cel finish under a print, wash, pixel or pencil engine
     engine_out = out                                # what the checks look at: the finish before the layers over it
     post = list(st.get("post", [])) + ([{"op": "relight", "hour": a.hour}] if a.hour else [])
-    if post and out_alpha.shape == alpha.shape:
+    if post:
+        if out_alpha.shape != alpha.shape:
+            die(f"the {st['engine']} finish changed the picture's size: its post layers cannot be laid over it")
         import _post
         out = _post.apply(post, out, out_alpha, parts, sj, U, seed=st.get("seed", 7))
     save_rgba(a.out, out, out_alpha)
@@ -122,54 +159,22 @@ def main():
                         encoding="utf-8")
         info.update({"palette": str(hexp), "colours": len(pal)})
     check = {}
-    if not a.no_check and st["engine"] in CHECKED + ("deai",):
-        from _check import look_checks, review, verdict
-        if st["engine"] == "deai":
-            import _deai
-            found = _deai.check(img, alpha, engine_out, U, sj.get("upscaled", 1),
-                                st.get("deai", {}).get("chroma", 1.0))
-        else:
-            from check_output import run_checks
-            found = run_checks(sj, img, alpha, parts, engine_out, out_alpha)
-        found += look_checks(sj, img, alpha, parts, engine_out, U, st["engine"])
+    if not a.no_check:
+        from _check import review, verdict
+        found, on, shown = run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base)
         rv = Path(a.out).with_suffix(".check.jpg")
-        review(engine_out, out_alpha, found, rv)
-        check = {"check": {"verdict": verdict(found), "fail": sum(f["level"] == "FAIL" for f in found),
-                           "warn": sum(f["level"] == "WARN" for f in found), "review": str(rv),
-                           "findings": [f"{f['id']} {f['level']} {f['part']}: {f['what']} at {f['box']}"
-                                        for f in found]}}
-    elif not a.no_check and cel_base is not None:
-        # an engine built on a cel finish: the part-map and paint checks run on that finish, where the mistakes they
-        # look for are made (a part painted in another's colour stays wrong in every print or wash made from it)
-        from _check import look_checks, review, verdict
-        from check_output import run_checks
-        found = run_checks(sj, img, alpha, parts, cel_base, alpha)
-        # the engine's own look on its own result: the skin, boxes round the features, mottled darks (O7 to O9)
-        found += look_checks(sj, img, alpha, parts, engine_out, U, st["engine"])
-        rv = Path(a.out).with_suffix(".check.jpg")
-        review(cel_base, alpha, found, rv)
-        check = {"check": {"verdict": verdict(found), "on": "the cel base (style '%s'); O7 to O9 on the result"
-                                                            % st.get("base", "tv-cel"),
-                           "fail": sum(f["level"] == "FAIL" for f in found),
-                           "warn": sum(f["level"] == "WARN" for f in found), "review": str(rv),
-                           "findings": [f"{f['id']} {f['level']} {f['part']}: {f['what']} at {f['box']}"
-                                        for f in found],
-                           "note": "beyond O7 to O9 the engine's own look is not measured: look at the result too"}}
-    elif not a.no_check:
-        # an engine with no parts of its own (the duotones): the look checks only, on the result
-        from _check import look_checks, review, verdict
-        found = look_checks(sj, img, alpha, parts, engine_out, U, st["engine"])
-        rv = Path(a.out).with_suffix(".check.jpg")
-        review(engine_out if engine_out.shape[:2] == alpha.shape else np.zeros(alpha.shape + (3,), np.float32),
-               alpha, found, rv)
-        check = {"check": {"verdict": verdict(found), "on": "the result: O7 to O9 only",
+        review(*shown, found, rv)
+        check = {"check": {"verdict": verdict(found), **({"on": on} if on else {}),
                            "fail": sum(f["level"] == "FAIL" for f in found),
                            "warn": sum(f["level"] == "WARN" for f in found), "review": str(rv),
                            "findings": [f"{f['id']} {f['level']} {f['part']}: {f['what']} at {f['box']}"
                                         for f in found]}}
+        if cel_base is not None:
+            check["check"]["note"] = "beyond O7 to O9 the engine's own look is not measured: look at the result too"
     emit({"out": a.out, "engine": st["engine"], "style": st.get("id", Path(a.style).stem),
           "px_per_unit": round(U.px, 3), "seconds": round(time.time() - t0, 1), **check,
           **{k: v for k, v in info.items() if not isinstance(v, np.ndarray)}})
+    sys.exit(1 if check.get("check", {}).get("verdict") == "fail" else 0)
 
 
 if __name__ == "__main__":

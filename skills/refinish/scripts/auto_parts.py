@@ -38,7 +38,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, die, emit, lab, load_rgba, over  # noqa: E402
+from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
 REGIONS_FORMAT = 1
@@ -1424,7 +1424,7 @@ def parts_sheet(img, alpha, reg, parts, path, fig_area):
         row = tiles[i:i + per]
         row += [np.full_like(tiles[0], 255)] * (per - len(row))
         rows.append(np.hstack([np.pad(t, ((0, 8), (0, 8), (0, 0)), constant_values=255) for t in row]))
-    cv2.imwrite(str(path), np.vstack(rows), [cv2.IMWRITE_JPEG_QUALITY, 88])
+    write_image(str(path), np.vstack(rows), [cv2.IMWRITE_JPEG_QUALITY, 88])
 
 
 def review(img, alpha, reg, parts, path, face_path, boxes, face_box):
@@ -1472,7 +1472,7 @@ def review(img, alpha, reg, parts, path, face_path, boxes, face_box):
                     (30, 30, 30), 1)
     small = np.vstack([small, np.full((legend.shape[0] - small.shape[0], small.shape[1], 3), 255, np.uint8)]) \
         if legend.shape[0] > small.shape[0] else small
-    cv2.imwrite(str(path), np.hstack([small, legend[:small.shape[0]]]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+    write_image(str(path), np.hstack([small, legend[:small.shape[0]]]), [cv2.IMWRITE_JPEG_QUALITY, 90])
     if face_box:
         x0, y0, x1, y1 = pad_box(face_box, 0.25, 10, h, w)
         z = min(4.0, 1400.0 / max(1, max(x1 - x0, y1 - y0)))
@@ -1481,7 +1481,7 @@ def review(img, alpha, reg, parts, path, face_path, boxes, face_box):
         numbers(crop, z, x0, y0, 120, 0.5)
         grid(src, z, x0, y0, 50 if (x1 - x0) <= 800 else 100)
         grid(crop, z, x0, y0, 50 if (x1 - x0) <= 800 else 100)
-        cv2.imwrite(str(face_path), np.hstack([src, crop]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+        write_image(str(face_path), np.hstack([src, crop]), [cv2.IMWRITE_JPEG_QUALITY, 90])
 
 
 def grid(canvas, scale, ox, oy, step):
@@ -1889,7 +1889,7 @@ def main():
     rp = sub_path.with_name(f"{stem}.regions.png")
     if n > 65535:
         die("more than 65535 regions: the picture is too noisy for automatic parts")
-    cv2.imwrite(str(rp), reg.astype(np.uint16))
+    write_image(str(rp), reg.astype(np.uint16))
     try:
         image_rel = os.path.relpath(Path(a.image).resolve(), sub_path.resolve().parent).replace("\\", "/")
     except ValueError:

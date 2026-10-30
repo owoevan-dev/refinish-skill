@@ -46,6 +46,11 @@ def test_plugin_manifest():
         assert (ROOT / pj["icon"]).is_file()
 
 
+def test_skill_folder_carries_the_licence():
+    """The skill is often copied on its own, without the repository round it: its folder keeps the licence."""
+    assert (SKILL / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")
+
+
 def test_references_linked_from_skill_exist():
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for rel in set(re.findall(r"\]\((references/[^)#]+)\)", text)):
@@ -414,3 +419,74 @@ def test_cutout(tmp_path):
     bg = cv2.imread(str(tmp_path / "hole" / "background.png")).astype(np.float32)
     inside = cv2.erode(truth.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
     assert np.abs(bg[inside] - wall).mean() < 20                      # the figure's place filled with the wall
+
+
+# ------------------------------------------------------------------------------- nothing done, or skipped, in silence
+
+def test_sixteen_bit_png(tmp_path):
+    """A 16-bit picture is read at its own depth (it once came out white: its values divided by 255)."""
+    from _core import load_rgba
+    im = np.zeros((4, 4, 4), np.uint16)
+    im[..., :3], im[..., 3] = 32768, 65535
+    cv2.imwrite(str(tmp_path / "sixteen.png"), im)
+    rgb_, a_ = load_rgba(tmp_path / "sixteen.png")
+    assert abs(float(rgb_[0, 0, 0]) - 0.5) < 0.01 and abs(float(a_[0, 0]) - 1.0) < 1e-6
+
+
+def test_composite_keeps_alpha_and_reports_writes(tmp_path):
+    """A half-opaque layer is laid at half (a glow or a shadow must not vanish), the output's folder is made, and a file
+    that cannot be written is an error, never a reported success."""
+    cv2.imwrite(str(tmp_path / "bg.png"), np.full((100, 200, 3), 200, np.uint8))
+    lay = np.zeros((100, 100, 4), np.uint8)
+    lay[..., 2], lay[..., 3] = 255, 128
+    cv2.imwrite(str(tmp_path / "half.png"), lay)
+    scene = {"frame": [200, 100], "background": {"image": "bg.png"},
+             "layers": [{"image": "half.png", "place": [50, 100, 1.0]}]}
+    (tmp_path / "scene.json").write_text(json.dumps(scene), encoding="utf-8")
+    out = tmp_path / "new" / "frame.png"
+    r, _ = run("composite.py", tmp_path / "scene.json", out, "--raw")
+    assert r.returncode == 0 and out.is_file(), r.stderr[-300:]
+    b, g, red = (int(v) for v in cv2.imread(str(out))[50, 100])
+    assert abs(red - 228) <= 3 and abs(g - 100) <= 3 and abs(b - 100) <= 3
+    # asked for, a generator's faint halo is cleared: here the whole layer, which has no opaque figure
+    scene["layers"][0]["clear_halo"] = True
+    (tmp_path / "scene.json").write_text(json.dumps(scene), encoding="utf-8")
+    r, _ = run("composite.py", tmp_path / "scene.json", tmp_path / "cleared.png", "--raw")
+    assert tuple(int(v) for v in cv2.imread(str(tmp_path / "cleared.png"))[50, 100]) == (200, 200, 200)
+    r, _ = run("composite.py", tmp_path / "scene.json", tmp_path / "frame.unknown")
+    assert r.returncode == 2 and not (tmp_path / "frame.unknown").exists()
+
+
+def test_mist_laid_once():
+    """The mist follows the curve style-format.md gives, 1 - (1 - k)²: `amount` 0.5 leaves a day sky 0.75 paper (a
+    plain blend would give 0.5, a second blend over the curve 0.9375)."""
+    import _texture as tx
+    from _core import Units
+    from _scene import mist
+    h, w = 200, 300
+    parts = np.full((h, w), 2, np.int32)
+    parts[:100] = 1
+    subject = {"parts": [{"name": "sky", "kind": "sky"}, {"name": "ground", "kind": "ground"}]}
+    img = np.full((h, w, 3), 0.6, np.float32)
+    out = mist(img, parts, subject, Units(np.ones((h, w), np.float32)), {"amount": 0.5, "bands": 0.0})
+    paper = np.asarray(tx.sheet_rgb("xuan"), np.float32)
+    k = float(np.mean((out[40, 150] - img[40, 150]) / (paper - img[40, 150])))
+    assert abs(k - 0.75) < 0.02, k
+
+
+def test_hour_refused_where_the_size_changes(draft, tmp_path):
+    """The pixel, sticker and neon finishes change the picture's size: --hour is refused, not skipped."""
+    for style in ("pixel-character", "sticker", "neon-sign"):
+        out = tmp_path / f"{style}.png"
+        r, _ = run("refinish.py", draft, style, out, "--hour", "night")
+        assert r.returncode == 2 and "--hour" in r.stderr and not out.exists(), (style, r.stderr[-300:])
+
+
+def test_exit_codes_follow_the_checks(draft, tmp_path):
+    """refinish.py exits 1 on a FAIL, as SKILL.md says, and check_output.py --style gives the same verdict."""
+    for style in ("pop-art-dots", "duotone-navy"):
+        out = tmp_path / f"{style}.png"
+        r, d = run("refinish.py", draft, style, out)
+        assert r.returncode == (1 if d["check"]["verdict"] == "fail" else 0), (style, d["check"])
+        r2, d2 = run("check_output.py", draft, out, "--style", style)
+        assert (r2.returncode, d2["verdict"]) == (r.returncode, d["check"]["verdict"]), (style, d2["verdict"])

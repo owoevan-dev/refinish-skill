@@ -20,7 +20,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import die, emit, load_rgba, over  # noqa: E402
+from _core import die, emit, load_rgba, over, write_image  # noqa: E402
 
 
 def main():
@@ -51,7 +51,7 @@ def main():
         cv2.line(crop, (0, py), (crop.shape[1] - 1, py), (60, 60, 255), 1)
         cv2.putText(crop, str(y), (2, py - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 200), 1)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(a.out, crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    write_image(a.out, crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
     emit({"out": a.out, "box": [x0, y0, x1, y1], "enlarged": round(z, 3)})
 
 

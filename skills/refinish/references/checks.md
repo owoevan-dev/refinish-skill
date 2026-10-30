@@ -1,8 +1,8 @@
 # Checks on a finished picture
 
-`scripts/refinish.py` checks every picture it writes. To check one again on its own: `scripts/check_output.py subject.json out.png`.
+`scripts/refinish.py` checks every picture it writes. To check one again on its own: `scripts/check_output.py subject.json out.png --style STYLE` (with the style named, the same checks and the same verdict as refinish.py gives it).
 
-- **Report**: JSON with a verdict (`pass`, `warn` or `fail`) and the findings. Each finding has its check, its part, a box and what to do.
+- **Report**: JSON with a verdict (`pass`, `warn` or `fail`) and the findings. Each finding has its check, its part, a box and what to do. A `fail` makes the script exit 1.
 - **Review picture**: `<out>.check.jpg` shows the result with each finding boxed and numbered (red for FAIL, orange for WARN).
 - **What to do**: fix every FAIL before the picture is used, and look at each WARN.
 
@@ -40,7 +40,7 @@
 
 ## How the checks were tested (2026-10-29)
 
-**Every real defect is caught.** Nine mistakes met while building the styles were made again, and every one was caught by the check meant for it:
+**The known mistakes are caught.** Nine mistakes met while building the styles were made again, and each was caught by the check meant for it:
 - the neck painted gold;
 - a lock of hair painted as the jacket;
 - keyholes painted gold;
@@ -52,6 +52,8 @@
 - an outline along a frame cut.
 
 Some were reproduced by undoing their fix and re-finishing. Others were put into a good result directly.
+
+**New pictures show their limits.** On 16 characters the checks had never seen, O7 flagged 1 of 57 skins printed the wrong colour and O8 8 of 15 boxes round the features, with no false alarms (CHANGELOG, Known issues). A pass is not a sign-off: look at every result (SKILL.md, step 5).
 
 **Good work passes.** Four accepted results gave no FAIL:
 - a bold-ink TV cel;

@@ -18,9 +18,9 @@ RECIPE.json (references/recipes.md):
 `base` and each layer's `style` are a bundled style's id, a style file's path, or "source" (the picture as it is).
 `where` names parts, kinds or areas (face, eyes, mouth, features, lines, outline, figure), or is
 {"only": [...], "not": [...], "box": [x0, y0, x1, y1]}; every layer's edge is feathered (`feather`, u, 1.5).
-Every finish is rendered once, with the guard and the checks refinish.py gives it.
+Every finish is rendered once, with the guard and the checks refinish.py gives it (the look checks O7 to O9 included).
 Prints JSON: the output, each finish and its check's verdict, and each layer's share of the figure.
-Exit codes: 0 done, 2 bad input.
+Exit codes: 0 done; 1 done, with a FAIL in a finish's checks to look at; 2 bad input.
 """
 import argparse
 import json
@@ -49,7 +49,7 @@ def render(ref, sj, img, alpha, parts, U, check):
     """One finish of the picture, as refinish.py makes it: (RGB, alpha, record)."""
     if ref == "source":
         return img, alpha, {"style": "source"}
-    from refinish import CHECKED, finish
+    from refinish import finish
     st = load_style(resolve_style(ref))
     if st["engine"] == "pixel":
         die(f"'{ref}' is a pixel sprite, a picture of another size: it cannot be mixed")
@@ -64,19 +64,15 @@ def render(ref, sj, img, alpha, parts, U, check):
         import _post
         out = _post.apply(st["post"], out, out_alpha, parts_g, sj_g, U, seed=st.get("seed", 7))
     rec = {"style": st.get("id", str(ref)), "engine": st["engine"]}
-    if check and (st["engine"] in CHECKED + ("deai",) or cel is not None):
+    if check:
         from _check import verdict
-        if st["engine"] == "deai":
-            import _deai
-            found = _deai.check(img, alpha, engine_out, U, sj.get("upscaled", 1), st.get("deai", {}).get("chroma", 1.0))
-        else:
-            from check_output import run_checks
-            found = run_checks(sj_g, img, alpha, parts_g, engine_out if cel is None else cel, out_alpha)
+        from refinish import run_finish_checks
+        found, on, _ = run_finish_checks(sj_g, st, img, alpha, parts_g, U, engine_out, out_alpha, cel)
         rec["check"] = {"verdict": verdict(found), "fail": sum(f["level"] == "FAIL" for f in found),
                         "findings": [f"{f['id']} {f['level']} {f['part']}: {f['what']} at {f['box']}"
                                      for f in found if f["level"] == "FAIL"][:5]}
-        if cel is not None:
-            rec["check"]["on"] = f"the cel base (style '{st.get('base', 'tv-cel')}')"
+        if on:
+            rec["check"]["on"] = on
     return out, out_alpha, rec
 
 
@@ -241,6 +237,7 @@ def main():
         mix = _post.apply(post, np.clip(mix, 0, 1), mix_alpha, parts, sj, U, seed=rc.get("seed", 7))
     save_rgba(a.out, np.clip(mix, 0, 1), mix_alpha)
     emit({"out": a.out, "finishes": records, "layers": covered, "seconds": round(time.time() - t0, 1)})
+    sys.exit(1 if any(r.get("check", {}).get("verdict") == "fail" for r in records) else 0)
 
 
 if __name__ == "__main__":

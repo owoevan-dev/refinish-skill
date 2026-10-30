@@ -32,7 +32,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, die, emit, lab, load_rgba, over, rgb, save_rgba  # noqa: E402
+from _core import Units, die, emit, lab, load_rgba, over, rgb, save_rgba, write_image  # noqa: E402
 
 REPAIRS = ("halo", "specks", "lines", "bleed")
 
@@ -407,7 +407,7 @@ def main():
             if m is not None and m.any():
                 edge = cv2.dilate(m.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
                 view[edge & ~m] = view[edge & ~m] * 0.3 + np.array(col, np.float32) * 0.7
-        cv2.imwrite(str(rv), view.astype(np.uint8), [cv2.IMWRITE_JPEG_QUALITY, 90])
+        write_image(str(rv), view.astype(np.uint8), [cv2.IMWRITE_JPEG_QUALITY, 90])
         res.update({"out": a.out, "review": str(rv)})
     emit(res)
 

@@ -7,7 +7,8 @@ scene's kinds (scripts/scene_subject.py: sky, far, water, foliage, ground, ...) 
         `horizon` [L, a, b] adds a second gradation rising from the horizon (a sunset's red)
   {"op": "mist", "amount": 0.75, "bands": 0.5, "paper": "xuan"}
         an ink painting's distance (留白 and 遠近): the sky left as paper, the far hills faded toward it, everything
-        fading with height in the picture, and soft bands of mist where a far plane meets the one before it; a night
+        fading with height in the picture, and soft bands of mist where a far plane meets the one before it, the mist
+        k laid at 1 - (1 - k)² so that it thickens fast with distance; a night
         sky (its median L below `night_below`, 45) is instead washed in a pale ink (`night_top`, `night_horizon`)
         with the moon left as paper and the wash lightening round it (烘雲托月)
   {"op": "wet_sky", "blooms": 0.35, "clouds": 0.8}
@@ -111,12 +112,14 @@ def mist(out, parts, subject, U, layer):
                                 (0, 0), max(2.0, U.len(14.0)))
         band = band / max(1e-6, band.max())
         k = np.clip(k + bands * band, 0, 1)
-    k = k[..., None]
+    # the mist thickens fast with distance: laid once at 1 - (1 - k)², so with `amount` 0.75 a day sky is nearly
+    # paper (0.94) and the far hills (depth 0.72) 0.79 misted
+    k = (1 - (1 - k) ** 2)[..., None]
     out = (out * (1 - k) + paper[None, None, :] * k).astype(np.float32)
     if night_sky is not None:
         soft = cv2.GaussianBlur(sky.astype(np.float32), (0, 0), max(1.0, U.len(2.0)))[..., None]
         out = (out * (1 - soft) + night_sky * soft).astype(np.float32)
-    return (out * (1 - k) + paper[None, None, :] * k).astype(np.float32)
+    return out
 
 
 def wet_sky(out, parts, subject, U, layer):
