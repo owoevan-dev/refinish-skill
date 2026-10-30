@@ -127,6 +127,12 @@ The paper cut limits each piece's smoothing to about half its width. It fills an
 
 The paint engine keeps a mass of pure black as black. A dark garment that still lifts is a dark grey in the source. Use the style's `palette.contrast` and `palette.lift`.
 
-## Wrong colours in every style
+## A patch in another material's colour
 
-This is the part map, not the style. See checks.md (P1, M1, O1, O5) and subject-file.md.
+**What it looks like:** a lock of hair painted like the clothes it lies on, or a ribbon's red in the collar, often the same in every style.
+
+**Why:** the part map, not the style. A region given to the wrong part is painted from that part's colours. The checks P1, M1, O1 and O5 point at most of these (checks.md).
+
+**What to change:** the parts. Look at the parts sheet there, put a hint point on the patch (`scripts/hints.py pick` in a box round it), and run `auto_parts.py --hints` again: the colour comes back. Measured: a lock of hair over a hoodie, read as the hoodie (M1 FAIL under the pastel cel), came out whole after one point on it. When a person points the patch out, one sentence from them is enough (subject-file.md).
+
+**Not this:** blotches inside one material. They come from soft airbrushed shading in the source (presets.md), and no hint removes them.

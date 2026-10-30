@@ -92,6 +92,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 The figures below come from the project's own runs on pictures the code had never seen; those pictures are not in this repository. The code is frozen and the pass marks are written down before the pictures are opened, and a set that has been looked at is used for development only.
 
 - **Parts.** On two sets of new characters, parts drafted with an agent's hints were right for 39 of 41 within two rounds.
+- **Match a reference.** On a closed loop (references drawn in one bundled style, fitted from another on a different character), three rounds brought 6 of the 8 finish numbers within 10%. On frames from a TV anime, 4 to 5 of 8: the softness that compositing adds to the frames is beyond the cel finishes.
 - **All 37 finishes on 16 new characters** (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure:
   - every cel finish except the sunset and 90s ones;
   - both de-AI finishes;
@@ -135,6 +136,8 @@ With the skill installed, ask your agent in plain words:
 
 > Cut the girl out of `street.png`, give her a 90s cel finish and put her back.
 
+> Match the finish of the frames in `refs/` on my character: the lines, the colours, the shading. Tell me what does not carry over.
+
 The agent follows [SKILL.md](skills/refinish/SKILL.md). It checks the picture, makes the subject file, runs the finish, and looks at the result before showing it to you. The scripts also work on their own:
 
 ```bash
@@ -147,8 +150,8 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 ## Limits
 
 - It doesn't change the design. Proportions, faces, poses and folds come from the source.
-- Parts are not always right the first time. Clean cel pictures settle within two rounds of hints; semi-realistic paintings, dense patterns and black on black are harder. When the parts will not come right, the agent asks you for one sentence about what is wrong and fixes the hints itself. Failing that, it merges parts, finishes only the parts that are right, or uses a finish that needs no parts ([subject-file.md](skills/refinish/references/subject-file.md)).
-- Soft airbrushed shading gives the flat cel finishes less to work with; the paint finishes cope better. [source-spec.md](skills/refinish/references/source-spec.md) explains how to ask an image model for a picture that finishes well.
+- The parts are drafted automatically, and the draft is often wrong somewhere: an eye missed when it is closed or winking, a lock of hair read as the clothes it lies on. A patch in another material's colour (that lock painted like the clothes) almost always comes from such a mistake, and goes once the parts are right. Whenever you see one, say what is wrong in a sentence, such as "this lock is hair". You never need to give boxes or points: the agent turns the sentence into hints and runs again. Clean cel pictures settle within two rounds; semi-realistic paintings, dense patterns and black on black are harder. When the parts will not come right, the agent merges parts, finishes only the parts that are right, or uses a finish that needs no parts ([subject-file.md](skills/refinish/references/subject-file.md)).
+- Soft airbrushed shading gives the flat cel finishes less to work with; the paint finishes cope better. Blotches inside one material come from it, not from the parts. [source-spec.md](skills/refinish/references/source-spec.md) explains how to ask an image model for a picture that finishes well.
 - Cut-outs have hard edges. A veil, a lens or smoke comes out as wholly figure or wholly background.
 - It doesn't hide where a picture came from. A generated picture is still generated after any finish here, the de-AI ones included, and none of them is tuned against any detector.
 

@@ -59,7 +59,7 @@ A subject file says what each part of the picture is (skin, hair, each garment) 
 - **Backgrounds**: `python scripts/scene_subject.py IMAGE.png subject.json` finds the scene's areas by colour and guesses their kinds (sky, far hills, foliage, ground, ...). A painted background takes `deai-light` or a scene style, not a cel style: flat tones break its gradients into blotches (presets.md, Scenes).
 - **No parts needed**: the de-AI and duotone styles run on the draft as it is.
 
-Everything about subjects and hints, with the measured failure modes, is in [references/subject-file.md](references/subject-file.md). When a person reviews the parts, ask them for one sentence about what is wrong ("the bow is part of the skirt"), never for boxes or points; turn the sentence into hints yourself.
+Everything about subjects and hints, with the measured failure modes, is in [references/subject-file.md](references/subject-file.md). The draft is often wrong somewhere, so before finishing, show the person the parts sheet and the face sheet, and tell them one sentence is enough to fix a mistake ("the bow is part of the skirt"). Never ask them for boxes or points: turn the sentence into hints yourself. Check the eye boxes first when the eyes are closed, winking, spirals or '><', or when something is held beside the face: the face finder misses or mistakes these.
 
 ### 3. Choose a style
 
@@ -89,7 +89,7 @@ Each FAIL names a box and a likely cause; [references/checks.md](references/chec
 
 ### 5. Look before showing
 
-The numbers catch the common mistakes, not all of them. Before showing a result, look at it at full size beside the source, and at the face and the hands at 1:1. Look for blotches in soft areas, a material in another's colour, and lost eye highlights. A style's limits are in presets.md; say them rather than hiding them.
+The numbers catch the common mistakes, not all of them. Before showing a result, look at it at full size beside the source, and at the face and the hands at 1:1. Look for blotches in soft areas, a material in another's colour, and lost eye highlights. A patch in another material's colour is almost always the part map: fix the parts there first (a hint point on the patch) and render again, before changing the style. Blotches inside one material come from soft shading in the source instead. A style's limits are in presets.md; say them rather than hiding them.
 
 When something is wrong, change a setting for this picture rather than a script. Change one at a time, a part's rule before the style, and compare before and after. [references/adjusting.md](references/adjusting.md) gives each common problem's cause and setting:
 - a skin painted another colour;
