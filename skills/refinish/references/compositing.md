@@ -55,6 +55,8 @@ with that layer's `blur`.
 
 ## Matching the figure to the scene
 
+A cel figure belongs in front of a painted background, as in anime production: the background re-finished with `deai-light` rather than a cel style (presets.md, Scenes), and the layer and background grades used to bring the two into one light.
+
 The camera does not relight. A figure meant for a night scene gets its night first: a style with a `relight` layer
 or `scripts/refinish.py --hour night` (a TV night colour model) or `--hour film-night` (a film's night grade). A
 figure by a fire can take a layer `grade` with a warm cast as well. Then the camera.

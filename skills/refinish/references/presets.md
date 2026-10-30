@@ -86,7 +86,19 @@ references/legal-and-disclosure.md says what to disclose.
 
 `scripts/scene_subject.py` makes a subject for a background: parts by colour, not by lines, and kinds such as sky, far, foliage and ground. It looks for no face.
 
-- Every style runs on it.
+Every style runs on a scene subject, but a painted background is not a figure. It has few lines, and most of it is long gradients: sky, haze, a room falling into shadow. Styles that cut colour into flat tones break those gradients into blotches. Anime production never cel-paints its backgrounds anyway: the cels are the figures, laid over a painted background.
+
+What two painted game backgrounds (a village street, a library hall) showed:
+
+| style | on a painted background |
+|---|---|
+| `deai-light` | the first choice: the painting and its depth stay, the rendering noise and airbrush go |
+| `deai-strong`, `gouache` | fine on a simple, well-lit scene; a dark far plane (the back of a hall) flattens into one patch |
+| the cel styles | not advised: hills, foliage and haze come out as camouflage blotches |
+| `watercolour-scene` | landscapes only, and only once the kinds are right: it read a village's far hills as sky |
+
+For a cel figure in a painted scene, finish the figure in its cel style and the background with `deai-light`, then put them together with `scripts/composite.py`, whose grades bring both into one light (compositing.md).
+
 - The `*-scene` styles add what the techniques do to a landscape.
 - The kinds are guesses. They are surest on a daytime landscape. In a night scene, bluish stone may be read as sky; fix the kind in the subject file. Interiors with large near-black areas print heavy in woodblock.
 

@@ -82,11 +82,13 @@ def main():
     level = "supported"
     if not cut_out:
         level = "not advised"
-        why.append("no transparent background: the cel styles need the figure cut out (a figure fused with its "
-                   "background loses its hair and edges); cut it out with scripts/cutout.py, or use a paint style "
-                   "for the whole picture")
-        advice.append("cut the figure out with scripts/cutout.py (references/cutout.md), or generate it on its own, "
-                      "transparent or on a plain background (source-spec.md)")
+        why.append("no transparent background. A figure drawn into a scene loses its hair and edges under flat "
+                   "tones: cut it out first. A background on its own has few lines and long gradients, which flat "
+                   "tones break into blotches: backgrounds take de-AI light or a scene style")
+        advice.append("a figure in a scene: cut it out with scripts/cutout.py (references/cutout.md), or generate it "
+                      "on its own, transparent or on a plain background (source-spec.md)")
+        advice.append("a background on its own: scripts/scene_subject.py, then deai-light or a *-scene style "
+                      "(presets.md, Scenes)")
     else:
         if cov["all"] < OUTLINE_FAIR or abs(cov["left"] - cov["right"]) > SIDE_GAP:
             level = "best effort"
@@ -112,11 +114,12 @@ def main():
     level = "supported"
     if U.height < 1000:
         level = "best effort"
-        why.append(f"the figure is {int(U.height)} px tall: strokes will be coarse")
+        why.append(f"the {'figure' if cut_out else 'picture'} is {int(U.height)} px tall: strokes will be coarse")
     grade["paint"] = {"level": level, "why": why}
 
     if U.height < MIN_FIGURE_PX:
-        advice.append(f"enlarge first: scripts/prep.py --scale 2 (the figure is {int(U.height)} px tall)")
+        advice.append(f"enlarge first: scripts/prep.py --scale 2 (the {'figure' if cut_out else 'picture'} is "
+                      f"{int(U.height)} px tall)")
     if found:
         advice.insert(0, "fix the part map's misfits first (scripts/parts.py)")
     report["grade"] = grade

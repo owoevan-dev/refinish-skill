@@ -55,7 +55,7 @@ A subject file says what each part of the picture is (skin, hair, each garment) 
   - boxes round the eyes and the mouth.
 
   Then run `auto_parts.py --hints` again. Two rounds settle most pictures.
-- **Backgrounds**: `python scripts/scene_subject.py IMAGE.png subject.json` finds the scene's areas by colour and guesses their kinds (sky, far hills, foliage, ground, ...).
+- **Backgrounds**: `python scripts/scene_subject.py IMAGE.png subject.json` finds the scene's areas by colour and guesses their kinds (sky, far hills, foliage, ground, ...). A painted background takes `deai-light` or a scene style, not a cel style: flat tones break its gradients into blotches (presets.md, Scenes).
 - **No parts needed**: the de-AI and duotone styles run on the draft as it is.
 
 Everything about subjects and hints, with the measured failure modes, is in [references/subject-file.md](references/subject-file.md). When a person reviews the parts, ask them for one sentence about what is wrong ("the bow is part of the skirt"), never for boxes or points; turn the sentence into hints yourself.
