@@ -1,6 +1,6 @@
 # Checks on a finished picture
 
-`scripts/refinish.py` checks every picture it writes. To check one again on its own: `scripts/check_output.py subject.json out.png --style STYLE` (with the style named, the same checks and the same verdict as refinish.py gives it).
+`scripts/refinish.py` checks every picture it writes, on the finish before its layers. To check one again on its own: `scripts/check_output.py subject.json out.png --style STYLE`, adding `--hour H` if the picture was made with it. With the style named, the part map is guarded as refinish.py guarded it and the checks are that engine's, except what the file cannot show: under post layers (a relight, paper, grain) only the part map is checked, and for an engine built on a cel finish the part map and the look checks. The report's `note` says which; refinish.py's own report remains the full check.
 
 - **Report**: JSON with a verdict (`pass`, `warn` or `fail`) and the findings. Each finding has its check, its part, a box and what to do. A `fail` makes the script exit 1.
 - **Review picture**: `<out>.check.jpg` shows the result with each finding boxed and numbered (red for FAIL, orange for WARN).

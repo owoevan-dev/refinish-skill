@@ -482,8 +482,40 @@ def test_hour_refused_where_the_size_changes(draft, tmp_path):
         assert r.returncode == 2 and "--hour" in r.stderr and not out.exists(), (style, r.stderr[-300:])
 
 
+def test_recheck_reads_what_the_file_shows(draft, tmp_path):
+    """check_output.py --style guards the part map as refinish.py did, so a plain finish gets the same findings (on the
+    draft, unguarded, it once found 9 warnings where refinish.py found 2); a file under a relight gets the part map's
+    checks only (P1, P2, M1), so the night is not misread: a light coat cut by the bottom of the frame once failed O3
+    there, as a dark line along the cut."""
+    for style in ("tv-cel", "heavy-cel"):
+        out = tmp_path / f"{style}.png"
+        r1, d1 = run("refinish.py", draft, style, out)
+        r2, d2 = run("check_output.py", draft, out, "--style", style)
+        assert d1["guard"].get("moved_px", 0) > 0                     # the guard moves pixels on the draft
+        mine = sorted(tuple(f.split(":")[0].split(" ", 2)) for f in d1["check"]["findings"])
+        assert mine == sorted((f["id"], f["level"], f["part"]) for f in d2["findings"]), style
+        assert r1.returncode == r2.returncode, style
+
+    from conftest import draw_figure
+    fig = draw_figure()
+    coat = np.all(fig[..., :3] == (60, 120, 200), axis=2)
+    shade = np.all(fig[..., :3] == (44, 88, 160), axis=2)
+    fig[coat, :3], fig[shade, :3] = (226, 228, 232), (196, 200, 208)
+    cv2.imwrite(str(tmp_path / "coat.png"), fig[:520])
+    r, _ = run("auto_parts.py", tmp_path / "coat.png", tmp_path / "subject.json")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    sp = tmp_path / "subject.json"
+    for style, extra in (("tv-cel-night", ()), ("tv-cel", ("--hour", "night"))):
+        out = tmp_path / f"{style}{'-'.join(('',) + extra)}.png"
+        r1, d1 = run("refinish.py", sp, style, out, *extra)
+        r2, d2 = run("check_output.py", sp, out, "--style", style, *extra)
+        assert "note" in d2 and all(f["id"] in ("P1", "P2", "M1") for f in d2["findings"]), (style, d2["findings"])
+        assert d1["check"]["verdict"] != "fail" and r2.returncode == 0, (style, d2["verdict"])
+
+
 def test_exit_codes_follow_the_checks(draft, tmp_path):
-    """refinish.py exits 1 on a FAIL, as SKILL.md says, and check_output.py --style gives the same verdict."""
+    """refinish.py exits 1 on a FAIL, as SKILL.md says, and check_output.py --style reaches the same verdict on these
+    two (a print built on a cel finish, and a duotone)."""
     for style in ("pop-art-dots", "duotone-navy"):
         out = tmp_path / f"{style}.png"
         r, d = run("refinish.py", draft, style, out)

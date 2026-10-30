@@ -199,7 +199,7 @@ A part of kind `accessory` with several colours (a basket of vegetables, a badge
 a wash or a block does not paint it as one blob.
 
 The checks (references/checks.md) run on the cel finish these engines start from, where a part map's mistakes show; the
-result says `"on": "the cel base"`. The engine's own look is not checked: look at the result itself.
+result says `"on": "the cel base"`. On the engine's own result only the look checks O7 to O9 run (a skin printed another colour, a box round the features, mottled darks): look at the result itself for the rest.
 
 ## Measured against the real techniques
 

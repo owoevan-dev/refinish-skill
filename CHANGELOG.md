@@ -59,7 +59,7 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
   - `composite.py` lays a layer's own soft alpha as it is (a glow, a cast shadow, a half-opaque layer). Clearing an image model's faint halo is a choice per layer (`clear_halo`).
   - `--hour`, and a style's post layers, are refused for the pixel, sticker and neon finishes, which change the picture's size, instead of being skipped.
   - 16-bit pictures are read at their own depth instead of coming out white.
-  - `refinish.py` and `recipe.py` exit 1 when a check FAILs, as SKILL.md says. `check_output.py` and `recipe.py` run the look checks O7 to O9 too, the duotones in a recipe included, and `check_output.py --style` gives refinish.py's verdict.
+  - `refinish.py` and `recipe.py` exit 1 when a check FAILs, as SKILL.md says. `check_output.py` and `recipe.py` run the look checks O7 to O9 too, the duotones in a recipe included. `check_output.py --style` guards the part map as refinish.py does and runs that engine's checks; a file with layers over its finish (a style's post layers, or `--hour`) gets the part map's checks only, instead of having its layers misread as mistakes.
 - The ink-wash mist was blended twice over. It is laid once, on the curve the two blends made, so the scenes look as they did by day; a night sky is no longer misted along its edges.
 - The checks guide no longer says that every real defect is caught: the nine known mistakes are, and new pictures show the checks' limits.
 - Black shapes that overlap no longer merge into one, as crossed legs in black tights did.

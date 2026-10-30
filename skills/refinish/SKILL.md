@@ -185,7 +185,7 @@ All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check
 | `scene_subject.py IMAGE.png SUBJECT.json` | the subject file for a background |
 | `parts.py SUBJECT.json` | rebuild and check a part map |
 | `refinish.py SUBJECT.json STYLE.json OUT.png [--hour H]` | re-finish, with the guard and the checks |
-| `check_output.py SUBJECT.json OUT.png [--style S]` | check a result on its own (with its style, as refinish.py does) |
+| `check_output.py SUBJECT.json OUT.png [--style S] [--hour H]` | check a result again on its own (name its style, and the hour if it had one) |
 | `measure_style.py ...` | measure a finish, compare two measurements |
 | `fit_style.py SUBJECT.json REF.png ... --out STYLE.json` | fit a style to references |
 | `tweak_style.py STYLE.json OUT.json "words"` | change a style by words |
