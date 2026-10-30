@@ -153,7 +153,7 @@ python scripts/recipe.py recipe.json out.png
 A recipe lays finishes over a base, each limited to parts, kinds or areas (the face, the lines) and blended in:
 - the clothes in watercolour, the face and hair in TV cel;
 - a screentone multiplied over a watercolour;
-- 30 % of a film's look over a heavy cel;
+- 30 % of the film everyday look over a heavy cel;
 - only the hair cleaned of rendering noise, the rest as drawn.
 
 Format, blend modes and examples: [references/recipes.md](references/recipes.md).
@@ -199,5 +199,5 @@ All print JSON on stdout; exit code 0 means done, 1 done with doubts or failures
 - A figure under 2000 px tall loses its fine lines in the cel styles: `prep.py --scale 2` first, and pass `--upscaled 2` to `auto_parts.py`.
 - Two materials of one colour (blue-grey hair over a pale blue cardigan, a beige coat on beige skin) are told apart only by boxes and lines. `auto_parts.py` says so in a doubt; look along that border first.
 - A tall narrow box cuts off an arm or a thigh more often than any other mistake: box the whole limb.
-- Night is not darkening: `--hour night` (a TV night colour model) and `--hour film-night` (a film's night grade) relight the colours. Generate the source in day colours under neutral light.
+- Night is not darkening: `--hour night` (a TV night colour model) and `--hour film-night` (a cinematic night grade) relight the colours. Generate the source in day colours under neutral light.
 - On a console that is not UTF-8, the scripts print non-ASCII text escaped (still valid JSON).

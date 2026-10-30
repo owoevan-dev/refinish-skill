@@ -5,7 +5,7 @@
 # ///
 """Mix finishes on one picture: a base finish, and layers of other finishes laid over it, each limited to some of the
 picture's parts or areas and blended in (the clothes in watercolour and the face in TV cel; a screentone multiplied
-over a watercolour; a heavy cel with 30 % of a film's look).
+over a watercolour; a heavy cel with 30 % of the film everyday look).
 
 Usage:
   python scripts/recipe.py RECIPE.json OUT.png [--no-check]

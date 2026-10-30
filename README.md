@@ -21,7 +21,7 @@
 
 <p align="center"><strong>Don't regenerate it. Re-finish it.</strong></p>
 
-Refinish is an [Agent Skill](https://agentskills.io) for re-finishing art you already have. It keeps the drawing (the line art, the pose, the face, the costume) and repaints the finish: the shape of the shadows, the ink of the lines, the palette, the medium. It comes with 37 finishes, from TV anime cel and watercolour to woodblock prints, manga screentone and pixel sprites.
+Refinish is an [Agent Skill](https://agentskills.io) for re-finishing art you already have. It keeps the drawing (the line art, the pose, the face, the costume) and repaints the finish: the shape of the shadows, the ink of the lines, the palette, the medium. It comes with 37 finishes, from TV anime cel and watercolour to woodblock prints, manga screentone and pixel sprites. It can also take the generic AI look off generated art.
 
 Everything happens in Python, with NumPy and OpenCV. No image model is involved, so the character that comes out is the character that went in.
 
@@ -34,6 +34,12 @@ Everything happens in Python, with NumPy and OpenCV. No image model is involved,
 Ask an image model to redraw a character in a new style and you get a slightly different character. The face shifts, the hands are drawn again, the costume drifts. For a single illustration that may be fine. For a cast of sprites that have to match, it isn't.
 
 Re-finishing works the other way round. The drawing stays fixed and only the finish moves. A whole cast can share one look, and the look can still change late in a project without anything being redrawn.
+
+## Less of the AI look
+
+Generated art often has a look people spot at a glance: the same fine detail everywhere, airbrushed gradients, extra gloss and noise. Re-finishing replaces it with one consistent, deliberate technique: the flat tones of cel, the washes of watercolour, the lines of a print. To keep the picture as it is and only clean those traces off, use the de-AI finishes, light or strong.
+
+A finish changes the paint, not the picture. The AI look that comes from the composition, the detail density and the light has to be avoided when the picture is generated ([source-spec.md](skills/refinish/references/source-spec.md)). Nor does a finish hide where a picture came from: a generated picture is still generated after it, and whatever a platform asks you to disclose, you still disclose.
 
 ## What changes, and what doesn't
 
@@ -77,7 +83,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 - **Every result is checked.** Each finish is compared with its source for parts, colours, the outline, lost features, skin printed the wrong colour, boxes round the face and mottled dark cloth. Every warning names a place and a likely cause.
 - **Match a reference.** `fit_style.py` measures the finish of reference pictures (line darkness, chroma, flatness, edge softness, grain) and fits a style to them, round by round. The references are measured, never copied.
 - **Adjust it in words.** `tweak_style.py` turns "softer shadows", "more vivid", "陰影柔一點" or "線を太く" into parameter steps, and tells you which measurement should move.
-- **Relight.** Night and sunset are worked out from the day colours in linear light, or come from a film's night grade.
+- **Relight.** Night and sunset are worked out from the day colours in linear light, or come from a cinematic night grade.
 - **Mix finishes.** `recipe.py` layers finishes part by part: the clothes in watercolour and the face in cel, or a screentone multiplied over a wash.
 - **Repair the source.** `repair.py` fixes a cut-out's fringe, stray specks, gaps in the line art and colour that ran across a material's edge, without restyling anything.
 

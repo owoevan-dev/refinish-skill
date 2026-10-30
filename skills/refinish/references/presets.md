@@ -18,8 +18,8 @@ Styles are named by technique, never by a work or an artist.
 | `tv-cel` | TV anime cel: two hard tones, coloured trace lines, a closed outline | yes | the cel source spec, level 2 | a soft painting blotches; generate to the spec or use a paint style |
 | `heavy-cel` | dense three-tone cel: a second shadow, crisp hair light, the fringe's cast shadow, heavier ink lines | yes | level 2; a key light from one side so the second shadow has somewhere to go | busy designs get busy |
 | `bold-ink-cel` | bold TV look: black ink lines kept as drawn, clothes brought to a vivid chroma target | yes | the line art in solid black already; level 2 shading | pale garments are held back on purpose (no neon) |
-| `film-everyday-cel` | a theatrical film's everyday look: a soft turn into shadow, muted palette, warm dark lines, a whisper of grain | yes | level 2; muted local colours help | — |
-| `film-everyday-night-cel` | the same at night: the figure light but nearly colourless, warm key, mauve-grey shadows (fitted to measurements of night stills) | yes | generate in **day** colours under neutral light; the night is made here | a scene's own coloured lights (lanterns) are not added: composite them |
+| `film-everyday-cel` | theatrical anime's everyday look: a soft turn into shadow, muted palette, warm dark lines, a whisper of grain | yes | level 2; muted local colours help | — |
+| `film-everyday-night-cel` | the same at night: the figure light but nearly colourless, warm key, mauve-grey shadows | yes | generate in **day** colours under neutral light; the night is made here | a scene's own coloured lights (lanterns) are not added: composite them |
 | `pastel-film-cel` | high-key pastel film look: lifted values, softer contrast | yes | light designs | dark designs lose their weight |
 | `cel-90s` | painted cels photographed on film: cool violet shadows, a wandering trace line, lifted blacks, halation, grain | yes | level 2 | — |
 | `tv-cel-night`, `tv-cel-sunset` | the TV cel relit for night (navy, a cool rim) or sunset (warm key, violet shadows) | yes | generate in day colours under neutral light | — |

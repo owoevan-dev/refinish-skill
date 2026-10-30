@@ -3,7 +3,7 @@
  "id": "film-everyday-cel",
  "name": "Film everyday cel",
  "engine": "cel",
- "summary": "The everyday look of a theatrical anime film: the source's own shadow shapes flattened into two tones with a slightly soft turn, a muted palette (chroma about 9 on clothes), lines a warm dark shade of the colour they border (0.41 of its lightness), a whisper of grain. Measured from film stills.",
+ "summary": "The everyday look of theatrical anime: the source's own shadow shapes flattened into two tones with a slightly soft turn, a muted palette (chroma about 9 on clothes), lines a warm dark shade of the colour they border (0.41 of its lightness), a whisper of grain.",
  "shading": {
   "follow": "drawn",
   "harden": 0.9,

@@ -90,7 +90,7 @@ colour as it is.
  "layers": [{"style": "manga-screentone", "blend": "multiply", "opacity": 0.8}]}
 ```
 
-**Between two styles.** A heavy cel with 30 % of a film's everyday look over it, everywhere but the eyes.
+**Between two styles.** A heavy cel with 30 % of the film everyday look over it, everywhere but the eyes.
 
 ```json
 {"format": "refinish-recipe/1", "subject": "subject.json", "base": "heavy-cel",

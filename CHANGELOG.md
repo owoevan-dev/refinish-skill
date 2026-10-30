@@ -21,7 +21,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - a same-material guard run before every engine that paints by parts;
   - `deblotch`, a per-part rule for an airbrushed part whose shadow comes out in blotches.
 - **Layers**:
-  - relight (night, sunset, dusk, a film's night grade), paper, film grain, halation, lens softness, tone curve, depth of field inside a figure;
+  - relight (night, sunset, dusk, a cinematic night grade), paper, film grain, halation, lens softness, tone curve, depth of field inside a figure;
   - scene layers: a woodblock sky's bokashi, an ink painting's mist and distance, a watercolour's wet sky.
 - **Checks** on every result:
   - parts, colours, outline and lost features against the source;

@@ -3,7 +3,7 @@
  "id": "film-everyday-night-cel",
  "name": "Film everyday cel, night",
  "engine": "cel",
- "summary": "The film everyday finish at night: the same two soft-turned tones and warm dark lines, then the figure relit the way a theatrical film grades its night scenes: still light (skin about L 75) but nearly colourless (skin chroma about 6), a warm lantern key, a cool sky ambient that turns the shadows mauve-grey. No grain: none shows in the night stills. Colours fitted to measurements of night stills.",
+ "summary": "The film everyday finish at night: the same two soft-turned tones and warm dark lines, then the figure relit the way theatrical anime grades its night scenes: still light (skin about L 75) but nearly colourless (skin chroma about 6), a warm lantern key, a cool sky ambient that turns the shadows mauve-grey. No grain.",
  "shading": {
   "follow": "drawn",
   "harden": 0.9,

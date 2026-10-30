@@ -238,7 +238,7 @@ The scene layers read the kinds of a scene's subject (`sky`, `far`, ...; scripts
 
 `scripts/refinish.py --hour night` adds a relight to any style. The checks look at the result before its layers.
 
-The hours are two kinds of night. `night` is a TV colour designer's night model (夜色指定): everything darker and navy, a cool rim light. `film-night` is a theatrical film's night grade: the figure stays light (skin about L 75 to 85) and loses most of its colour (skin chroma 4 to 7 against 15 to 25 by day), a warm lantern key and a cool sky ambient, so the shadows turn mauve-grey. Its key, ambient and chroma were fitted to colours measured in a film's night stills (lit and shadowed skin, blonde and dark hair, whites); the stills themselves are in nothing shipped.
+The hours are two kinds of night. `night` is a TV colour designer's night model (夜色指定): everything darker and navy, a cool rim light. `film-night` is the night grade of theatrical anime: the figure stays light (skin about L 75 to 85) and loses most of its colour (skin chroma 4 to 7 against 15 to 25 by day), a warm lantern key and a cool sky ambient, so the shadows turn mauve-grey.
 
 ## Writing a new style
 

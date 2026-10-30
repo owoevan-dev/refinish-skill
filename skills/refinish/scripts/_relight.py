@@ -32,9 +32,8 @@ HOURS = {
                "rim": {"width": 1.5, "alpha": 0.75, "colour": [1.0, 0.78, 0.45]}},
     "dusk": {"key": [0.62, 0.50, 0.62], "ambient": [0.20, 0.19, 0.36], "light": [0.8, -0.6],
              "floor": [15.0, 8.0, -15.0], "floor_amount": 0.45, "chroma_cap": 40.0, "rim": None},
-    # a theatrical film's night: the figure stays light (skin L 57-85) and loses most of its colour (skin chroma 4-7
+    # the night of theatrical anime: the figure stays light (skin L 57-85) and loses most of its colour (skin chroma 4-7
     # against 15-25 by day); a warm key from the lanterns, a cool ambient from the sky, so the shadows turn mauve-grey.
-    # Fitted to colours measured in night stills, not to the stills themselves.
     "film-night": {"key": [0.37, 0.32, 0.20], "ambient": [0.39, 0.485, 0.745], "light": [-0.5, -1.0],
                    "chroma": 0.45, "floor": [12.0, 4.0, -10.0], "floor_amount": 0.3, "chroma_cap": 24.0,
                    "rim": None},
@@ -109,7 +108,7 @@ def relight(img, alpha, parts, hour="night", lines=None, features=None, U=None, 
     fl = np.array(p.get("floor", [12.0, 0.0, -10.0]), np.float32)
     k = np.clip((fl[0] + 6 - f[..., 0]) / (fl[0] + 6), 0, 1) * p.get("floor_amount", 0.5)
     f = f + (fl[None, None, :] - f) * (k[..., None] * np.array([0.5, 1.0, 1.0], np.float32))
-    # the hour's own loss of colour (a film's night grade), then a cap on chroma, the hue kept
+    # the hour's own loss of colour (a cinematic night grade), then a cap on chroma, the hue kept
     f[..., 1:] *= p.get("chroma", 1.0)
     cap = p.get("chroma_cap")
     if cap:
