@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/brand/logo-1200.png" alt="Refinish 重新完稿" width="440">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-dark-1200.png">
+    <img src="assets/brand/logo-1200.png" alt="Refinish" width="440">
+  </picture>
 </p>
 
 <p align="center">

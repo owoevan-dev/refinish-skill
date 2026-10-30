@@ -6,14 +6,15 @@ publishing.
 
 ## A style is not protected; expression is
 
-- **Taiwan:** 著作權法 §10-1 protects a work's expression only, not the ideas, concepts or principles in it. The courts
-  compare concrete features (the strokes' direction, the lines' waves and weights, the layout); a shared concept or
-  school of painting is not infringement on its own.
 - **United States:** 17 U.S.C. §102(b): copyright never extends to an idea, procedure, process, system, method of
   operation, concept or principle.
-- **Japan:** the Agency for Cultural Affairs' 2024 「AIと著作権に関する考え方について」 treats 作風・画風 as ideas, outside
-  protection. An output infringes when it shares another work's creative expression (類似性) and relied on it
-  (依拠性): the usual test. The paper has no legal force of its own.
+- **Japan:** the Agency for Cultural Affairs' 2024 paper *General Understanding on AI and Copyright* (AIと著作権に関する
+  考え方について) treats a style of painting (作風・画風) as an idea, outside protection. An output infringes when it
+  shares another work's creative expression (similarity, 類似性) and relied on it (reliance, 依拠性): the usual test.
+  The paper has no legal force of its own.
+- **Taiwan:** the Copyright Act (著作權法), §10-1, protects a work's expression only, not the ideas, concepts or
+  principles in it. The courts compare concrete features (the strokes' direction, the lines' waves and weights, the
+  layout); a shared concept or school of painting is not infringement on its own.
 
 What this skill measures and writes into a style file is the finish:
 - line darkness;
@@ -60,8 +61,9 @@ signed Content Credentials signs its final assets with a C2PA tool of its own.
 
 ## Sources
 
-- 著作權法 §10-1 (全國法規資料庫); 智慧財產法院 113 年度民暫字第 14 號裁定 (the one-stroke drawing case).
 - U.S. Copyright Act, 17 U.S.C. §102(b).
-- 文化庁「AIと著作権に関する考え方について」 (2024).
+- Agency for Cultural Affairs, Japan: *General Understanding on AI and Copyright* (文化庁「AIと著作権に関する考え方について」, 2024).
+- Taiwan Copyright Act §10-1 (Laws & Regulations Database, 全國法規資料庫); Intellectual Property and Commercial Court,
+  ruling 113 Min-Zan-Zi No. 14 (智慧財產法院 113 年度民暫字第 14 號裁定, the one-stroke drawing case).
 - Steamworks documentation, content survey (AI disclosure).
 - pixiv guidelines and help on AI-generated works.

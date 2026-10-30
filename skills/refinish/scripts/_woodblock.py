@@ -87,6 +87,7 @@ def run(subject, style, cel, alpha, parts, U, seed=7):
     pigments = {**PIGMENTS, **{k: tuple(v) for k, v in ws.get("pigments", {}).items()}}
     pl = _lin(paper_rgb)
     printed = np.ones((h, w, 3), np.float32) * pl
+    sumi_solid = np.zeros((h, w), bool)                 # the solid sumi blocks of black cloth (not hair)
     report = []
     grain_amt = ws.get("grain", 0.07)
     # the woodgrain: long wavy bands across each block, a little different per block
@@ -111,10 +112,15 @@ def run(subject, style, cel, alpha, parts, U, seed=7):
             # things and lines
             k = min(k, ws.get("scene_sumi_cap", 0.8))
         # black hair and black cloth print in solid sumi; in a scene a dark area is mostly shade, not a black thing,
-        # so only the near-black takes sumi there
+        # so only the near-black takes sumi there. Dark cloth that has a colour (navy, maroon, a deep green) prints in
+        # its pigment at full strength, as the prints' dark indigo robes do; hair keeps the prints' sumi whatever its
+        # colour, and anything darker than the sumi itself takes the sumi (no pigment prints darker than it)
         sumi_below = ws.get("sumi_below", 12.0 if subject.get("scene") else 30.0)
-        if lay["base_lab"][0] < sumi_below and kind != "skin":
+        coloured = float(np.hypot(bl[1], bl[2])) >= ws.get("sumi_chroma", 10.0) and bl[0] >= pigments["sumi"][0]
+        if bl[0] < sumi_below and kind != "skin" and (kind == "hair" or not coloured):
             name, k = "sumi", 1.0                   # black hair and black cloth: solid sumi, as the prints have it
+            if kind != "hair":
+                sumi_solid |= m
         if kind == "skin":
             # the prints leave a light skin near the paper, a breath of beni; a darker skin keeps its own value and
             # hue in the earth pigments (a skin printed paper-white whatever its colour would change who the figure is)
@@ -202,6 +208,17 @@ def run(subject, style, cel, alpha, parts, U, seed=7):
     a = np.maximum(a, np.clip((ol - 0.45) * 6 + 0.5, 0, 1)) * within
     a = a * (0.92 + 0.08 * tx.fbm(rng, h, w, U.len(10.0), octaves=2))      # the sumi printed a little unevenly
     T_s = np.clip(_lin(rgb(np.array(pigments["sumi"], np.float32).reshape(1, 1, 3))[0, 0]) / pl, 0, 1)
+    # a line inside a block printed nearly as dark as the sumi (black tights, a black coat) is left uncut (白抜き):
+    # the paper shows along it, so two black shapes that overlap stay two shapes. Hair, skin and the eyes keep their
+    # sumi lines
+    if ws.get("white_lines", True) and not subject.get("scene"):
+        L_fill = lab(_srgb(printed).astype(np.float32))[..., 0]
+        dark = (L_fill < float(pigments["sumi"][0]) + ws.get("white_line_below", 10.0)) & within
+        dark &= ~np.isin(kinds_arr[parts], ("hair", "skin", "eyes")) & ~face
+        rev = _lines.reversed_lines(a, (dark | sumi_solid) & ~face & within, U.len(ws.get("white_line_margin", 1.5)),
+                                    U.area(ws.get("white_line_min", 20.0)))
+        a = a * (1 - rev)
+        printed = printed * (1 - rev[..., None]) + pl * rev[..., None]
     printed = printed * (1 - a[..., None] * (1 - T_s[None, None, :]))
     out = _srgb(printed).astype(np.float32)
     # blocks printed over each other saturate at the sumi's own darkness (the key block over a sumi block is the same

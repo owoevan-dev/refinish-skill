@@ -188,6 +188,15 @@ def run(subject, style, cel, alpha, parts, U, src=None):
                             * (grow / r))
     ol = _lines.closed_outline(alpha, U.len(ts.get("outline", 1.2)), 3)
     ink = np.maximum(ink, np.maximum(a_line, ol) * within)
+    # lines inside solid black (ベタ) drawn in white, as a manga artist does, so two black shapes that overlap stay
+    # two shapes; black hair keeps its own white shine instead
+    if ts.get("white_lines", True):
+        solid = np.zeros((h, w), bool)
+        for j, mode, *_ in plan:
+            if mode == "solid" and kinds[j] != "hair":
+                solid |= (parts == j) & within
+        ink *= 1 - _lines.reversed_lines(a_line, solid, U.len(ts.get("white_line_margin", 1.5)),
+                                          U.area(ts.get("white_line_min", 20.0)))
     g = (paper_L + (ink_L - paper_L) * ink) / 100.0
     # lightness to grey sRGB: L* 0..100 is close enough to the display's own curve for paper and ink
     grey = np.clip(((g + 0.16) / 1.16) ** 3, 0, 1)

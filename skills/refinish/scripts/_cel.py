@@ -309,7 +309,8 @@ def run(subject, style, img, alpha, parts, U):
     thicken, band = U.len(outer.get("thicken", 0.0)), U.len(outer.get("band", 1.67))
     if mode == "own":
         own = lines.get("own", {})
-        out = ln_.lay_own(out, img, L_new, within, strength, own.get("L", 16.0), own.get("chroma", 0.9))
+        out = ln_.lay_own(out, img, L_new, within, strength, own.get("L", 16.0), own.get("chroma", 0.9),
+                          own.get("gap", 9.0))
     elif mode == "ink":
         ink = lines.get("ink", {})
         by = [(skin, ink.get("skin", [36, 18, 18]))] + [(of_kind(k), c) for k, c in ink.get("kinds", {}).items()]

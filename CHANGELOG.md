@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Brand**: a light and a dark version of the logo, the README showing the one that suits the reader's theme; the logo and the social preview are English only.
 - **Repository**: READMEs in English, 繁體中文, 简体中文, 日本語 and 한국어 with pictures of an original sample character in every finish; tests on GitHub Actions (Python 3.10 and 3.13); a contributing guide and issue forms (issues are open, outside pull requests are not).
 
 - **Subjects**:
@@ -51,8 +52,15 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - **duotone-auto** can break a dark face into specks.
 - **When the face finder reads no eyes**, the hint boxes become whole rectangles of iris and mouth. A doubt says so; check the eye boxes on the face sheet.
 - **The look checks miss most of these.** O7 flagged 1 of 57 skin failures, O8 8 of 15 box seams.
+
 ### Fixed
 
+- Black shapes that overlap no longer merge into one, as crossed legs in black tights did.
+  - The cel finishes laid every line at one darkness, which nearly vanishes on black cloth or hair. A line is now always darker than the paint beside it (`lines.own.gap`, 9), so the finishes built on a cel base, stained glass among them, see it too.
+  - Manga screentone draws the lines inside solid black in white (ホワイト), as a manga artist does.
+  - The woodblock styles leave a line inside a block printed nearly as dark as the sumi uncut (白抜き), so the paper shows along it.
+  - Short flecks of fold stay dark in both; only lines of some length turn white.
+- The woodblock styles printed every dark part in sumi, a navy skirt or brown shoes like black cloth. Dark cloth with a colour now prints in its own pigment at full strength (indigo, brown, red); hair keeps the prints' sumi, and anything darker than the sumi itself still takes it.
 - A darker skin is no longer printed pale by the woodblock styles, nor left paper and broken into boxes by the manga screentone, nor turned to pale dots by the pop art.
 - The features' boxes keep only the features: lightness counts half against the skin, and hair or cloth that runs into a box from outside is painted with its part.
 - Engines that lay one colour per piece:

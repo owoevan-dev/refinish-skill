@@ -67,6 +67,27 @@ def keep_lines(L_line, min_area, reach=3, by_part=None, always=None):
     return L_line * near
 
 
+def reversed_lines(line, solid, margin, min_area=0.0):
+    """The lines that run inside a solid black mass, to be cut out of it (0..1).
+
+    Two black legs crossing, a fold in a black coat, a black skirt over black tights: drawn black on black, such a line
+    vanishes and the mass reads as one shape. A manga artist draws it in white on the solid black (ホワイト), and a
+    block cutter leaves it uncut in the sumi block (白抜き). The mass's own edge keeps its dark line: only lines at
+    least `margin` px inside `solid` (a bool mask, the solid areas of every part that is not hair) reverse, and only
+    pieces of at least `min_area` px: an artist whites out the edges and the overlaps, not every fleck of a fold."""
+    if margin < 1 or not solid.any():
+        return np.zeros(line.shape, np.float32)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * int(round(margin)) + 1,) * 2)
+    inside = cv2.erode(solid.astype(np.uint8), k) > 0
+    core = ((line > 0.5) & inside).astype(np.uint8)
+    if min_area > 0:
+        n, lab_, st, _ = cv2.connectedComponentsWithStats(core, connectivity=8)
+        keep = st[:, cv2.CC_STAT_AREA] >= min_area
+        keep[0] = False
+        core = keep[lab_].astype(np.uint8)
+    return np.clip(cv2.GaussianBlur(core.astype(np.float32), (0, 0), 0.6) * 1.4, 0, 1)
+
+
 def closed_outline(alpha, width, smooth=3, min_len=40):
     """The figure's outline as one closed line of even width just inside the silhouette, on every side: where the
     picture drew no line (a lit edge, a rim light) as much as where it did, the way an animation drawing is lined all
@@ -145,14 +166,17 @@ def lay_ink(base, L, within, ink, by=(), strength=1.0, thicken=2, band=6.0):
     return base * (1 - a[..., None]) + col * a[..., None]
 
 
-def lay_own(base, src, L, within, strength=1.0, L_ink=16.0, chroma=0.9):
+def lay_own(base, src, L, within, strength=1.0, L_ink=16.0, chroma=0.9, gap=9.0, floor=3.0):
     """Each line in a dark shade of its own drawn colour (navy in the hair, brown on the skin, the fill's own hue
-    where only the closed outline runs), all at one darkness: a line keeps the part it was drawn for."""
+    where only the closed outline runs), all at one darkness: a line keeps the part it was drawn for. A line is never
+    lighter than `gap` below the paint beside it: on black tights or black hair a line at the one darkness would sink
+    into the fill (two crossed legs would read as one), so there it goes as dark as the fill needs, down to `floor`."""
     a = alpha_of(L, strength)
     on = ((L > 0.05) & within).astype(np.float32)                      # (a transparent pixel's colour is noise)
     num = cv2.GaussianBlur(lab(src) * on[..., None], (0, 0), 1.5)
     den = cv2.GaussianBlur(on, (0, 0), 1.5)[..., None]
     f = np.where(den > 1e-3, num / np.maximum(den, 1e-3), lab(src))
-    f[..., 0] = L_ink
+    fill_L = lab(fill_under(base, L))[..., 0]
+    f[..., 0] = np.minimum(L_ink, np.maximum(floor, fill_L - gap))
     f[..., 1:] *= chroma
     return base * (1 - a[..., None]) + rgb(f) * a[..., None]
