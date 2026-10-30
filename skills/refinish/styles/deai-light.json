@@ -1,0 +1,20 @@
+{
+ "format": "refinish-style/1",
+ "id": "deai-light",
+ "name": "De-AI, light",
+ "engine": "deai",
+ "summary": "The picture's own colours and lines kept; each area's shading pulled half-way to clean tones, its rendering noise smoothed away.",
+ "deai": {
+  "flatten": 0.55,
+  "tones": 3,
+  "smooth": 1.0,
+  "lines": "drawn",
+  "chroma": 0.97,
+  "guard": [
+   12.0,
+   28.0
+  ],
+  "patch_de": 0.0,
+  "patch_frac": 0.06
+ }
+}

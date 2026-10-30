@@ -1,0 +1,162 @@
+{
+ "format": "refinish-style/1",
+ "id": "pastel-film-cel",
+ "name": "Pastel film cel",
+ "engine": "cel",
+ "summary": "High-key and airy: almost flat colour with very little shading in large simple shapes, everything lifted toward light pastel values, pale pink on skin and lavender grey on white; thin coloured lines, each a darker shade of the colour it borders; one soft lighter band on the hair.",
+ "shading": {
+  "follow": "form",
+  "tones": 2,
+  "share": 0.18,
+  "scale": 3.33,
+  "smooth": 2.0,
+  "min_island": 166.7,
+  "min_hole": 44.4,
+  "shadow": "derive",
+  "derive": [
+   -12,
+   2,
+   -7
+  ]
+ },
+ "kinds": {
+  "skin": {
+   "share": 0.1,
+   "derive": [
+    -7,
+    7,
+    1
+   ],
+   "scale": 2.0,
+   "min_depth": 0.05
+  },
+  "cloth-white": {
+   "share": 0.18,
+   "derive": [
+    -11,
+    3,
+    -10
+   ]
+  },
+  "cloth": {
+   "share": 0.2,
+   "derive": [
+    -12,
+    3,
+    -7
+   ]
+  },
+  "cloth-dark": {
+   "share": 0.2,
+   "derive": [
+    -5,
+    2,
+    -5
+   ]
+  },
+  "hair": {
+   "share": 0.15,
+   "derive": [
+    -5,
+    3,
+    -6
+   ],
+   "scale": 1.67,
+   "highlight": {
+    "mode": "band",
+    "share": 0.08,
+    "band": {
+     "soft": 3.0,
+     "alpha": 0.5,
+     "lift": 8
+    }
+   }
+  },
+  "sheer": {
+   "share": 0.25,
+   "derive": [
+    -6,
+    2,
+    -3
+   ],
+   "base_pct": 30
+  },
+  "gloss": {
+   "share": 0.3,
+   "derive": [
+    -5,
+    0,
+    -2
+   ],
+   "base_pct": 15,
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.06
+   }
+  },
+  "accessory": {
+   "model": "regions"
+  },
+  "eyes": {
+   "model": "regions"
+  }
+ },
+ "palette": {
+  "pivot": 28,
+  "contrast": 0.86,
+  "lift": 7,
+  "chroma": 0.85
+ },
+ "touches": {
+  "blush": {
+   "alpha": 0.3,
+   "colour": [
+    1.0,
+    0.66,
+    0.68
+   ]
+  }
+ },
+ "lines": {
+  "colour": "trace",
+  "trace": {
+   "dark": 0.55,
+   "cap": 45,
+   "chroma": 1.5,
+   "kinds": {
+    "hair": {
+     "dark": 0.55,
+     "cap": 30,
+     "chroma": 0.9
+    }
+   }
+  },
+  "strength": 0.95,
+  "cut": 0.12,
+  "outline": {
+   "width": 0.67,
+   "smooth": 3
+  },
+  "outer": {
+   "thicken": 0.33,
+   "band": 1.67
+  },
+  "keep": {
+   "min_area": 8.9,
+   "kinds": {
+    "hair": 44.4
+   }
+  },
+  "finder": {
+   "simplify": [
+    3,
+    9
+   ],
+   "lo": 0.2,
+   "crisp": [
+    0.15,
+    0.6
+   ]
+  }
+ }
+}

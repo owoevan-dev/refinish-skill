@@ -1,0 +1,9 @@
+{
+ "format": "refinish-style/1",
+ "id": "charcoal",
+ "name": "Charcoal",
+ "engine": "drawing",
+ "base": "tv-cel",
+ "summary": "a charcoal drawing on cream paper: the tones hatched in a few directions and pressed into the tooth, the darks crossed, the line broken where the stick skipped, the lights lifted with white chalk",
+ "drawing": {"medium": "charcoal", "paper": [214, 206, 190], "tooth": 0.6, "hatch": 3.5, "angles": [62, 28, -20], "strength": 1.0, "lines": 0.9, "lift": 0.35, "smudge": 1.5}
+}

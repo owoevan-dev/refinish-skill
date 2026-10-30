@@ -1,0 +1,16 @@
+{
+ "format": "refinish-style/1",
+ "id": "manga-screentone",
+ "name": "Manga screentone",
+ "engine": "tone",
+ "summary": "Black ink and screentone on white paper: lines solid black, dark parts filled black with the hair's light left white, light parts paper with only their shadows toned, the middle tones a standard dot tone chosen by density, a different pattern for parts of one density, blush as hatching.",
+ "base": "tv-cel",
+ "tone": {
+  "cell": 2.2,
+  "angle": 45,
+  "white_below": 0.2,
+  "black_above": 0.72,
+  "outline": 1.2,
+  "blush": true
+ }
+}

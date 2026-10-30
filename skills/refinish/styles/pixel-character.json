@@ -1,0 +1,14 @@
+{
+ "format": "refinish-style/1",
+ "id": "pixel-character",
+ "name": "Pixel sprite (character)",
+ "engine": "pixel",
+ "summary": "A 96-pixel game sprite from a TV cel finish: per-part colour ramps, a selective outline (each edge in the darker side's shade), the drawn folds dropped at this size, hard alpha; the palette written beside it.",
+ "base": "tv-cel",
+ "pixel": {
+  "height": 96,
+  "outline": "selout",
+  "colours": 32,
+  "folds_from": 128
+ }
+}

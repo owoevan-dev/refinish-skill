@@ -1,0 +1,120 @@
+{
+ "format": "refinish-style/1",
+ "id": "heavy-cel",
+ "name": "Heavy TV cel",
+ "engine": "cel",
+ "summary": "Rich, dense anime cel: every material flat in three hard tones (base, shadow, a deeper second shadow) where the source drew its shading, the skin in two (its second shadow only under the chin and in the deepest folds of the drawing); a crisp light on the hair, the fringe's thin cast shadow on the brow, solid dark lines a little heavier than drawn with a closed outline.",
+ "shading": {
+  "follow": "drawn",
+  "harden": 1.0,
+  "tones": 3,
+  "scale": 1.0,
+  "range": 0.05,
+  "smooth": 0.5,
+  "min_island": 6.0,
+  "min_hole": 6.0,
+  "shadow": "derive",
+  "derive": [
+   -14,
+   6,
+   -2
+  ],
+  "deep": [
+   -12,
+   4,
+   -4
+  ],
+  "deep_min_island": 40.0
+ },
+ "kinds": {
+  "skin": {
+   "tones": 2,
+   "min_depth": 0.03,
+   "shadow": "derive",
+   "derive": [
+    -12,
+    9,
+    4
+   ]
+  },
+  "hair": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.07,
+    "smooth": 0.6,
+    "min_island": 12.0
+   },
+   "deep_min_island": 90.0,
+   "min_island": 12.0
+  },
+  "accessory": {
+   "model": "keep"
+  },
+  "eyes": {
+   "model": "keep"
+  }
+ },
+ "palette": {
+  "pivot": 50,
+  "contrast": 1.0,
+  "lift": 0,
+  "chroma": 1.0
+ },
+ "lines": {
+  "colour": "ink",
+  "ink": {
+   "ink": [
+    14,
+    6,
+    6
+   ],
+   "skin": [
+    26,
+    16,
+    12
+   ]
+  },
+  "strength": 1.0,
+  "cut": 0.05,
+  "grow": 0.4,
+  "outline": {
+   "width": 1.4,
+   "smooth": 3
+  },
+  "keep": {
+   "min_area_drawn": 0.67,
+   "kinds_drawn": {
+    "hair": 30.0
+   }
+  },
+  "finder": {
+   "simplify": [
+    3,
+    9
+   ],
+   "lo": 0.18
+  }
+ },
+ "touches": {
+  "blush": {
+   "alpha": 0.25,
+   "colour": [
+    1.0,
+    0.72,
+    0.74
+   ]
+  },
+  "cast": [
+   {
+    "from": "hair",
+    "onto": "skin",
+    "offset": [
+     1.5,
+     4.0
+    ],
+    "smooth": 0.6,
+    "min_island": 6.0
+   }
+  ]
+ }
+}

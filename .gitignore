@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Eval workspaces and run outputs never belong in the repo
+*-workspace/
+evals/results/
+
+# Pictures a user works on stay out of the repo; the eval cases' inputs are drawn by code and ship
+*.png
+*.jpg
+*.webp
+!docs/**/*.png
+!skills/refinish/evals/*/files/*.png
+!assets/brand/*.png
+
+# Local secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db

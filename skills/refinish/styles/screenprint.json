@@ -1,0 +1,16 @@
+{
+ "format": "refinish-style/1",
+ "id": "screenprint",
+ "name": "Screen print",
+ "engine": "print",
+ "summary": "A four-colour screen print: the figure separated into spot inks (the darkest the key), each ink screened at its own angle so the tints read as dots, the screens landing a hair off each other, the ink a little uneven, on off-white paper.",
+ "base": "tv-cel",
+ "print": {
+  "inks": 4,
+  "cell": 1.6,
+  "offset": 0.8,
+  "uneven": 0.12,
+  "paper": "newsprint",
+  "solid_above": 0.92
+ }
+}

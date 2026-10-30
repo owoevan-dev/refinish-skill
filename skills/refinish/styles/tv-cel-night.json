@@ -1,0 +1,114 @@
+{
+ "format": "refinish-style/1",
+ "id": "tv-cel-night",
+ "name": "TV cel, night",
+ "engine": "cel",
+ "summary": "The TV cel finish relit for the night the way a colour designer makes a night colour model (夜色指定): each colour lit by a cool, dim key where it was lit and a navy ambient everywhere, the darkest values pulled toward navy, a thin cool rim light.",
+ "shading": {
+  "follow": "drawn",
+  "harden": 0.85,
+  "tones": 2,
+  "scale": 1.0,
+  "range": 0.05,
+  "share": 0.35,
+  "smooth": 0.4,
+  "min_island": 4.44,
+  "min_hole": 4.44,
+  "shadow": "own",
+  "tint": [
+   0.86,
+   0.84,
+   1.0
+  ],
+  "tint_amount": 0.4
+ },
+ "kinds": {
+  "skin": {
+   "share": 0.25,
+   "min_depth": 0.05,
+   "shadow": "derive",
+   "derive": [
+    -9,
+    7,
+    3
+   ]
+  },
+  "hair": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.07,
+    "smooth": 0.6,
+    "min_island": 16.7
+   }
+  },
+  "gloss": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.06
+   },
+   "base_pct": 20
+  },
+  "sheer": {
+   "base_pct": 40,
+   "scale": 4.0,
+   "range": 0.3,
+   "smooth": 1.33,
+   "min_island": 66.7,
+   "min_hole": 666.7
+  },
+  "accessory": {
+   "model": "keep"
+  },
+  "eyes": {
+   "model": "regions"
+  }
+ },
+ "palette": {
+  "pivot": 50,
+  "contrast": 1.05,
+  "lift": 0,
+  "chroma": 1.08
+ },
+ "touches": {
+  "blush": {
+   "alpha": 0.22
+  }
+ },
+ "lines": {
+  "colour": "own",
+  "own": {
+   "L": 16,
+   "chroma": 0.9
+  },
+  "strength": 1.05,
+  "cut": 0.08,
+  "outline": {
+   "width": 1.0,
+   "smooth": 3
+  },
+  "keep": {
+   "min_area": 6.67,
+   "min_area_drawn": 0.67,
+   "kinds": {
+    "hair": 44.4
+   }
+  },
+  "finder": {
+   "simplify": [
+    3,
+    9
+   ],
+   "lo": 0.18,
+   "crisp": [
+    0.15,
+    0.6
+   ]
+  }
+ },
+ "post": [
+  {
+   "op": "relight",
+   "hour": "night"
+  }
+ ]
+}

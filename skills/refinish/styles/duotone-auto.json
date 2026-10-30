@@ -1,0 +1,11 @@
+{
+ "format": "refinish-style/1",
+ "id": "duotone-auto",
+ "name": "Duotone, the picture's own colours",
+ "engine": "duotone",
+ "summary": "The whole figure read as one material: painted in its median colour and its own shadow, two flat tones over the drawing with a little of the source left under them. The colours change completely; the drawing and its shading stay.",
+ "duotone": {
+  "mode": "auto",
+  "base": "tv-cel"
+ }
+}

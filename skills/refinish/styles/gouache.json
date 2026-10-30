@@ -1,0 +1,37 @@
+{
+ "format": "refinish-style/1",
+ "id": "gouache",
+ "name": "Gouache background painting",
+ "engine": "paint",
+ "summary": "Opaque flat brushwork in large simple masses, values grouped per part, soft edges coming and going in the shade; the line art kept in a darker shade of the colour beside it. Matches a scene repainted in the same medium.",
+ "shading": {
+  "share": 0.30,
+  "scale": 2.67,
+  "smooth": 1.33,
+  "min_island": 44.4,
+  "min_hole": 33.3,
+  "keep": 0.5,
+  "keep_lit": 0.7,
+  "detail": 0.25,
+  "stroke_direction": 90,
+  "stroke_follow": 0.6,
+  "stroke_vary": 0.7
+ },
+ "kinds": {
+  "skin": {"detail": 0.5, "share": 0.20, "keep": 0.75, "stroke_follow": 0.4},
+  "hair": {"detail": 0.35, "stroke_follow": 0.9, "share": 0.35, "stroke_vary": 1.2},
+  "cloth-dark": {"stroke_follow": 0.7},
+  "sheer": {"share": 0.35},
+  "gloss": {"stroke_follow": 0.8, "keep": 0.8, "keep_lit": 0.9},
+  "accessory": {"keep": 0.85, "keep_lit": 0.9, "detail": 0.6},
+  "eyes": {"keep": 1.0, "detail": 1.0}
+ },
+ "pieces": {"size": 2.33, "merge": 1.8},
+ "palette": {"k": 16, "pull": 0.18},
+ "values": {"light_shift": [0, 0, 0], "shadow_shift": [0, 0, 0]},
+ "strokes": {"scale": 1.2, "grain": 1.0},
+ "edges": {"soft": 0.8},
+ "lines": {"colour": "trace", "strength": 0.9, "dark": 0.5, "cap": 42, "chroma": 1.3, "shade_keep": 1.0, "min_area": 8.9},
+ "texture": {"grain": 0.007, "face_detail": 0.6},
+ "seed": 7
+}

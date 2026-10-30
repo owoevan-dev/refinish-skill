@@ -1,0 +1,54 @@
+{
+ "format": "refinish-style/1",
+ "id": "cyanotype",
+ "name": "Cyanotype",
+ "engine": "duotone",
+ "summary": "A cyanotype: Prussian blue on watercolour paper, contrasty, the shadows a deep ink blue, the middle tones a clear cyan-blue, the lights the paper with a faint blue stain, the paper's tooth catching the light.",
+ "duotone": {
+  "mode": "gradient",
+  "base": "deai-strong",
+  "levels": [
+   0.1,
+   0.88
+  ],
+  "gamma": 1.1,
+  "stops": [
+   [
+    0.0,
+    [
+     18,
+     8,
+     -42
+    ]
+   ],
+   [
+    0.4,
+    [
+     36,
+     -2,
+     -42
+    ]
+   ],
+   [
+    0.75,
+    [
+     70,
+     -10,
+     -22
+    ]
+   ],
+   [
+    1.0,
+    [
+     93,
+     -3,
+     -5
+    ]
+   ]
+  ],
+  "sheet": {
+   "kind": "cold-press",
+   "tooth": 0.07
+  }
+ }
+}

@@ -1,0 +1,9 @@
+{
+ "format": "refinish-style/1",
+ "id": "neon-sign",
+ "name": "Neon sign",
+ "engine": "neon",
+ "base": "tv-cel",
+ "summary": "the line art redrawn as glowing glass tubes in the parts' own hues (greys burn white) on a dark ground, with a white-hot core and a glow past the figure; the picture grows by the glow",
+ "neon": {"tube": 2.4, "glow": 9, "core": 0.55, "fill": 0.1, "ground": [14, 12, 24], "min_line": 30, "outline": true, "halo": 0.8}
+}

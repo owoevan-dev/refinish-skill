@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: watercolour-street-scene
+expected_outcome: |
+  street_watercolour.png has street.png's size and layout (the houses, roofs, trees, road and sky where they were),
+  painted by code as a watercolour: paper texture, transparent washes laid by area, the sky as one soft gradation
+  with the clouds left light, softened edges, lines light or gone. No image generation model was used.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,10 @@
+{
+ "format": "refinish-style/1",
+ "id": "sticker",
+ "name": "Die-cut sticker",
+ "engine": "sticker",
+ "base": "tv-cel",
+ "summary": "the figure in TV cel on a white vinyl border cut along its outline, its notches closed, with a soft shadow and a faint sheen; the picture grows by the border",
+ "sticker": {"border": 18, "round": 14, "colour": [255, 255, 255], "edge": [205, 205, 205],
+             "shadow": {"offset": [2.5, 4.0], "blur": 5.0, "opacity": 0.3}, "sheen": 0.06}
+}

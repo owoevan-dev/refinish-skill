@@ -1,0 +1,20 @@
+{
+ "format": "refinish-style/1",
+ "id": "watercolour",
+ "name": "Watercolour",
+ "engine": "wash",
+ "summary": "Transparent watercolour on cold-press paper: each part a light wash of its colour, its shadow a second glaze, the lights left as paper; a little pigment gathered at the washes' drying edges and settled in the paper's tooth, a few blooms, a faint sepia pencil line. Edge darkening and the darkest values set from five museum watercolours (CC0), measured at one scale.",
+ "base": "tv-cel",
+ "wash": {
+  "medium": "watercolour",
+  "paper": "cold-press",
+  "edge": 0.15,
+  "granulation": 0.12,
+  "flow": 0.08,
+  "bloom": 0.3,
+  "bleed": 1.5,
+  "lines": 0.5,
+  "light_paper": 0.85,
+  "glaze": 0.9
+ }
+}

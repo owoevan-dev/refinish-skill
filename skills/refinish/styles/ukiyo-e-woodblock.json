@@ -1,0 +1,17 @@
+{
+ "format": "refinish-style/1",
+ "id": "ukiyo-e-woodblock",
+ "name": "Colour woodblock print (nishiki-e)",
+ "engine": "woodblock",
+ "summary": "An Edo colour woodblock print: the key block's lines carved crisp in sumi, each part one block in the period pigment nearest its colour (indigo, Prussian blue, safflower red, red lead, yellow, green, purple, ochre), shadows printed as bokashi gradations, the wood's grain and the baren's mottle in the flats, washi paper, a hair off register.",
+ "base": "tv-cel",
+ "woodblock": {
+  "paper": "washi",
+  "bokashi": 0.55,
+  "grain": 0.07,
+  "offset": 0.5,
+  "line_width": 0.25,
+  "min_line": 18.0,
+  "outline": 1.0
+ }
+}

@@ -1,0 +1,58 @@
+{
+ "format": "refinish-style/1",
+ "id": "duotone-navy",
+ "name": "Duotone, navy and cream",
+ "engine": "duotone",
+ "summary": "A gradient map over a flat finish: the shadows and lines deep navy, the lights a warm cream, the middle tones a soft blue-grey between them. A digital duotone, flat and clean.",
+ "duotone": {
+  "mode": "gradient",
+  "base": "deai-strong",
+  "levels": [
+   0.06,
+   0.97
+  ],
+  "gamma": 1.0,
+  "stops": [
+   [
+    0.0,
+    [
+     14,
+     4,
+     -22
+    ]
+   ],
+   [
+    0.3,
+    [
+     28,
+     8,
+     -36
+    ]
+   ],
+   [
+    0.6,
+    [
+     58,
+     2,
+     -18
+    ]
+   ],
+   [
+    0.82,
+    [
+     86,
+     1,
+     0
+    ]
+   ],
+   [
+    1.0,
+    [
+     96,
+     1,
+     8
+    ]
+   ]
+  ]
+ }
+}

@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: cel-finish-keeps-the-drawing
+expected_outcome: |
+  figure_cel.png is the same character as figure.png, pixel for pixel in its outline, face and pose, re-finished
+  by code in a TV-anime cel look: each material in one lit and one shadow tone with hard edges, the lines kept,
+  nothing generated. The reply says what changed and what was kept, and names anything to look at.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,29 @@
+{
+ "format": "refinish-style/1",
+ "id": "woodblock-scene",
+ "name": "Colour woodblock print, landscape",
+ "engine": "woodblock",
+ "summary": "The woodblock print for a scene: the key block, the period pigments, a deep Prussian-blue bokashi wiped down from the top of the sky (一文字ぼかし), washi.",
+ "base": "tv-cel",
+ "woodblock": {
+  "paper": "washi",
+  "bokashi": 0.55,
+  "grain": 0.07,
+  "offset": 0.5,
+  "line_width": 0.25,
+  "min_line": 18.0,
+  "outline": 1.0
+ },
+ "post": [
+  {
+   "op": "bokashi",
+   "colour": [
+    32,
+    8,
+    -38
+   ],
+   "depth": 0.85,
+   "reach": 0.45
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+{
+ "format": "refinish-style/1",
+ "id": "pop-art-dots",
+ "name": "Pop art, Ben-Day dots",
+ "engine": "pop",
+ "base": "tv-cel",
+ "summary": "comic-print pop art: heavy black lines, flat process inks (red, yellow, blue, black on white) and every tint printed as an even grid of Ben-Day dots",
+ "pop": {"cell": 9, "levels": [0.18, 0.3, 0.42], "line_grow": 1.0, "outline": 3.0}
+}

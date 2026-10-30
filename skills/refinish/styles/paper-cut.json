@@ -1,0 +1,9 @@
+{
+ "format": "refinish-style/1",
+ "id": "paper-cut",
+ "name": "Paper cut",
+ "engine": "papercut",
+ "base": "tv-cel",
+ "summary": "layers of cut coloured paper: each part's tones as flat sheets with clean, slightly simplified cut edges, a soft shadow under each sheet onto the one below, the paper's fibre; no drawn lines, the eyes and the mouth as drawn",
+ "papercut": {"simplify": 2.5, "min_piece": 25, "shadow": {"offset": [1.6, 2.6], "blur": 2.4, "opacity": 0.6}, "fibre": 0.35, "paper": "washi", "chroma": 1.0}
+}

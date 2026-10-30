@@ -1,0 +1,109 @@
+{
+ "format": "refinish-style/1",
+ "id": "film-everyday-night-cel",
+ "name": "Film everyday cel, night",
+ "engine": "cel",
+ "summary": "The film everyday finish at night: the same two soft-turned tones and warm dark lines, then the figure relit the way a theatrical film grades its night scenes: still light (skin about L 75) but nearly colourless (skin chroma about 6), a warm lantern key, a cool sky ambient that turns the shadows mauve-grey. No grain: none shows in the night stills. Colours fitted to measurements of night stills.",
+ "shading": {
+  "follow": "drawn",
+  "harden": 0.9,
+  "tones": 2,
+  "scale": 1.0,
+  "range": 0.05,
+  "smooth": 0.4,
+  "min_island": 4.44,
+  "min_hole": 4.44,
+  "soft": 1.0,
+  "shadow": "own",
+  "tint": [
+   0.92,
+   0.94,
+   1.0
+  ],
+  "tint_amount": 0.4
+ },
+ "kinds": {
+  "skin": {
+   "min_depth": 0.05,
+   "shadow": "derive",
+   "derive": [
+    -15,
+    8,
+    3
+   ]
+  },
+  "hair": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.06,
+    "smooth": 0.5,
+    "min_island": 8.0
+   },
+   "tint": [
+    0.9,
+    0.95,
+    1.0
+   ]
+  },
+  "accessory": {
+   "model": "keep"
+  },
+  "eyes": {
+   "model": "keep"
+  }
+ },
+ "palette": {
+  "pivot": 50,
+  "contrast": 1.0,
+  "lift": 0,
+  "chroma": 0.78
+ },
+ "touches": {
+  "blush": {
+   "alpha": 0.06,
+   "colour": [
+    1.0,
+    0.7,
+    0.72
+   ]
+  }
+ },
+ "lines": {
+  "colour": "trace",
+  "trace": {
+   "dark": 0.41,
+   "cap": 40,
+   "chroma": 1.5,
+   "neutral_bias": [
+    0,
+    0
+   ]
+  },
+  "strength": 1.0,
+  "cut": 0.05,
+  "grow": 0.08,
+  "outline": {
+   "width": 0.5,
+   "smooth": 3
+  },
+  "keep": {
+   "min_area_drawn": 0.67
+  },
+  "finder": {
+   "simplify": [
+    3,
+    9
+   ],
+   "lo": 0.1
+  }
+ },
+ "texture": {
+  "grain": 0.0
+ },
+ "post": [
+  {
+   "op": "relight",
+   "hour": "film-night"
+  }
+ ]
+}

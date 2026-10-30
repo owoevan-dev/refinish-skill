@@ -1,0 +1,15 @@
+{
+ "format": "refinish-style/1",
+ "id": "ink-wash",
+ "name": "Ink wash (sumi-e)",
+ "engine": "wash",
+ "summary": "Sumi ink on xuan paper: no colour but the five tones of ink, each part a wash of the tone of its lightness, the lines a brush line broken by dry-brush streaks, the washes feathering into the paper.",
+ "base": "tv-cel",
+ "wash": {
+  "medium": "ink",
+  "paper": "xuan",
+  "lines": 0.95,
+  "bleed": 2.5,
+  "dry": 0.55
+ }
+}

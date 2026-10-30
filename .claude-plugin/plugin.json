@@ -1,0 +1,22 @@
+{
+  "name": "refinish-skill",
+  "version": "0.1.0",
+  "description": "Re-finish character art and backgrounds in another style by code, never by regenerating them: 37 styles (anime cel and its film, night and 90s variants, a cleaner de-AI finish, duotone and risograph, watercolour, gouache, manga screentone, an animator's key drawing, screen print, ink wash, ukiyo-e woodblock, pop art, neon, stained glass, paper cut, pixel sprites), style matching by measurement, style tweaks from plain words, relighting, cutting a figure out of its scene, and a compositing camera.",
+  "license": "MIT",
+  "keywords": [
+    "art-style",
+    "anime",
+    "cel-shading",
+    "style-transfer",
+    "watercolour",
+    "manga",
+    "woodblock",
+    "pixel-art",
+    "duotone",
+    "game-dev",
+    "visual-novel"
+  ],
+  "skills": [
+    "./skills/refinish"
+  ]
+}

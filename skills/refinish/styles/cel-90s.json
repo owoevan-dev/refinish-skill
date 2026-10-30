@@ -1,0 +1,162 @@
+{
+ "format": "refinish-style/1",
+ "id": "cel-90s",
+ "name": "90s TV cel",
+ "engine": "cel",
+ "summary": "Painted cels photographed on film: hard two-tone paint with cool violet-leaning shadows, a hand-traced line that wanders a little off the drawing, slightly lifted blacks and warm highlights, the softness of a rostrum lens, a little halation round the lights and a fine film grain.",
+ "shading": {
+  "follow": "drawn",
+  "harden": 0.92,
+  "tones": 2,
+  "scale": 1.0,
+  "range": 0.05,
+  "share": 0.35,
+  "smooth": 0.4,
+  "min_island": 4.44,
+  "min_hole": 4.44,
+  "shadow": "derive",
+  "tint": [
+   0.86,
+   0.84,
+   1.0
+  ],
+  "tint_amount": 0.4,
+  "derive": [
+   -14,
+   6,
+   -8
+  ]
+ },
+ "kinds": {
+  "skin": {
+   "share": 0.25,
+   "min_depth": 0.05,
+   "shadow": "derive",
+   "derive": [
+    -9,
+    7,
+    3
+   ]
+  },
+  "hair": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.07,
+    "smooth": 0.6,
+    "min_island": 16.7
+   }
+  },
+  "gloss": {
+   "highlight": {
+    "mode": "crisp",
+    "share": 0.06
+   },
+   "base_pct": 20
+  },
+  "sheer": {
+   "base_pct": 40,
+   "scale": 4.0,
+   "range": 0.3,
+   "smooth": 1.33,
+   "min_island": 66.7,
+   "min_hole": 666.7
+  },
+  "accessory": {
+   "model": "keep"
+  },
+  "eyes": {
+   "model": "regions"
+  }
+ },
+ "palette": {
+  "pivot": 50,
+  "contrast": 1.0,
+  "lift": 0,
+  "chroma": 0.95
+ },
+ "touches": {
+  "blush": {
+   "alpha": 0.22
+  }
+ },
+ "lines": {
+  "colour": "ink",
+  "own": {
+   "L": 16,
+   "chroma": 0.9
+  },
+  "strength": 1.05,
+  "cut": 0.08,
+  "outline": {
+   "width": 1.0,
+   "smooth": 3
+  },
+  "keep": {
+   "min_area": 6.67,
+   "min_area_drawn": 0.67,
+   "kinds": {
+    "hair": 44.4
+   }
+  },
+  "finder": {
+   "simplify": [
+    3,
+    9
+   ],
+   "lo": 0.18,
+   "crisp": [
+    0.15,
+    0.6
+   ]
+  },
+  "ink": {
+   "ink": [
+    16,
+    6,
+    2
+   ],
+   "skin": [
+    34,
+    20,
+    18
+   ]
+  },
+  "jitter": 0.35
+ },
+ "post": [
+  {
+   "op": "soften",
+   "radius": 0.35,
+   "amount": 0.7
+  },
+  {
+   "op": "halation",
+   "threshold": 0.82,
+   "radius": 5.0,
+   "amount": 0.18
+  },
+  {
+   "op": "curve",
+   "lift": [
+    0.035,
+    0.03,
+    0.045
+   ],
+   "gain": [
+    0.97,
+    0.96,
+    0.93
+   ],
+   "gamma": [
+    1.0,
+    0.98,
+    0.96
+   ]
+  },
+  {
+   "op": "grain",
+   "amount": 0.007,
+   "size": 0.5
+  }
+ ]
+}

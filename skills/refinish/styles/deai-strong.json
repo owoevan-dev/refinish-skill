@@ -1,0 +1,25 @@
+{
+ "format": "refinish-style/1",
+ "id": "deai-strong",
+ "name": "De-AI, strong",
+ "engine": "deai",
+ "summary": "The picture's own colours kept; every area in clean flat tones (shadow, base, a light), crisp lines in a dark shade of their own colour and a closed outline.",
+ "deai": {
+  "flatten": 0.92,
+  "tones": 3,
+  "smooth": 0.6,
+  "lines": "crisp",
+  "line_dark": 0.8,
+  "outline": 1.0,
+  "chroma": 0.94,
+  "min_island": 12.0,
+  "guard": [
+   18.0,
+   40.0
+  ],
+  "noise": 4.0,
+  "despeckle": 100.0,
+  "patch_de": 0.0,
+  "patch_frac": 0.06
+ }
+}

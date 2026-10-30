@@ -1,0 +1,23 @@
+{
+ "format": "refinish-style/1",
+ "id": "ink-wash-scene",
+ "name": "Ink wash, landscape",
+ "engine": "wash",
+ "summary": "Sumi ink for a scene: the sky left as paper, the far hills faded toward it, the planes separated by bands of mist (留白、遠近), the near things in the darker tones.",
+ "base": "tv-cel",
+ "wash": {
+  "medium": "ink",
+  "paper": "xuan",
+  "lines": 0.95,
+  "bleed": 2.5,
+  "dry": 0.55
+ },
+ "post": [
+  {
+   "op": "mist",
+   "amount": 0.75,
+   "bands": 0.5,
+   "paper": "xuan"
+  }
+ ]
+}

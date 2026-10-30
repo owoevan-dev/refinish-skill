@@ -1,0 +1,14 @@
+{
+ "format": "refinish-style/1",
+ "id": "pixel-portrait",
+ "name": "Pixel sprite (portrait)",
+ "engine": "pixel",
+ "summary": "A large 192-pixel sprite for a portrait or a close shot: more colours, a dark outline, the drawn folds kept; the palette written beside it.",
+ "base": "tv-cel",
+ "pixel": {
+  "height": 192,
+  "outline": "dark",
+  "colours": 48,
+  "folds_from": 128
+ }
+}

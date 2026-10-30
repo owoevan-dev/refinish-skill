@@ -1,0 +1,27 @@
+{
+ "format": "refinish-style/1",
+ "id": "watercolour-scene",
+ "name": "Watercolour, landscape",
+ "engine": "wash",
+ "summary": "Watercolour for a scene: the sky one wet-in-wet gradation from its top colour to a paler horizon with soft blooms and the clouds left as paper, the rest in washes and glazes on cold-press paper.",
+ "base": "tv-cel",
+ "wash": {
+  "medium": "watercolour",
+  "paper": "cold-press",
+  "edge": 0.15,
+  "granulation": 0.12,
+  "flow": 0.08,
+  "bloom": 0.3,
+  "bleed": 1.5,
+  "lines": 0.4,
+  "light_paper": 0.85,
+  "glaze": 0.9
+ },
+ "post": [
+  {
+   "op": "wet_sky",
+   "blooms": 0.35,
+   "clouds": 0.8
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "format": "refinish-style/1",
+ "id": "genga-pencil",
+ "name": "Animator's key drawing (genga)",
+ "engine": "pencil",
+ "summary": "An animator's key drawing: the figure in soft graphite on drawing paper, the lines broken by the paper's tooth, the edges of shadows drawn in coloured pencil by the common convention (shadow blue, highlight red, second shadow yellow-green; studios differ).",
+ "base": "tv-cel",
+ "pencil": {
+  "paper": "hot-press",
+  "strength": 0.9,
+  "tooth": 0.35,
+  "min_line": 10.0,
+  "outline": 0.8,
+  "colour_width": 0.5
+ }
+}
