@@ -43,7 +43,8 @@ def put(d, path, value):
 
 
 def apply(style, changes):
-    """The style with one step of each change; returns the list of (path, old, new)."""
+    """The style with one step of each change; returns the list of (path, old, new). A number the style does not
+    set starts from the engine's default, and that is its old value."""
     log = []
     for ch in changes:
         op = ch[0]
@@ -54,7 +55,7 @@ def apply(style, changes):
             new = base + v if op == "add" else base * v
             new = round(float(min(hi, max(lo, new))), 4)
             put(style, path, new)
-            log.append((path, old, new))
+            log.append((path, base, new))
         elif op == "set":
             _, path, v = ch
             old = get(style, path)
@@ -108,9 +109,11 @@ def main():
         if not changes:
             skipped.append(k)
             continue
+        moves = {}                                      # each key: before the first step, after the last
         for _ in range(a.steps):
-            log = apply(new, changes)
-        changed += [{"key": p, "was": o, "now": n} for p, o, n in log]
+            for key, was, now in apply(new, changes):
+                moves.setdefault(key, [was, now])[1] = now
+        changed += [{"key": k_, "was": w_, "now": n_} for k_, (w_, n_) in moves.items()]
         measure[k] = e["measure"]
     if changed:
         new["id"] = Path(a.out).stem

@@ -14,7 +14,9 @@ Usage:
 
 REF: finished pictures in the look wanted (cut-outs are best; one to five, ideally from one set). They are measured
 where they lie and never copied: the style written holds numbers only (references/replicating-a-style.md says what
-can and cannot be carried over). Every picture, the references and the results alike, is measured shrunk to one
+can and cannot be carried over). It fits the cel finishes, the only ones whose settings it moves: --start takes a cel
+style; a reference in another technique (a watercolour, a print) starts from the nearest bundled style of that
+technique, changed by words (tweak_style.py). Every picture, the references and the results alike, is measured shrunk to one
 height (--height, by default the smallest figure among them) with the same stand-in parts (--clusters), so the
 numbers compare like with like.
 Prints JSON: the start style and why, every round's numbers against the target, the round kept, and the numbers
@@ -162,6 +164,13 @@ def main():
     ap.add_argument("--clusters", type=int, default=6)
     ap.add_argument("--work")
     a = ap.parse_args()
+    if a.rounds < 0 or a.clusters < 2:
+        die("--rounds is 0 or more and --clusters 2 or more")
+    if a.start != "auto":
+        eng = load_style(resolve_style(a.start)).get("engine")
+        if eng != "cel":
+            die(f"{a.start} is a {eng} finish, and this fits the cel finishes only: start from a cel style, or change "
+                f"{a.start} by words with scripts/tweak_style.py")
     sj = load_subject(a.subject)
     src = subject_path(sj, sj["image"])
     work = Path(a.work) if a.work else Path(a.out).with_suffix("").parent / (Path(a.out).stem + ".fit")

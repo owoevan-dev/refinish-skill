@@ -13,9 +13,10 @@ Usage:
   halo    a cut-out's edge keeps a light or dark fringe of the background it was cut from: the edge's colour is
           taken from just inside it, and where the fringe is strong the matte is choked by a pixel
   specks  small blobs of a colour foreign to the flat area round them (rendering noise, stray dots) are filled from
-          their surroundings; lines, the protected features and anything in a busy area are left alone
+          their surroundings; lines, the protected features and anything in a busy area are left alone. A small dark
+          dot is taken only off a known face (the subject's focal ellipse named "face"): on a face it is a feature
   lines   gaps in the line art: two line ends facing each other across a short gap, or a line end facing a line, are
-          joined with a stroke of the line's own colour and width
+          joined with a stroke of the line's own colour and width; never inside a protected box
   bleed   colour that ran across a part's edge into its neighbour: near a part's boundary, pixels in the neighbour's
           colour and not their own part's are repainted from their part (needs --subject)
 
@@ -172,10 +173,11 @@ def thin(mask):
             return m[1:-1, 1:-1].astype(bool)
 
 
-def fix_lines(img, alpha, U, line, max_gap=None, max_turn=30.0):
+def fix_lines(img, alpha, U, line, max_gap=None, max_turn=30.0, protect=None):
     """Gaps in the line art closed: a line end facing another line end, or facing a line's side, across a gap no
     longer than `max_gap`, joined by a stroke of the line's colour and width. A gap between ends that point away from
-    each other is left: it is drawn so (a strand's tip, a fold that stops)."""
+    each other is left: it is drawn so (a strand's tip, a fold that stops). No stroke is laid where it would touch
+    `protect` (the features kept as drawn)."""
     within = alpha > 0.5
     max_gap = max_gap or U.len(5.0)
     h, w = alpha.shape
@@ -255,13 +257,15 @@ def fix_lines(img, alpha, U, line, max_gap=None, max_turn=30.0):
         if (seg.astype(bool) & ~within).any():
             continue
         thick = max(1, int(round(2 * width[ends[i][0], ends[i][1]] - 1)))   # (the stroke's width, from its centre)
+        stroke = np.zeros((h, w), np.uint8)
+        cv2.line(stroke, (int(a0[0]), int(a0[1])), (int(round(a1[0])), int(round(a1[1]))), 255, thick, cv2.LINE_AA)
+        if protect is not None and (protect & (stroke > 0)).any():
+            continue
         r = max(2, thick)
         y0, y1, x0, x1 = (max(0, int(a0[1]) - r), min(h, int(a0[1]) + r + 1), max(0, int(a0[0]) - r),
                           min(w, int(a0[0]) + r + 1))
         near = line[y0:y1, x0:x1]
         colour = np.median(img[y0:y1, x0:x1][near], axis=0) if near.any() else np.zeros(3, np.float32)
-        stroke = np.zeros((h, w), np.uint8)
-        cv2.line(stroke, (int(a0[0]), int(a0[1])), (int(round(a1[0])), int(round(a1[1]))), 255, thick, cv2.LINE_AA)
         k = stroke.astype(np.float32)[..., None] / 255
         out = out * (1 - k) + colour * k
         drawn |= stroke
@@ -402,13 +406,16 @@ def main():
         if f == "halo":
             out, r = fix_halo(out, alpha, U, out_alpha)
         elif f == "specks":
+            # the face is known only from a focal ellipse named for it: without one, no place is known to be off
+            # the face, and a dark dot anywhere may be a mole
             face = None
-            if sj is not None:
+            focal = (sj or {}).get("focal", [])
+            if any(str(e.get("name", "")).lower() == "face" for e in focal):
                 from _core import ellipse_mask
-                face = (ellipse_mask(*alpha.shape, sj.get("focal", [])) > 0.3) | protect
+                face = (ellipse_mask(*alpha.shape, focal) > 0.3) | protect
             out, r = fix_specks(out, alpha, U, protect, cv2.dilate(line.astype(np.uint8), np.ones((3, 3))) > 0, face)
         elif f == "lines":
-            out, r = fix_lines(out, alpha, U, line)
+            out, r = fix_lines(out, alpha, U, line, protect=protect)
         else:
             out, r = fix_bleed(out, alpha, U, parts, names, line, protect)
         marks[f] = r.pop("_mask", None)

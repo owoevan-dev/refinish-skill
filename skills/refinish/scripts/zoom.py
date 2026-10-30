@@ -31,6 +31,8 @@ def main():
     ap.add_argument("--step", type=int, default=50, help="grid spacing in the picture's pixels")
     ap.add_argument("--size", type=int, default=1000, help="the enlarged picture's longer side")
     a = ap.parse_args()
+    if a.step < 1 or a.size < 1:
+        die("--step and --size are pixels: 1 or more")
     img, alpha = load_rgba(a.picture)
     h, w = alpha.shape
     try:

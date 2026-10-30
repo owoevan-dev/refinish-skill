@@ -126,7 +126,7 @@ It moves each matched word's keys one step (`--steps N` for more) and names the 
 python scripts/fit_style.py subject.json ref1.png ref2.png --out matched.json
 ```
 
-It measures the references' finish, starts from the nearest bundled style and moves each number more than 10% off toward the references, round by round. [references/replicating-a-style.md](references/replicating-a-style.md) has the manual loop and the table of numbers to parameters.
+It measures the references' finish, starts from the nearest bundled cel style and moves each number more than 10% off toward the references, round by round. It fits the cel finishes only: for a reference in another technique (a watercolour, a print), start from the nearest bundled style of that technique and change it by words (step 7). Tell the user what does not carry over: the design and the scene's light. [references/replicating-a-style.md](references/replicating-a-style.md) has the manual loop and the table of numbers to parameters.
 
 Three rules hold either way:
 - the reference pictures stay where the user keeps them, never copied into a project or a shared file;

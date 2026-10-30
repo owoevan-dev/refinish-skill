@@ -63,6 +63,7 @@ def _clusters(px, k=4, seed=0):
     rng = np.random.default_rng(seed)
     sub = px[rng.choice(len(px), min(len(px), 20000), replace=False)].astype(np.float32)
     w = np.array([0.6, 1, 1], np.float32)
+    cv2.setRNGSeed(seed)                                # (k-means++ draws from OpenCV's generator)
     _, lbl, cen = cv2.kmeans(sub * w, k, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 25, 0.5), 2,
                              cv2.KMEANS_PP_CENTERS)
     share = np.bincount(lbl.ravel(), minlength=k) / len(sub)

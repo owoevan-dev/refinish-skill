@@ -107,7 +107,7 @@ Applied to every skin, such a convention would change who the character is. The 
 - a cut edge smoothed wider than the part (paper cut);
 - a thin part's colour read off its outline.
 
-The paper cut limits each piece's smoothing to about half its width. It fills any sliver no sheet covers with the cel base's colour. Paper cut and woodblock read each part's colour off its fill.
+The paper cut limits each piece's smoothing to about half its width. It fills any sliver no sheet covers inside the drawing with the cel base's colour; what the smoothed outer edge closes beyond the drawing is cut from the sheet beside it, and the eyes lie on the face's paper as drawn, with no sheet of their own under them. Paper cut and woodblock read each part's colour off its fill.
 
 **What to change:**
 - a smaller `papercut.simplify`;

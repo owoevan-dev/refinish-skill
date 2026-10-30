@@ -9,8 +9,10 @@ Usage:
   python scripts/png_note.py OUT.png --key Description "..."
   python scripts/png_note.py OUT.png --read
 
-The pixels are not touched: the chunk goes right after the header. A note of the same key is replaced. This is a
-plain note for honesty and bookkeeping, not signed Content Credentials (C2PA); see references/legal-and-disclosure.md.
+The pixels are not touched: the chunk goes right after the header. A note of the same key is replaced, in whichever
+of the PNG's three text chunks it was (tEXt, the compressed zTXt, iTXt), so no reader finds the old one; notes of
+other keys are kept. This is a plain note for honesty and bookkeeping, not signed Content Credentials (C2PA); see
+references/legal-and-disclosure.md.
 Prints JSON. Exit codes: 0 done, 2 bad input.
 """
 import argparse
@@ -45,13 +47,21 @@ def text_chunk(key, text):
     return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xffffffff)
 
 
+TEXT = (b"tEXt", b"zTXt", b"iTXt")
+
+
 def read_note(kind, body):
-    """(keyword, text) of a tEXt or iTXt chunk, else None."""
+    """(keyword, text) of a tEXt, zTXt or iTXt chunk, else None."""
     if b"\x00" not in body:
         return None
     k, rest = body.split(b"\x00", 1)
     if kind == b"tEXt":
         return k.decode("latin-1"), rest.decode("latin-1")
+    if kind == b"zTXt" and len(rest) >= 1:
+        try:                                            # a compression method byte (0, zlib), then the text
+            return k.decode("latin-1"), zlib.decompress(rest[1:]).decode("latin-1")
+        except zlib.error:
+            return None
     if kind == b"iTXt" and len(rest) >= 2:
         flag, rest = rest[0], rest[2:]
         parts = rest.split(b"\x00", 2)
@@ -84,7 +94,7 @@ def main():
         return
     out = bytearray(SIG)
     for i, n, kind, body in chunks(data):
-        if kind in (b"tEXt", b"iTXt") and body.split(b"\x00", 1)[0] == a.key.encode("latin-1"):
+        if kind in TEXT and body.split(b"\x00", 1)[0] == a.key.encode("latin-1"):
             continue                                        # the old note of this key is replaced
         out += data[i:i + 12 + n]
         if kind == b"IHDR":

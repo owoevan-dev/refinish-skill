@@ -84,6 +84,10 @@ def main():
         return
     img, alpha = load_rgba(a.src)
     h, w = alpha.shape
+    if a.box:
+        x0, y0, x1, y1 = max(0, x0), max(0, y0), min(w, x1), min(h, y1)
+        if x1 <= x0 or y1 <= y0:
+            die(f"--box {a.box} holds nothing of the {w}x{h} source: x0,y0,x1,y1 with x0 < x1 and y0 < y1")
     if not a.box:
         ys, xs = np.nonzero(alpha > 0.03)
         if not len(ys):

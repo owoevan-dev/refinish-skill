@@ -81,7 +81,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 
 - **Parts, not pixels.** A subject file says what each part of the picture is: skin, hair, each garment. Every material is painted from its own colours, so a red ribbon never bleeds into the skin beside it. The file is drafted automatically and corrected with a few hint points.
 - **Every result is checked.** Each finish is compared with its source for parts, colours, the outline, lost features, skin printed the wrong colour, boxes round the face and mottled dark cloth. Every warning names a place and a likely cause.
-- **Match a reference.** `fit_style.py` measures the finish of reference pictures (line darkness, chroma, flatness, edge softness, grain) and fits a style to them, round by round. The references are measured, never copied.
+- **Match a reference.** `fit_style.py` measures the finish of reference pictures (line darkness, chroma, flatness, edge softness, grain) and fits one of the cel styles to them, round by round. The references are measured, never copied. The design (proportions, how the eyes are drawn) and the scene's light do not carry over; for a reference in another technique, start from the nearest style and change it in words (`tweak_style.py`).
 - **Adjust it in words.** `tweak_style.py` turns "softer shadows", "more vivid", "陰影柔一點" or "線を太く" into parameter steps, and tells you which measurement should move.
 - **Relight.** Night and sunset are worked out from the day colours in linear light, or come from a cinematic night grade.
 - **Mix finishes.** `recipe.py` layers finishes part by part: the clothes in watercolour and the face in cel, or a screentone multiplied over a wash.

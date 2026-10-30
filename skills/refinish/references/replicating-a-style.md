@@ -11,7 +11,7 @@ Tell the user this before starting. A request for "the style of X" gets X's fini
 
 ## The quick way: fit_style.py
 
-`scripts/fit_style.py SUBJECT.json REF.png [REF2.png ...] --out STYLE.json` runs the loop below for you:
+`scripts/fit_style.py SUBJECT.json REF.png [REF2.png ...] --out STYLE.json` runs the loop below for you, within the cel finishes (the only ones whose settings it moves; `--start` refuses another engine). A reference in another technique, a watercolour or a print, starts from the nearest bundled style of that technique, changed by words (below):
 1. It measures the references and the subject at one height with the same stand-in parts.
 2. It tries the bundled cel styles on the subject and starts from the nearest.
 3. Each round moves every number more than 10 % off one step toward the references. A number that overshoots takes half steps after that.

@@ -666,3 +666,241 @@ def test_exit_codes_follow_the_checks(draft, tmp_path):
         assert r.returncode == (1 if d["check"]["verdict"] == "fail" else 0), (style, d["check"])
         r2, d2 = run("check_output.py", draft, out, "--style", style)
         assert (r2.returncode, d2["verdict"]) == (r.returncode, d["check"]["verdict"]), (style, d2["verdict"])
+
+
+# ---------------------------------------------------------------------------------- composite, repair, note, paint
+
+def test_composite_grades_all_of_a_layer_and_blurs_before_the_frame(tmp_path):
+    """A layer's grade reaches all of it: a veil at a quarter or just under half alpha is greyed by chroma 0 as the solid
+    one is (below half alpha it once kept its colour). A light just past the frame's edge, blurred, spreads into it
+    (the frame was once cut before the blur, and the light lost)."""
+    cv2.imwrite(str(tmp_path / "bg.png"), np.full((200, 300, 3), 128, np.uint8))
+    sc_path = tmp_path / "scene.json"
+    for a8 in (64, 127, 255):
+        lay = np.zeros((100, 100, 4), np.uint8)
+        lay[..., 2], lay[..., 3] = 255, a8
+        cv2.imwrite(str(tmp_path / f"red{a8}.png"), lay)
+        sc = {"frame": [300, 200], "background": {"image": "bg.png"},
+              "layers": [{"image": f"red{a8}.png", "place": [50, 150, 1.0], "grade": {"chroma": 0}}]}
+        sc_path.write_text(json.dumps(sc), encoding="utf-8")
+        r, _ = run("composite.py", sc_path, tmp_path / "o.png")
+        assert r.returncode == 0, r.stderr[-300:]
+        px = cv2.imread(str(tmp_path / "o.png"))[100, 100].astype(int)
+        assert px.max() - px.min() <= 3, (a8, px.tolist())
+    cv2.imwrite(str(tmp_path / "black.png"), np.zeros((200, 300, 3), np.uint8))
+    cv2.imwrite(str(tmp_path / "lamp.png"), np.full((120, 60, 4), 255, np.uint8))
+    sc = {"frame": [300, 200], "background": {"image": "black.png"},
+          "layers": [{"image": "lamp.png", "place": [304, 160, 1.0], "blur": 20}]}       # wholly past the right edge
+    sc_path.write_text(json.dumps(sc), encoding="utf-8")
+    r, _ = run("composite.py", sc_path, tmp_path / "o.png")
+    assert r.returncode == 0 and cv2.imread(str(tmp_path / "o.png"))[100, 299].min() > 40
+
+
+def test_line_repair_keeps_out_of_protected_boxes():
+    """A gap in a line inside a protected box is left (the features are kept as drawn); the same gap outside is
+    closed. repair.py passes the subject's boxes on."""
+    from _core import Units
+    from repair import fix_lines
+    img = np.ones((300, 300, 3), np.float32)
+    alpha = np.ones((300, 300), np.float32)
+    for y in (100, 200):
+        cv2.line(img, (40, y), (140, y), (0.15, 0.12, 0.14), 4)
+        cv2.line(img, (148, y), (260, y), (0.15, 0.12, 0.14), 4)
+    line = img.mean(-1) < 0.5
+    U = Units(alpha, head_px=900)
+    _, rep = fix_lines(img, alpha, U, line)
+    assert rep["found"] == 2
+    box = np.zeros((300, 300), bool)
+    box[80:120, 120:170] = True
+    out, rep = fix_lines(img, alpha, U, line, protect=box)
+    assert rep["found"] == 1 and not (np.abs(out - img).max(-1) > 0.03)[box].any()
+    assert (np.abs(out - img).max(-1) > 0.03)[190:210, 135:155].any()
+    assert "protect=protect" in (SCRIPTS / "repair.py").read_text(encoding="utf-8")
+
+
+def test_dark_dots_kept_on_a_face_not_known(draft, figure, tmp_path):
+    """A dark dot is taken as a speck only off a known face: with the subject's focal face, a dot on the jacket goes and
+    a mole on the cheek stays; with no focal face, both stay (the cheek's mole was once taken as a speck)."""
+    im = cv2.imread(str(figure), cv2.IMREAD_UNCHANGED)
+    spots = {"cheek": (205, 222), "jacket": (300, 470)}
+    for x, y in spots.values():
+        im[y:y + 3, x:x + 3, :3] = (40, 32, 36)
+    p = tmp_path / "dots.png"
+    cv2.imwrite(str(p), im)
+    sj = json.loads(draft.read_text(encoding="utf-8"))
+    assert any(f["name"] == "face" for f in sj["focal"])
+    sj.pop("focal")
+    nofocal = draft.with_name("nofocal.json")
+    nofocal.write_text(json.dumps(sj), encoding="utf-8")
+
+    def changed(subject):
+        r, _ = run("repair.py", p, tmp_path / "out.png", "--fix", "specks", "--subject", subject)
+        assert r.returncode == 0, r.stderr[-300:]
+        out = cv2.imread(str(tmp_path / "out.png"), cv2.IMREAD_UNCHANGED)
+        return {k: bool((np.abs(out[y:y + 3, x:x + 3, :3].astype(int) - im[y:y + 3, x:x + 3, :3].astype(int)) > 8).any())
+                for k, (x, y) in spots.items()}
+
+    assert changed(draft) == {"cheek": False, "jacket": True}
+    assert changed(nofocal) == {"cheek": False, "jacket": False}
+
+
+def test_png_note_replaces_a_compressed_note(tmp_path):
+    """A note of the same key in a zTXt chunk (compressed) is replaced too, so no reader finds the old one; a note of
+    another key and the pixels are kept."""
+    import struct
+    import zlib
+
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xffffffff)
+
+    p = tmp_path / "a.png"
+    img = (np.random.default_rng(1).random((20, 30, 4)) * 255).astype(np.uint8)
+    cv2.imwrite(str(p), img)
+    data = p.read_bytes()
+    i = 8 + 12 + struct.unpack(">I", data[8:12])[0]
+    old = chunk(b"zTXt", b"Comment\x00\x00" + zlib.compress(b"OLD: hand drawn"))
+    other = chunk(b"zTXt", b"Author\x00\x00" + zlib.compress(b"someone"))
+    p.write_bytes(data[:i] + old + other + data[i:])
+    _, d = run("png_note.py", p, "--read")
+    assert d["notes"] == {"Comment": "OLD: hand drawn", "Author": "someone"}
+    r, _ = run("png_note.py", p, "AI-assisted: refinished with tv-cel")
+    assert r.returncode == 0
+    data, notes, j = p.read_bytes(), [], 8
+    while j < len(data):
+        n = struct.unpack(">I", data[j:j + 4])[0]
+        if data[j + 4:j + 8] in (b"tEXt", b"zTXt", b"iTXt"):
+            notes.append(data[j + 8:j + 8 + n].split(b"\x00", 1)[0])
+        j += 12 + n
+    assert sorted(notes) == [b"Author", b"Comment"]
+    _, d = run("png_note.py", p, "--read")
+    assert d["notes"] == {"Comment": "AI-assisted: refinished with tv-cel", "Author": "someone"}
+    assert np.array_equal(cv2.imread(str(p), cv2.IMREAD_UNCHANGED), img)
+
+
+def test_paint_follows_its_own_seed(draft):
+    """A paint finish with a given seed comes out the same whatever ran before it in the process (another finish in a
+    recipe): its palette's k-means once drew from OpenCV's shared generator."""
+    from _core import Units
+    from _style import load_style, load_subject, resolve_style
+    from parts import load_or_build
+    import _paint
+    sj = load_subject(draft)
+    img, alpha, parts = load_or_build(sj)
+    U = Units(alpha, sj.get("head_px"))
+    st = load_style(resolve_style("gouache"))
+    outs = []
+    for g in (1, 987654):
+        cv2.setRNGSeed(g)
+        outs.append(_paint.run(sj, st, img, alpha, parts, U, seed=7)[0])
+    assert np.array_equal(outs[0], outs[1])
+
+
+# -------------------------------------------------------------------------------------------- paper cut, fit, tweak
+
+def test_paper_cut_closes_gaps_and_lays_the_eyes_on_the_face():
+    """The paper cut's outer edge closes a narrow gap with the paper beside it (it once showed the colour hidden under
+    the gap, black); an eye lies on the face's paper with no sheet of its own (whose shadow once made a dark ring
+    under it); a strand of hair beside the eye in its box is paper like the rest (it was once pasted as drawn)."""
+    import _papercut
+    from _core import Units
+    from _style import load_style, resolve_style
+    h, w = 320, 320
+    yy, xx = np.mgrid[0:h, 0:w]
+    disc = (xx - 160) ** 2 + (yy - 170) ** 2 < 120 ** 2
+    parts = np.zeros((h, w), np.uint8)
+    parts[disc] = 1                                                  # skin
+    parts[disc & (yy < 110)] = 2                                     # hair
+    slit = (np.abs(xx - 160) <= 1) & (yy < 70)                       # a gap 3 px wide into the hair
+    alpha = (disc & ~slit).astype(np.float32)
+    parts[slit] = 0
+    cel = np.zeros((h, w, 3), np.float32)                            # (black under the gap, as a file's hidden colour)
+    cel[parts == 1] = (0.98, 0.86, 0.78)
+    cel[parts == 2] = (0.36, 0.26, 0.22)
+    eye = ((xx - 120) / 16.0) ** 2 + ((yy - 170) / 10.0) ** 2 < 1
+    parts[eye] = 3
+    cel[eye] = (0.97, 0.97, 0.98)
+    cel[(xx - 120) ** 2 + (yy - 170) ** 2 < 49] = (0.30, 0.20, 0.12)
+    strand = (np.abs(xx - 99) <= 1) & (yy >= 152) & (yy <= 190)
+    parts[strand] = 2
+    cel[strand] = (0.36, 0.26, 0.22)
+    sj = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "hair", "kind": "hair"}, {"name": "eyes", "kind": "eyes"}],
+          "protect": [{"name": "eye", "box": [96, 150, 144, 192]}], "upscaled": 1}
+    out, info = _papercut.run(sj, load_style(resolve_style("paper-cut")), cel, alpha, parts, Units(alpha, 260))
+    closed = slit & (info["alpha"] > 0.5)
+    assert closed.sum() > 30 and np.abs(out[closed].mean(0) - cel[parts == 2][0]).max() < 0.05
+    under = (np.abs(xx - 124) <= 10) & (yy >= 182) & (yy <= 188)
+    away = (np.abs(xx - 200) <= 10) & (yy >= 182) & (yy <= 188)
+    assert abs(float(out[under].mean()) - float(out[away].mean())) < 0.02
+    assert np.abs(out[strand & (yy > 160) & (yy < 185)].mean(0) - cel[parts == 1][0]).max() < 0.05
+
+
+def test_fit_style_starts_from_a_cel_style(draft, figure, tmp_path):
+    """fit_style.py moves the cel finishes' settings only, so a start in another technique is refused with exit 2."""
+    r, _ = run("fit_style.py", draft, figure, "--out", tmp_path / "fit.json", "--start", "watercolour")
+    assert r.returncode == 2 and "cel" in r.stderr and "Traceback" not in r.stderr
+
+
+def test_tweak_reports_every_step(tmp_path):
+    """--steps N reports each key from before the first step to after the last (a number the style does not set from
+    the engine's default), as written to the file."""
+    from _adjectives import DEFAULTS
+    out = tmp_path / "t.json"
+    r, d = run("tweak_style.py", "tv-cel", out, "softer shadows", "--steps", "3")
+    assert r.returncode == 0 and d["changed"]
+    st0 = json.loads((SKILL / "styles" / "tv-cel.json").read_text(encoding="utf-8"))
+    st1 = json.loads(out.read_text(encoding="utf-8"))
+
+    def get(s, path):
+        for k in path.split("."):
+            s = s.get(k) if isinstance(s, dict) else None
+        return s
+
+    for ch in d["changed"]:
+        was = get(st0, ch["key"])
+        assert ch["was"] == (DEFAULTS.get(ch["key"], 0.0) if was is None else was), ch
+        assert ch["now"] == get(st1, ch["key"]), ch
+
+
+# ----------------------------------------------------------------------------------- bad input and stale outputs
+
+def test_more_bad_input_stops_with_a_message(draft, figure, tmp_path):
+    """A crop box that holds nothing, a grid step of 0, a de-AI finish without a region map and a part map's cache
+    whose region map is gone all end with exit 2 and a message; a sliver of skin colour is no face to read; the review
+    lists only the files this run wrote."""
+    import shutil
+    from pathlib import Path
+    r, _ = run("prep.py", figure, tmp_path / "p.png", "--box", "300,300,100,100")
+    assert r.returncode == 2 and "Traceback" not in r.stderr
+    r, _ = run("zoom.py", figure, "100,100,300,300", tmp_path / "z.jpg", "--step", "0")
+    assert r.returncode == 2 and "Traceback" not in r.stderr
+    sj = json.loads(draft.read_text(encoding="utf-8"))
+    sj["image"] = str(figure.resolve()).replace("\\", "/")
+    noreg = tmp_path / "noreg.json"
+    noreg.write_text(json.dumps({k: v for k, v in sj.items() if k != "regions"}), encoding="utf-8")
+    r, _ = run("refinish.py", noreg, "deai-light", tmp_path / "d.png", "--no-check")
+    assert r.returncode == 2 and "Traceback" not in r.stderr and "region map" in r.stderr
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "subject.json").write_text(json.dumps(sj), encoding="utf-8")
+    shutil.copy(draft.with_name(sj["regions"]), cache / sj["regions"])
+    r, _ = run("refinish.py", cache / "subject.json", "tv-cel", tmp_path / "a.png", "--no-check")
+    assert r.returncode == 0, r.stderr[-300:]
+    (cache / sj["regions"]).unlink()
+    r, _ = run("refinish.py", cache / "subject.json", "tv-cel", tmp_path / "b.png", "--no-check")
+    assert r.returncode == 2 and "Traceback" not in r.stderr
+
+    from auto_parts import eyes_in
+    F = np.zeros((80, 40), bool)
+    F[10:70, 18:21] = True
+    eyes, sure, _, _ = eyes_in(F, F.copy(), np.full(F.shape, 85.0, np.float32), np.ones(F.shape, bool),
+                               np.ones(F.shape, np.int32), np.zeros(F.shape, bool))
+    assert eyes == [] and sure == 0.0
+
+    im = np.zeros((600, 300, 4), np.uint8)
+    cv2.ellipse(im, (150, 300), (100, 240), 0, 0, 360, (160, 90, 40, 255), -1)
+    cv2.ellipse(im, (150, 300), (100, 240), 0, 0, 360, (40, 32, 36, 255), 2)
+    cv2.imwrite(str(tmp_path / "noface.png"), im)
+    (tmp_path / "noface_sub.face.jpg").write_bytes(b"an earlier draft's face sheet")
+    r, d = run("auto_parts.py", tmp_path / "noface.png", tmp_path / "noface_sub.json")
+    assert r.returncode in (0, 1) and d["review"] and all(Path(f).is_file() for f in d["review"])
+    assert not (tmp_path / "noface_sub.face.jpg").exists()

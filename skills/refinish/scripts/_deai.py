@@ -31,7 +31,7 @@ import cv2
 import numpy as np
 
 import _lines
-from _core import clean_shape, ellipse_mask, lab, piece_blur, protect_mask, rgb
+from _core import clean_shape, die, ellipse_mask, lab, piece_blur, protect_mask, rgb
 from _parts import region_map
 
 
@@ -161,8 +161,8 @@ def run(subject, style, img, alpha, parts, U, seed=7):
     h, w = alpha.shape
     within = alpha > 0.5
     if not subject.get("regions"):
-        raise ValueError("the de-AI finish works on a region map: run scripts/auto_parts.py on the picture first "
-                         "(no hints are needed)")
+        die("the de-AI finish works on a region map: run scripts/auto_parts.py on the picture first (no hints are "
+            "needed)")
     reg0 = region_map(subject, alpha.shape)
     L_line = _lines.find_lines(img, subject.get("upscaled", 1))
     is_line = L_line > 0.3

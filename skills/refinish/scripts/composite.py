@@ -22,9 +22,11 @@ SCENE.json (paths relative to it):
 
 Everything is in pixels of the frame. Layers are listed back to front; each layer's `blur` is its own distance from
 the focus (0 sharp, a foreground shoulder far out of focus 30 or more). The background is resized to cover the frame
-(`zoom` > 1 crops in, a longer lens: everything behind the figure larger and closer). --raw lays the layers on the
-background with nothing else, the plain paste-up, to compare with. A layer's alpha is used as it is; `clear_halo`
-first clears a generator's faint halo (alpha more than 4 px from the opaque figure) on a cut-out that has one.
+(`zoom` > 1 crops in, a longer lens: everything behind the figure larger and closer). Every blur is laid before the
+frame is cut, so what lies just outside it (a shoulder, a lamp) still spreads in; past the background picture's own
+edges the blur mirrors it. --raw lays the layers on the background with nothing else, the plain paste-up, to compare
+with. A layer's alpha is used as it is; `clear_halo` first clears a generator's faint halo (alpha more than 4 px from
+the opaque figure) on a cut-out that has one.
 Prints JSON: the output and what each grade did.
 Exit codes: 0 done, 2 bad input or an output that cannot be written.
 """
@@ -50,12 +52,18 @@ def to_srgb(c):
     return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(c, 1 / 2.4) - 0.055)
 
 
-def cover(img, w, h):
+def cover(img, w, h, pad=0):
+    """The picture resized to cover a w x h frame, centred; with `pad`, that many pixels more on every side, taken
+    from the picture where it reaches past the frame and mirrored where it does not."""
     s = max(w / img.shape[1], h / img.shape[0])
     r = cv2.resize(img, (int(np.ceil(img.shape[1] * s)), int(np.ceil(img.shape[0] * s))),
                    interpolation=cv2.INTER_LANCZOS4 if s > 1 else cv2.INTER_AREA)
-    y0, x0 = (r.shape[0] - h) // 2, (r.shape[1] - w) // 2
-    return np.clip(r[y0:y0 + h, x0:x0 + w], 0, 1)
+    y0, x0 = (r.shape[0] - h) // 2 - pad, (r.shape[1] - w) // 2 - pad
+    c = r[max(0, y0):y0 + h + 2 * pad, max(0, x0):x0 + w + 2 * pad]
+    top, left = max(0, -y0), max(0, -x0)
+    c = cv2.copyMakeBorder(c, top, h + 2 * pad - c.shape[0] - top, left, w + 2 * pad - c.shape[1] - left,
+                           cv2.BORDER_REFLECT)
+    return np.clip(c, 0, 1)
 
 
 def kernel(r, shape="disk", blades=6, rotation=15.0):
@@ -98,7 +106,9 @@ def lens_blur(img, r, alpha=None, bokeh=None):
 def grade(img, g, mask=None):
     """A grade: lift, gain and chroma for the whole picture, then regions told apart by hue (a sky's blue from the
     ground under it), each brought to its own median lightness `L`; a night sky and a slope sit at nearly the same
-    lightness in a day picture, so one curve cannot move them apart. Returns the graded picture and a report."""
+    lightness in a day picture, so one curve cannot move them apart. With a layer's alpha (`mask`) the medians are read
+    where the layer is solid, and the grade is laid on all of it: a half-clear veil or glow takes it too, its alpha
+    weighing what it adds. Returns the graded picture and a report."""
     if not g:
         return img, {}
     f = lab(img)
@@ -136,8 +146,7 @@ def grade(img, g, mask=None):
     f[..., 1:] *= g.get("chroma", 1.0)
     f[..., 1] += g.get("cast_a", 0.0) * (1 - L / 100.0)
     f[..., 2] += g.get("cast_b", 0.0) * (1 - L / 100.0)
-    out = rgb(f)
-    return (np.where(within[..., None], out, img) if mask is not None else out), rep
+    return rgb(f), rep
 
 
 def bloom(img, threshold=0.72, radius=14.0, amount=0.25):
@@ -147,10 +156,11 @@ def bloom(img, threshold=0.72, radius=14.0, amount=0.25):
     return np.clip(to_srgb(lin + cv2.GaussianBlur(hi, (0, 0), radius) * amount), 0, 1)
 
 
-def load_layer(path, place, W, H, clear_halo=False):
+def load_layer(path, place, W, H, clear_halo=False, pad=0):
     """A cut-out (RGBA, 8 or 16 bits) placed on the frame: [x0, y_bottom, scale]. Its alpha is used as it is (a glow,
     a cast shadow, a half-opaque veil); `clear_halo` first clears a generator's faint halo, the alpha more than 4 px
-    from the opaque figure."""
+    from the opaque figure. With `pad`, the frame is that many pixels larger on every side, for a blur that reaches
+    into it from what lies just outside."""
     fig = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if fig is None or fig.ndim < 3 or fig.shape[2] != 4:
         die(f"{path}: a layer must be an RGBA cut-out")
@@ -164,8 +174,9 @@ def load_layer(path, place, W, H, clear_halo=False):
     pre = cv2.resize(fr * fa[..., None], (w2, h2), interpolation=interp)
     a2 = np.clip(cv2.resize(fa, (w2, h2), interpolation=interp), 0, 1)
     col = np.where(a2[..., None] > 1e-3, pre / np.maximum(a2[..., None], 1e-3), 0)
+    W, H = W + 2 * pad, H + 2 * pad
     rgb_, al = np.zeros((H, W, 3), np.float32), np.zeros((H, W), np.float32)
-    X0, Y0 = int(round(x0)), int(round(yb)) - h2
+    X0, Y0 = int(round(x0)) + pad, int(round(yb)) - h2 + pad
     xs0, ys0, xs1, ys1 = max(0, X0), max(0, Y0), min(W, X0 + w2), min(H, Y0 + h2)
     if xs1 > xs0 and ys1 > ys0:
         rgb_[ys0:ys1, xs0:xs1] = col[ys0 - Y0:ys1 - Y0, xs0 - X0:xs1 - X0]
@@ -204,14 +215,22 @@ def main():
         x0 = int(np.clip(cx * w0 - cw / 2, 0, w0 - cw))
         y0 = int(np.clip(cy * h0 - ch / 2, 0, h0 - ch))
         bg = bg[y0:y0 + int(ch), x0:x0 + int(cw)]
-    bg = cover(bg, W, H)
     report = {}
+
+    def margin(blur):
+        # a blur reaches its kernel's radius: the frame is cut after it, so what lies just outside still spreads in
+        return int(np.ceil(blur)) + 2 if blur >= 0.5 and not a.raw else 0
+
+    p = margin(bk.get("blur", 0.0))
+    bg = cover(bg, W, H, p)
     if not a.raw:
         bg, report["background"] = grade(bg, bk.get("grade"))
         bg = lens_blur(bg, bk.get("blur", 0.0), bokeh=cam.get("bokeh"))
+    bg = bg[p:p + H, p:p + W]
     out = bg.copy()
     for i, ly in enumerate(sc.get("layers", [])):
-        fr, fa = load_layer(sp.parent / ly["image"], ly["place"], W, H, ly.get("clear_halo", False))
+        p = margin(ly.get("blur", 0))
+        fr, fa = load_layer(sp.parent / ly["image"], ly["place"], W, H, ly.get("clear_halo", False), p)
         if a.raw:
             out = out * (1 - fa[..., None]) + fr * fa[..., None]
             continue
@@ -221,6 +240,7 @@ def main():
             fr = sharpen_lines(fr, fa, ly["sharpen"])
         if ly.get("blur", 0) >= 0.5:
             fr, fa = lens_blur(fr, ly["blur"], fa, cam.get("bokeh"))
+        fr, fa = fr[p:p + H, p:p + W], fa[p:p + H, p:p + W]
         under = out
         out = out * (1 - fa[..., None]) + fr * fa[..., None]
         wrap = ly.get("wrap", 0.0)

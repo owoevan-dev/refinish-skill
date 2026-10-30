@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, emit, load_rgba, write_image  # noqa: E402
+from _core import Units, die, emit, load_rgba, write_image  # noqa: E402
 from _parts import misfits, part_map  # noqa: E402
 from _style import load_subject, subject_path  # noqa: E402
 
@@ -44,7 +44,11 @@ def load_or_build(sj):
     src = [Path(sj["_dir"]) / f"{sj['_stem']}.json", subject_path(sj, sj["image"])]
     if "regions" in sj:
         src.append(subject_path(sj, sj["regions"]))
-    if pp.is_file() and all(pp.stat().st_mtime >= s.stat().st_mtime for s in src if s.is_file()):
+    gone = [s for s in src if not s.is_file()]
+    if gone:                                            # (a cache is no stand-in for what it was made from)
+        die(f"{', '.join(str(s) for s in gone)}: named by the subject file but not there; run scripts/auto_parts.py "
+            "again")
+    if pp.is_file() and all(pp.stat().st_mtime >= s.stat().st_mtime for s in src):
         img, alpha = load_rgba(subject_path(sj, sj["image"]))
         parts = cv2.imread(str(pp), cv2.IMREAD_GRAYSCALE)
         if parts is not None and parts.shape == alpha.shape:

@@ -361,6 +361,8 @@ def eyes_in(F, skin, L, within, reg, line, skin_L=90.0, hints=None):
     face's width."""
     top, X = face_width(F)
     head = F & (np.arange(F.shape[0])[:, None] < top + 1.4 * X)
+    if X < 8:
+        return [], 0.0, head, X                         # a sliver of skin colour: too narrow to hold eyes
     # the outline, raised for bangs over the skin above an eye and widened for an eye at the edge of a face seen
     # from the side; the skin closed over small specks (blush hatching, grain) that are no eye
     area = hull_of(head)
@@ -1903,6 +1905,8 @@ def main():
           "blush": blush}
     sub_path.write_text(json.dumps(sj, ensure_ascii=False, indent=1), encoding="utf-8")
     rv, fv = sub_path.with_name(f"{stem}.auto.jpg"), sub_path.with_name(f"{stem}.face.jpg")
+    if face is None and fv.is_file():
+        fv.unlink()                                     # (an earlier draft's face, not this picture's)
     review(img, alpha, reg, parts, rv, fv, [p["box"] for p in protect], face["box"] if face is not None else None)
     sv = sub_path.with_name(f"{stem}.sheet.jpg")
     parts_sheet(img, alpha, reg, parts, sv, fig["area"])
@@ -1910,7 +1914,8 @@ def main():
           "parts": [{"name": p["name"], "kind": p["kind"], "colour_lab": [round(float(v), 1) for v in p["_colour"]],
                      "share": round(float(st["area"][p["regions"]].sum() / fig["area"]), 4),
                      **({"why": p["_why"]} if p.get("_why") else {})} for p in parts],
-          "protect": protect, "focal": focal, "doubts": doubts, "review": [str(rv), str(fv), str(sv)]})
+          "protect": protect, "focal": focal, "doubts": doubts,
+          "review": [str(v) for v in (rv, fv, sv) if v.is_file()]})
     sys.exit(1 if doubts else 0)
 
 

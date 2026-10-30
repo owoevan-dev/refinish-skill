@@ -248,6 +248,9 @@ def run(subject, style, img, alpha, parts_u8, U, seed=None, palette_from=None):
             die(f"cannot read the palette picture {palette_from}")
         pal_src.append(lab8(cv2.resize(scene, (scene.shape[1] // 4, scene.shape[0] // 4))).reshape(-1, 3))
     centres = []
+    # k-means seeds its centres from OpenCV's own generator: set from this finish's seed, so the palette does not
+    # depend on what ran before it (another finish in a recipe)
+    cv2.setRNGSeed(int(seed))
     for smp in pal_src:
         smp = smp[rng.integers(0, len(smp), min(40000, len(smp)))].astype(np.float32)
         _, _, c = cv2.kmeans(smp, int(pal.get("k", 16)), None,
