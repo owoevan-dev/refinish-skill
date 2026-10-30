@@ -149,8 +149,10 @@ def run(subject, style, cel, alpha, parts, U, seed=7):
             x0, y0, x1, y1 = (max(0, int(v)) for v in p["box"])
             if feat[y0:y1, x0:x1].any():
                 boxed[y0:y1, x0:x1] = 1
-        boxed = cv2.dilate(boxed, np.ones((9, 9), np.uint8)).astype(bool)
-        prot = np.where(boxed, prot * eye, prot)
+        prot = np.where(cv2.dilate(boxed, np.ones((9, 9), np.uint8)).astype(bool), prot * eye, prot)
+        # and the eye's own parts in the boxes, all of them: a white a few points from the skin is no skin, though
+        # the colour test above may take it for skin, and the paper under it is now the face's
+        prot = np.maximum(prot, cv2.GaussianBlur((feat & boxed.astype(bool)).astype(np.float32), (0, 0), 1.0))
     out = out * (1 - prot[..., None]) + cel * prot[..., None]
     # the paper's fibre, faint, everywhere
     fib = float(ps.get("fibre", 0.35))

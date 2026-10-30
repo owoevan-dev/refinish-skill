@@ -694,6 +694,14 @@ def test_composite_grades_all_of_a_layer_and_blurs_before_the_frame(tmp_path):
     sc_path.write_text(json.dumps(sc), encoding="utf-8")
     r, _ = run("composite.py", sc_path, tmp_path / "o.png")
     assert r.returncode == 0 and cv2.imread(str(tmp_path / "o.png"))[100, 299].min() > 40
+    # and a lamp in the background just past a zoom's window: the zoom once cut it off before the blur
+    bg = np.zeros((200, 400, 3), np.uint8)
+    bg[80:120, 205:245] = 255
+    cv2.imwrite(str(tmp_path / "lamp_bg.png"), bg)
+    sc = {"frame": [200, 100], "background": {"image": "lamp_bg.png", "zoom": 2.0, "centre": [0.25, 0.5], "blur": 20}}
+    sc_path.write_text(json.dumps(sc), encoding="utf-8")
+    r, _ = run("composite.py", sc_path, tmp_path / "o.png")
+    assert r.returncode == 0 and cv2.imread(str(tmp_path / "o.png"))[50, 199].min() > 40
 
 
 def test_line_repair_keeps_out_of_protected_boxes():
@@ -742,6 +750,11 @@ def test_dark_dots_kept_on_a_face_not_known(draft, figure, tmp_path):
 
     assert changed(draft) == {"cheek": False, "jacket": True}
     assert changed(nofocal) == {"cheek": False, "jacket": False}
+    # a face given little detail weight (strength 0.2) is a face all the same: its mole was once taken
+    sj["focal"] = [dict(f, strength=0.2) for f in json.loads(draft.read_text(encoding="utf-8"))["focal"]]
+    weak = draft.with_name("weakface.json")
+    weak.write_text(json.dumps(sj), encoding="utf-8")
+    assert changed(weak) == {"cheek": False, "jacket": True}
 
 
 def test_png_note_replaces_a_compressed_note(tmp_path):
@@ -796,6 +809,31 @@ def test_paint_follows_its_own_seed(draft):
 
 
 # -------------------------------------------------------------------------------------------- paper cut, fit, tweak
+
+def test_paper_cut_keeps_the_white_of_an_eye():
+    """An eye's white a few points from a light skin, in a part of kind eyes inside a protected box, stays white under
+    the paper cut: the eyes once lost their own sheet and the paste missed a white too close to the skin."""
+    import _papercut
+    from _core import Units
+    from _style import load_style, resolve_style
+    h, w = 320, 320
+    yy, xx = np.mgrid[0:h, 0:w]
+    face = (xx - 160) ** 2 + (yy - 170) ** 2 < 120 ** 2
+    parts = np.zeros((h, w), np.uint8)
+    parts[face] = 1
+    cel = np.zeros((h, w, 3), np.float32)
+    cel[face] = (0.99, 0.91, 0.85)                                   # a light skin
+    eye = ((xx - 120) / 22.0) ** 2 + ((yy - 170) / 13.0) ** 2 < 1
+    iris = (xx - 124) ** 2 + (yy - 170) ** 2 < 8 ** 2
+    parts[eye], parts[iris] = 2, 3
+    cel[eye], cel[iris] = (0.98, 0.98, 0.98), (0.25, 0.30, 0.45)
+    alpha = face.astype(np.float32)
+    sj = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "eye-whites", "kind": "eyes"},
+                    {"name": "irises", "kind": "eyes"}],
+          "protect": [{"name": "eye", "box": [92, 150, 148, 190]}], "upscaled": 1}
+    out, _ = _papercut.run(sj, load_style(resolve_style("paper-cut")), cel, alpha, parts, Units(alpha, 260))
+    white = cv2.erode((eye & ~iris).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+    assert np.abs(out[white] - 0.98).max(axis=1).mean() < 0.04, out[white].mean(0)
 
 def test_paper_cut_closes_gaps_and_lays_the_eyes_on_the_face():
     """The paper cut's outer edge closes a narrow gap with the paper beside it (it once showed the colour hidden under

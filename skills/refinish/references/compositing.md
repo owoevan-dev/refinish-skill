@@ -24,11 +24,11 @@ All sizes are pixels of the frame. Paths are relative to the scene file.
 
 | key | meaning |
 |---|---|
-| `background.zoom`, `centre` | crop into the background: a longer lens, so what lies behind is larger and closer. It is blurred anyway, so the enlargement shows nothing a lens would not soften. |
+| `background.zoom`, `centre` | crop into the background: a longer lens, so what lies behind is larger and closer. It is blurred anyway, so the enlargement shows nothing a lens would not soften. The blur is laid before the crop, so a light just outside the window still spreads in. |
 | `background.blur` | the background's distance from the focus, as the radius of its blur. |
 | `background.grade` | `lift`, `gain`, `chroma`, `cast_a`, `cast_b`, and `regions`: parts of the background told apart by hue (a sky's blue from the ground) and each brought to its own median lightness `L`. A day background turned to night needs this: its sky and its slope sit at nearly the same lightness, and one curve cannot move them apart. |
 | `layers[].place` | [left edge, bottom, scale] of the cut-out on the frame. Layers are back to front. |
-| `layers[].blur` | that layer's own distance from the focus: 0 sharp, a near shoulder far out of focus 30 or more. Blurred with its alpha, so its silhouette softens too. |
+| `layers[].blur` | that layer's own distance from the focus: 0 sharp, a near shoulder far out of focus 30 or more. Blurred with its alpha, so its silhouette softens too, and before the frame is cut, so a part outside the frame still spreads in. |
 | `layers[].wrap` | light wrap: the light of what lies behind reaching a little way over the layer's edge (`wrap_width` px). 0.15 to 0.25 for a lit background; little or none against a dark one. |
 | `layers[].sharpen` | a fine unsharp mask on the lines only, for a cut-out enlarged a little (the flat paint stays smooth). |
 | `layers[].clear_halo` | `true` first clears an image model's faint halo round a cut-out: the alpha more than 4 px from the opaque figure. Off by default, since a layer's own soft alpha (a glow, a cast shadow, a half-opaque veil) is meant to show. |

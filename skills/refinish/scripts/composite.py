@@ -23,8 +23,8 @@ SCENE.json (paths relative to it):
 Everything is in pixels of the frame. Layers are listed back to front; each layer's `blur` is its own distance from
 the focus (0 sharp, a foreground shoulder far out of focus 30 or more). The background is resized to cover the frame
 (`zoom` > 1 crops in, a longer lens: everything behind the figure larger and closer). Every blur is laid before the
-frame is cut, so what lies just outside it (a shoulder, a lamp) still spreads in; past the background picture's own
-edges the blur mirrors it. --raw lays the layers on the background with nothing else, the plain paste-up, to compare
+frame is cut, so what lies just outside it (a shoulder, a lamp, the background beyond a zoom's window) still spreads
+in; past the background picture's own edges the blur mirrors it. --raw lays the layers on the background with nothing else, the plain paste-up, to compare
 with. A layer's alpha is used as it is; `clear_halo` first clears a generator's faint halo (alpha more than 4 px from
 the opaque figure) on a cut-out that has one.
 Prints JSON: the output and what each grade did.
@@ -52,13 +52,20 @@ def to_srgb(c):
     return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(c, 1 / 2.4) - 0.055)
 
 
-def cover(img, w, h, pad=0):
-    """The picture resized to cover a w x h frame, centred; with `pad`, that many pixels more on every side, taken
-    from the picture where it reaches past the frame and mirrored where it does not."""
-    s = max(w / img.shape[1], h / img.shape[0])
-    r = cv2.resize(img, (int(np.ceil(img.shape[1] * s)), int(np.ceil(img.shape[0] * s))),
-                   interpolation=cv2.INTER_LANCZOS4 if s > 1 else cv2.INTER_AREA)
-    y0, x0 = (r.shape[0] - h) // 2 - pad, (r.shape[1] - w) // 2 - pad
+def cover(img, w, h, pad=0, window=None):
+    """The picture, or a `window` of it ([x0, y0, width, height]: a zoom's crop), resized to cover a w x h frame,
+    centred; with `pad`, that many pixels more on every side, taken from the picture where it reaches past the frame
+    (past the window too, so a light just outside a zoom still blurs in) and mirrored where it does not."""
+    x0, y0, cw, ch = window or (0, 0, img.shape[1], img.shape[0])
+    s = max(w / cw, h / ch)
+    interp = cv2.INTER_LANCZOS4 if s > 1 else cv2.INTER_AREA
+    if pad:                                             # the whole picture at the frame's scale, the frame cut from it
+        r = cv2.resize(img, (int(np.ceil(img.shape[1] * s)), int(np.ceil(img.shape[0] * s))), interpolation=interp)
+        x0 = int(round(x0 * s)) + (int(np.ceil(cw * s)) - w) // 2 - pad
+        y0 = int(round(y0 * s)) + (int(np.ceil(ch * s)) - h) // 2 - pad
+    else:                                               # (no blur: the window alone, as it was always cut)
+        r = cv2.resize(img[y0:y0 + ch, x0:x0 + cw], (int(np.ceil(cw * s)), int(np.ceil(ch * s))), interpolation=interp)
+        y0, x0 = (r.shape[0] - h) // 2, (r.shape[1] - w) // 2
     c = r[max(0, y0):y0 + h + 2 * pad, max(0, x0):x0 + w + 2 * pad]
     top, left = max(0, -y0), max(0, -x0)
     c = cv2.copyMakeBorder(c, top, h + 2 * pad - c.shape[0] - top, left, w + 2 * pad - c.shape[1] - left,
@@ -208,13 +215,14 @@ def main():
         die(f"cannot read the background {bk['image']}")
     bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     z = bk.get("zoom", 1.0)
+    window = None
     if z > 1:
         cx, cy = bk.get("centre", [0.5, 0.5])
         h0, w0 = bg.shape[:2]
         cw, ch = w0 / z, h0 / z
         x0 = int(np.clip(cx * w0 - cw / 2, 0, w0 - cw))
         y0 = int(np.clip(cy * h0 - ch / 2, 0, h0 - ch))
-        bg = bg[y0:y0 + int(ch), x0:x0 + int(cw)]
+        window = (x0, y0, int(cw), int(ch))
     report = {}
 
     def margin(blur):
@@ -222,7 +230,7 @@ def main():
         return int(np.ceil(blur)) + 2 if blur >= 0.5 and not a.raw else 0
 
     p = margin(bk.get("blur", 0.0))
-    bg = cover(bg, W, H, p)
+    bg = cover(bg, W, H, p, window)
     if not a.raw:
         bg, report["background"] = grade(bg, bk.get("grade"))
         bg = lens_blur(bg, bk.get("blur", 0.0), bokeh=cam.get("bokeh"))

@@ -55,6 +55,10 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - **One feature in two parts** (an iris given a part of its own by a hint) can print in two pigments under the woodblock styles.
 - **Paper cut** can leave a thin light rim where two sheets meet (a collar against the hair, a ribbon).
 - **The key drawing** can lay its coloured shadow guides as small filled patches along the edge of a dark part.
+- **Closed and winking eyes** (^^, a wink) are not found by the face finder, and a dark object beside the face (a bottle held up) can be read as an eye: give the eye boxes by hand.
+- **Spiral eyes** under the pastel finishes can show a faint ring where the protected box meets the repainted skin; **O2** reports eye whites painted as skin on eyes drawn with none ('><').
+- **A hand round a dark, bubbly object** (a bottle of soda) can take dark specks on its fingers, and **small coloured marks** (a sparkle, an anger mark) can lose their colour.
+- **`fit_style.py`** reads the references' colour figure-wide, so references with vivid costumes or backgrounds push a figure's colours too far, and a start style that boosts cloth by kind keeps doing so: start from the visually nearest style, and look at the result beside a reference.
 - **The look checks miss most of these.** O7 flagged 1 of 57 skin failures, O8 8 of 15 box seams.
 
 ### Fixed
@@ -73,8 +77,8 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - A `--palette-from` picture that cannot be read stops the run with exit 2 instead of being skipped; a style without a paint palette refuses the option.
 - `repair.py`'s bleed fix splits a part's two tones at Otsu's threshold. A flat part (whose empty darker half was a NaN) and a part whose shade sat at the median both work now, and the colour run in is repainted.
 - Bad input stops with exit 2 and a message instead of a traceback: a subject, style or recipe file that is not a JSON object, `--steps 0`, a pixel style with fewer than 8 colours, a crop box that holds nothing, `zoom.py --step 0`, a de-AI finish without a region map, a part map's cache whose region map is gone (it was once used as if nothing had changed). Reports written into a missing folder make it; a figure under 200 px tall no longer crashes the paint styles; a check no longer takes the mean of nothing; a sliver of skin colour is not read as a face. `auto_parts.py` lists only the review sheets it wrote.
-- A layer's grade in `composite.py` reaches all of it, a half-clear veil or glow too (below half alpha it once kept its colour). Every blur is laid before the frame is cut, so what lies just outside the frame (a shoulder, a lamp) spreads into it.
-- `repair.py` lays no line stroke in a protected box, and takes a dark dot for a speck only off a face the subject names in its focal ellipses: without one, a mole on a face was once taken.
+- A layer's grade in `composite.py` reaches all of it, a half-clear veil or glow too (below half alpha it once kept its colour). Every blur is laid before the frame is cut, so what lies just outside the frame (a shoulder, a lamp, the background beyond a zoom's window) spreads into it.
+- `repair.py` lays no line stroke in a protected box, and takes a dark dot for a speck only off a face the subject names in its focal ellipses, wherever that ellipse is whatever its detail weight: without one, or with a weak one, a mole on a face was once taken.
 - `png_note.py` replaces a note of the same key in a compressed zTXt chunk too; other readers once still found the old note.
 - A paint finish follows its own seed whatever ran before it: an earlier finish in a recipe once changed its palette.
 - `tweak_style.py --steps N` reports each key from before the first step to after the last, not the last step alone.
@@ -91,7 +95,7 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
   - a skin-coloured run of an accessory's part, grown from a rough box, goes back to the skin;
   - a thin part's colour is read off its fill, not its outline.
 - Dark areas no longer mottle into camouflage. The wash drift and the woodblock grain fade near solid; charcoal and pastel show only the tooth's grain; charcoal lays its darks flat and blends the skin.
-- Paper cut keeps thin parts (a cord, a strap) and fills slivers with the cel's colour instead of white paper. What its outer edge's curve closes beyond the drawing (the gaps between loose strands of hair) is cut from the sheet beside it; it once showed the colour hidden there, in black slivers. The eyes lie on the face's paper as drawn, with no sheet of their own whose shadow made a dark ring round them, and a strand of the fringe beside an eye is paper like the rest of the fringe instead of a faint pasted piece.
+- Paper cut keeps thin parts (a cord, a strap) and fills slivers with the cel's colour instead of white paper. What its outer edge's curve closes beyond the drawing (the gaps between loose strands of hair) is cut from the sheet beside it; it once showed the colour hidden there, in black slivers. The eyes lie on the face's paper as drawn, with no sheet of their own whose shadow made a dark ring round them, the white of an eye close to the skin's colour kept white, and a strand of the fringe beside an eye is paper like the rest of the fringe instead of a faint pasted piece.
 - Neon draws the face in paler, finer tubes instead of one glowing mass.
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.

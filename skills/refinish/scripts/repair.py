@@ -412,7 +412,8 @@ def main():
             focal = (sj or {}).get("focal", [])
             if any(str(e.get("name", "")).lower() == "face" for e in focal):
                 from _core import ellipse_mask
-                face = (ellipse_mask(*alpha.shape, focal) > 0.3) | protect
+                # where the face is, whatever detail weight (strength) its ellipse has
+                face = (ellipse_mask(*alpha.shape, [dict(e, strength=1.0) for e in focal]) > 0.5) | protect
             out, r = fix_specks(out, alpha, U, protect, cv2.dilate(line.astype(np.uint8), np.ones((3, 3))) > 0, face)
         elif f == "lines":
             out, r = fix_lines(out, alpha, U, line, protect=protect)
