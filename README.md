@@ -69,10 +69,6 @@ Backgrounds are handled differently. A painted background has few lines and long
 
 So a background takes the cleaner de-AI finish or a landscape finish, and the character goes on top in its cel finish. `composite.py` brings the two together with depth of field, light wrap and a grade that puts both in the same light.
 
-<p align="center">
-  <img src="docs/images/scene.jpg" alt="The sample character in TV cel standing in a street whose background was given the de-AI light finish">
-</p>
-
 A character drawn into a scene can be cut out first with `cutout.py`. You draw a rough outline, the colours decide the exact edge, and you also get the background back with the figure's place filled, ready to be finished on its own.
 
 ## Beyond a filter

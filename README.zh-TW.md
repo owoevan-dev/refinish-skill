@@ -69,10 +69,6 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 
 所以背景用乾淨的去 AI 味完稿或風景完稿，角色用賽璐璐完稿疊在上面。`composite.py` 負責把兩者合起來，加上景深、光線包覆，以及讓兩者落在同一種光線裡的調色。
 
-<p align="center">
-  <img src="docs/images/scene.jpg" alt="範例角色以電視動畫賽璐璐完稿，站在以去 AI 味（輕）完稿的街景中">
-</p>
-
 畫在場景裡的角色，可以先用 `cutout.py` 摳出來：畫一圈大概的外框，精確的邊緣交給顏色判斷，同時拿回補好角色位置的背景，可以另外完稿。
 
 ## 不只是濾鏡
