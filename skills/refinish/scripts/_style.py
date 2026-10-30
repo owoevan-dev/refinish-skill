@@ -42,6 +42,8 @@ def load_style(path):
         st = json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         die(f"{path} is not valid JSON: {e}")
+    if not isinstance(st, dict):
+        die(f"{path} is not a style file: a style is one JSON object (references/style-format.md)")
     if st.get("format") != STYLE_FORMAT:
         die(f"{path}: 'format' must be \"{STYLE_FORMAT}\" (see references/style-format.md)")
     if st.get("engine") not in ENGINES:
@@ -57,6 +59,8 @@ def load_subject(path):
         sj = json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         die(f"{path} is not valid JSON: {e}")
+    if not isinstance(sj, dict):
+        die(f"{path} is not a subject file: a subject is one JSON object (references/subject-file.md)")
     if sj.get("format") != SUBJECT_FORMAT:
         die(f"{path}: 'format' must be \"{SUBJECT_FORMAT}\" (see references/subject-file.md)")
     for key in ("image", "families", "parts"):

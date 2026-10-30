@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
+# dependencies = ["numpy", "opencv-python", "scipy"]
 # ///
 """Change a style file by the words people use about a finish: "softer shadows", "more vivid", "陰影柔一點",
 "線を太く". Each word found moves its keys one step (scripts/_adjectives.py); --steps repeats it.
@@ -89,6 +90,8 @@ def main():
         emit({k: {"words": e["words"], "engines": [g for g in e if g not in ("words", "measure")],
                   "measure": e["measure"]} for k, e in ADJECTIVES.items()})
         return
+    if a.steps < 1:
+        die("--steps is how many steps each word moves: 1 or more")
     if not (a.style and a.out and a.words):
         die("give STYLE.json OUT.json \"words\" (or --list)")
     st = load_style(resolve_style(a.style))
@@ -105,13 +108,14 @@ def main():
         if not changes:
             skipped.append(k)
             continue
-        for _ in range(max(1, a.steps)):
+        for _ in range(a.steps):
             log = apply(new, changes)
         changed += [{"key": p, "was": o, "now": n} for p, o, n in log]
         measure[k] = e["measure"]
     if changed:
         new["id"] = Path(a.out).stem
         new["summary"] = st.get("summary", "") + f" (tweaked: {', '.join(k for k in hits if k not in skipped)})"
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps(new, ensure_ascii=False, indent=1), encoding="utf-8")
     emit({"out": a.out if changed else None, "engine": eng, "matched": hits, "changed": changed,
           "not_for_this_engine": skipped, "check": measure})

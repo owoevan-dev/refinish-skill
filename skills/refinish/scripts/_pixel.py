@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 
 import _lines
-from _core import lab, rgb
+from _core import die, lab, rgb
 
 INK = np.array([12.0, 5.0, 3.0], np.float32)
 
@@ -311,6 +311,8 @@ def pixelize(img, alpha, parts, subject, height, outline="selout", colours=32, f
             res[yv, xv] = vals[cnts.argmax()] / 2.0
     col = res
     uniq, inv, cnt = np.unique(np.round(col[solid], 1), axis=0, return_inverse=True, return_counts=True)
+    if colours < 8:
+        die(f"pixel.colours is {colours}: a sprite needs 8 or more, a quarter of them (4 at least) kept for its lines")
     n_line = max(4, colours // 4)
     pal_f, mapping = merge_palette(uniq, cnt, colours - n_line)
     col[solid] = pal_f[np.array([mapping[i] for i in np.asarray(inv).ravel()])]

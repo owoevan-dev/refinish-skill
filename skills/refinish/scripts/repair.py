@@ -274,6 +274,26 @@ def fix_lines(img, alpha, U, line, max_gap=None, max_turn=30.0):
 
 # -------------------------------------------------------------------------------------------------------------- bleed
 
+def two_tones(v):
+    """A part's lit and shaded colour (Lab rows): its lightness split where the two groups lie furthest apart (Otsu's
+    threshold), so the split follows the part's own two tones whatever their shares, and a few pixels of a colour run in
+    from outside make no tone of their own. A flat part gives its one colour twice."""
+    Ls = v[:, 0]
+    lo, hi = np.percentile(Ls, [2, 98])
+    if hi - lo < 2.0:
+        t = np.median(v, axis=0)
+        return [t, t]
+    hist, edges = np.histogram(np.clip(Ls, lo, hi), bins=64, range=(lo, hi))
+    p = hist / hist.sum()
+    mids = (edges[:-1] + edges[1:]) / 2
+    w0 = np.cumsum(p)
+    m0 = np.cumsum(p * mids)
+    between = (m0[-1] * w0 - m0) ** 2 / np.maximum(w0 * (1 - w0), 1e-9)
+    cut = edges[1:][int(np.argmax(between[:-1]))]
+    lit, shade = v[Ls > cut], v[Ls <= cut]
+    return [np.median(lit if len(lit) else shade, axis=0), np.median(shade if len(shade) else lit, axis=0)]
+
+
 def fix_bleed(img, alpha, U, parts, names, line, protect, reach=None, margin=6.0):
     """Colour run across a part's edge: within `reach` of another part, a pixel nearer that part's colours than its
     own part's (by `margin`) is the neighbour's paint; it is repainted from its own part's pixels nearby."""
@@ -289,10 +309,7 @@ def fix_bleed(img, alpha, U, parts, names, line, protect, reach=None, margin=6.0
         m = (parts == j) & within & ~line
         if m.sum() < 200:
             continue
-        v = Lab_[m]
-        Ls = v[:, 0]
-        cut = np.median(Ls)
-        tones[j] = [np.median(v[Ls >= cut], axis=0), np.median(v[Ls < cut], axis=0)]
+        tones[j] = two_tones(Lab_[m])
 
     def dist_to(j, px):
         return np.min(np.stack([np.linalg.norm(px - t, axis=-1) for t in tones[j]]), axis=0)

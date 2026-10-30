@@ -2,13 +2,14 @@
 into pieces (a large area split again, the way a glazier cuts a sheet to fit), each piece one colour of glass,
 luminous, uneven within (streaks and a darker rim where the glass is thicker), the lead came between them dark with a
 thin light along its crown. The line art is painted on the glass as thin dark trace lines (grisaille), the way a
-glass painter draws strands and folds; the skin is not cut, and the eyes and the mouth are kept as drawn.
+glass painter draws strands and folds; the skin is not cut, and the eyes and the mouth are kept as drawn. Parts painted
+on whole glass meet on one piece, as a face's features are painted on its glass: no lead between them.
 
 Style keys, section `glass`: `piece` (u, the side of a typical piece, 70), `lead` (u, half the came's width, 0.8), `paint` (0..1, the
 grisaille trace lines' strength, 0.85),
 `lead_colour` (RGB), `saturation` (1.25), `light` (0..1, how luminous the glass, 0.25), `vary` (how much the sheets differ
 in lightness and hue, 1.0), `texture` (0..1, 0.5),
-`grisaille` (kinds painted on whole glass instead of cut, ["skin"])."""
+`grisaille` (kinds painted on whole glass instead of cut, ["skin"]; the bundled style adds "eyes")."""
 import cv2
 import numpy as np
 
@@ -93,16 +94,18 @@ def run(subject, style, cel, alpha, parts, U, seed=7):
             out_lab[ys_, xs_, 0] = np.clip(out_lab[ys_, xs_, 0] + (t - 0.5) * 9 * light / 0.25, 3, 98)
     # within each piece: streaks, and a darker rim where the glass is thick at the lead
     tex = float(gs.get("texture", 0.5))
-    edge = np.zeros((h, w), bool)                       # (one pixel per cut: where the right or lower neighbour differs)
-    edge[:, :-1] |= label[:, :-1] != label[:, 1:]
-    edge[:-1, :] |= label[:-1, :] != label[1:, :]
-    rim = cv2.distanceTransform((~edge).astype(np.uint8), cv2.DIST_L2, 3)
-    rim_k = np.clip(1 - rim / max(1.0, U.len(6.0)), 0, 1)
-    cut = label > 0
     gris_mask = np.zeros((h, w), bool)
     for m, _, whole in pieces:
         if whole:
             gris_mask |= m
+    # (one pixel per cut: where the right or lower neighbour differs; two painted parts meet on one piece of glass, so
+    # no cut lies between them, or the white of an eye too close to the skin to be protected is leaded round)
+    edge = np.zeros((h, w), bool)
+    edge[:, :-1] |= (label[:, :-1] != label[:, 1:]) & ~(gris_mask[:, :-1] & gris_mask[:, 1:])
+    edge[:-1, :] |= (label[:-1, :] != label[1:, :]) & ~(gris_mask[:-1, :] & gris_mask[1:, :])
+    rim = cv2.distanceTransform((~edge).astype(np.uint8), cv2.DIST_L2, 3)
+    rim_k = np.clip(1 - rim / max(1.0, U.len(6.0)), 0, 1)
+    cut = label > 0
     glass_px = cut & ~gris_mask
     out_lab[..., 0] = np.where(glass_px, out_lab[..., 0] * (1 + 0.06 * tex * streak) - 9 * tex * rim_k, out_lab[..., 0])
     out = np.clip(rgb(out_lab), 0, 1)

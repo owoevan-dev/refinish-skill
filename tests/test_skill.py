@@ -482,6 +482,150 @@ def test_hour_refused_where_the_size_changes(draft, tmp_path):
         assert r.returncode == 2 and "--hour" in r.stderr and not out.exists(), (style, r.stderr[-300:])
 
 
+def test_hidden_colour_changes_nothing(tmp_path):
+    """The colour a file keeps under full transparency is hidden: two files that differ only there give the same
+    finish (once, black and magenta there moved 58,934 visible pixels of film-everyday-cel by up to 199)."""
+    import shutil
+    from conftest import draw_figure
+    fig = draw_figure()
+    a, b = tmp_path / "black", tmp_path / "magenta"
+    a.mkdir()
+    cv2.imwrite(str(a / "image.png"), fig)
+    r, _ = run("auto_parts.py", a / "image.png", a / "subject.json")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    shutil.copytree(a, b)
+    fig[fig[..., 3] == 0, :3] = (255, 0, 255)
+    cv2.imwrite(str(b / "image.png"), fig)
+    for style in ("film-everyday-cel", "cel-90s"):
+        outs = []
+        for d in (a, b):
+            r, _ = run("refinish.py", d / "subject.json", style, d / f"{style}.png", "--no-check")
+            assert r.returncode == 0, r.stderr[-400:]
+            outs.append(cv2.imread(str(d / f"{style}.png"), cv2.IMREAD_UNCHANGED).astype(int))
+        seen = (outs[0][..., 3] > 0) | (outs[1][..., 3] > 0)
+        assert np.abs(outs[0] - outs[1])[seen].max() <= 1, style
+
+
+def test_recipe_layer_alpha():
+    """A recipe's layer paints only where it has paint: transparent, it leaves the mix below; half transparent, it
+    counts half (a paper cut's trimmed edge once painted the base white)."""
+    from recipe import lay_over
+    base = np.full((4, 4, 3), (0.16, 0.25, 0.41), np.float32)
+    white = np.ones((4, 4, 3), np.float32)
+    mask = np.ones((4, 4), np.float32)
+    assert np.allclose(lay_over(base, white, np.zeros((4, 4), np.float32), mask, 1.0, "normal"), base)
+    half = lay_over(base, white, np.full((4, 4), 0.5, np.float32), mask, 1.0, "normal")
+    assert np.allclose(half, (base + white) / 2)
+
+
+def test_palette_picture_must_be_read(draft, tmp_path):
+    """--palette-from names a picture: one that cannot be read stops the run before any output, and a style without
+    a paint palette refuses it rather than ignoring it."""
+    out = tmp_path / "g.png"
+    r, _ = run("refinish.py", draft, "gouache", out, "--palette-from", tmp_path / "missing.png", "--no-check")
+    assert r.returncode == 2 and not out.exists() and "palette" in r.stderr
+    r, _ = run("refinish.py", draft, "tv-cel", out, "--palette-from", tmp_path / "missing.png", "--no-check")
+    assert r.returncode == 2 and not out.exists()
+
+
+def test_bleed_from_a_flat_part():
+    """repair.py's bleed fix: a flat part's colour run into its shaded neighbour is repainted (a flat part has no
+    darker half, and its empty half was a NaN that matched nothing), and a clean picture is left as it is."""
+    import warnings
+    from _core import Units
+    from repair import fix_bleed
+    h, w = 1000, 300                                                  # (a unit of 1 px: the fix reaches 4 u)
+    img = np.zeros((h, w, 3), np.float32)
+    parts = np.zeros((h, w), np.int32)
+    parts[:, :150], parts[:, 150:] = 1, 2
+    img[:, :150] = (0.20, 0.55, 0.25)
+    img[:500, :150] = (0.30, 0.70, 0.35)
+    img[:, 150:] = (0.80, 0.15, 0.15)
+    alpha = np.ones((h, w), np.float32)
+    none = np.zeros((h, w), bool)
+    clean = img.copy()
+    run_in = np.zeros((h, w), bool)
+    run_in[300:533, 147:150] = True                                   # 699 px of red run into the coat
+    img[run_in] = (0.80, 0.15, 0.15)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        out, _ = fix_bleed(img, alpha, Units(alpha), parts, ["coat", "sleeve"], none, none)
+        same, _ = fix_bleed(clean, alpha, Units(alpha), parts, ["coat", "sleeve"], none, none)
+    assert (np.abs(out[run_in] - img[run_in]).max(axis=1) > 0.05).mean() > 0.95
+    assert np.allclose(same, clean)
+
+
+def test_bad_input_stops_with_a_message(draft, tmp_path):
+    """Bad input ends with exit 2 and a line saying what is wrong, never a traceback; an output's missing folder is
+    made."""
+    lst = tmp_path / "list.json"
+    lst.write_text("[]", encoding="utf-8")
+    style = json.loads((SKILL / "styles" / "pixel-character.json").read_text(encoding="utf-8"))
+    style["pixel"]["colours"] = 4
+    px4 = tmp_path / "px4.json"
+    px4.write_text(json.dumps(style), encoding="utf-8")
+    for args in (("refinish.py", lst, "tv-cel", tmp_path / "a.png"), ("refinish.py", draft, lst, tmp_path / "b.png"),
+                 ("recipe.py", lst, tmp_path / "c.png"),
+                 ("tweak_style.py", "tv-cel", tmp_path / "t.json", "softer shadows", "--steps", "0"),
+                 ("refinish.py", draft, px4, tmp_path / "d.png", "--no-check")):
+        r, _ = run(*args)
+        assert r.returncode == 2 and "Traceback" not in r.stderr and "error:" in r.stderr, (args[0], r.stderr[-300:])
+    r, _ = run("tweak_style.py", "tv-cel", tmp_path / "new" / "dir" / "t.json", "softer shadows")
+    assert r.returncode == 0 and (tmp_path / "new" / "dir" / "t.json").is_file()
+
+
+def test_small_picture_paints(tmp_path):
+    """A figure 180 px tall (smaller than SKILL.md advises) still paints: the strokes' spacing was once 0."""
+    from conftest import draw_figure
+    cv2.imwrite(str(tmp_path / "image.png"), cv2.resize(draw_figure(), (96, 180), interpolation=cv2.INTER_AREA))
+    run("auto_parts.py", tmp_path / "image.png", tmp_path / "subject.json")
+    r, _ = run("refinish.py", tmp_path / "subject.json", "gouache", tmp_path / "g.png", "--no-check")
+    assert r.returncode == 0, r.stderr[-400:]
+
+
+def test_prep_restore(figure, tmp_path):
+    """prep.py --restore puts a finish of the prepped picture back on the source's canvas: the source's size, its
+    figure where it was."""
+    from _core import load_rgba
+    r, d = run("prep.py", figure, tmp_path / "prepped.png", "--scale", "2")
+    assert r.returncode == 0
+    box = ",".join(str(v) for v in d["box"])
+    r, _ = run("prep.py", tmp_path / "prepped.png", tmp_path / "back.png", "--restore", figure, "--box", box,
+               "--scale", "2")
+    assert r.returncode == 0, r.stderr[-300:]
+    src, sa = load_rgba(figure)
+    back, ba = load_rgba(tmp_path / "back.png")
+    assert back.shape == src.shape and np.mean(np.abs(ba - sa) > 0.5) < 0.002
+    r, _ = run("prep.py", figure, tmp_path / "x.png", "--restore", figure, "--box", box, "--scale", "2")
+    assert r.returncode == 2                                          # a picture of another size does not go back
+
+
+def test_glass_paints_features_without_lead():
+    """Stained glass: two parts painted on whole glass (the skin and the white of an eye, too close in colour for the
+    protected boxes to tell apart) meet on one piece, with no lead between them; a cut part is still leaded."""
+    import _glass
+    from _core import Units
+    h, w = 160, 240
+    parts = np.full((h, w), 1, np.int32)
+    parts[:, 160:] = 3
+    yy, xx = np.mgrid[0:h, 0:w]
+    eye = (yy - 80) ** 2 + (xx - 80) ** 2 < 24 ** 2
+    parts[eye] = 2
+    cel = np.zeros((h, w, 3), np.float32)
+    cel[parts == 1] = (0.93, 0.80, 0.74)
+    cel[parts == 2] = (0.95, 0.93, 0.92)
+    cel[parts == 3] = (0.25, 0.35, 0.60)
+    subject = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "eye", "kind": "eyes"},
+                         {"name": "coat", "kind": "cloth"}]}
+    alpha = np.ones((h, w), np.float32)
+    style = {"glass": {"grisaille": ["skin", "eyes"]}}
+    out, _ = _glass.run(subject, style, cel, alpha, parts, Units(alpha), seed=7)
+    lead = (out.max(axis=2) - out.min(axis=2) < 0.08) & (out.mean(axis=2) < 0.55)   # the came: a dark neutral grey
+    ring = np.abs(np.hypot(yy - 80, xx - 80) - 24) < 2.5
+    assert lead[ring].mean() < 0.02, lead[ring].mean()                # no lead round the eye
+    assert lead[20:140, 154:166].any(axis=1).mean() > 0.9             # the lead between skin and coat stays
+
+
 def test_recheck_reads_what_the_file_shows(draft, tmp_path):
     """check_output.py --style guards the part map as refinish.py did, so a plain finish gets the same findings (on the
     draft, unguarded, it once found 9 warnings where refinish.py found 2); a file under a relight gets the part map's

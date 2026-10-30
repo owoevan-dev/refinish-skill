@@ -123,7 +123,8 @@ def part_map_checks(subject, img, alpha, parts, U, line):
                 c = np.median(L[y0:y1, x0:x1][sub], axis=0)
                 elsewhere = m.copy()
                 elsewhere[y0:y1, x0:x1] &= ~sub
-                if float((np.linalg.norm(L[elsewhere] - c, axis=1) < 8).mean()) >= 0.03:
+                rest = L[elsewhere]                             # (empty when the patch is the whole part)
+                if len(rest) and float((np.linalg.norm(rest - c, axis=1) < 8).mean()) >= 0.03:
                     continue                                    # a shade the part has all over
                 patch = np.zeros(m.shape, np.uint8)
                 patch[y0:y1, x0:x1] = sub

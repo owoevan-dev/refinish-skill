@@ -131,6 +131,8 @@ def main():
     t0 = time.time()
     sj = load_subject(a.subject)
     st = load_style(resolve_style(a.style))
+    if a.palette_from and st["engine"] != "paint":
+        die(f"--palette-from leans a paint style's palette toward a scene; the {st['engine']} engine has no such palette")
     if st["engine"] in RESIZING and (a.hour or st.get("post")):
         die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
             "relight a style that keeps the size, or leave --hour out")

@@ -118,6 +118,7 @@ def main():
     if a.profile:
         p = profile([json.loads(Path(q).read_text(encoding="utf-8")) for q in a.profile])
         if a.out:
+            Path(a.out).parent.mkdir(parents=True, exist_ok=True)
             Path(a.out).write_text(json.dumps(p, ensure_ascii=False, indent=1), encoding="utf-8")
         emit(p)
         return
@@ -146,6 +147,7 @@ def main():
         m = style_metrics(img, alpha, a.upscaled or 1, parts, kinds)
         m["source"] = a.source
     if a.out:
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
     emit(m)

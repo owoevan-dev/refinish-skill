@@ -108,6 +108,8 @@ The finish does not change where a picture came from. A picture generated with a
 - style and copyright;
 - what Steam and pixiv ask for.
 
+A finish of a prepped picture is at prep's size: `python scripts/prep.py out.png final.png --restore source.png --box X0,Y0,X1,Y1 --scale 2` (the box and the scale prep printed) puts it back on the source's canvas.
+
 `python scripts/png_note.py out.png "AI-assisted: ..."` writes a note into the PNG.
 
 ### 7. Adjust a style by words
@@ -178,7 +180,7 @@ All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check
 | script | use |
 |---|---|
 | `cutout.py PICTURE.png OUTLINE.json OUT_DIR [--trimap T.png]` | cut a figure out of a picture with a background |
-| `prep.py SRC.png OUT.png [--scale 2]` | crop to the figure and enlarge |
+| `prep.py SRC.png OUT.png [--scale 2]` | crop to the figure and enlarge; `--restore SRC.png --box B` puts a finish back on the source's canvas |
 | `check_input.py PICTURE.png \| SUBJECT.json` | grade a source |
 | `auto_parts.py IMAGE.png SUBJECT.json [--hints H.json]` | the subject file for a figure, with its parts sheet |
 | `hints.py check \| points \| pick` | check hint points, turn region numbers into points, pick a point in a colour |

@@ -93,6 +93,7 @@ def main():
            "warn": sum(f["level"] == "WARN" for f in found), "findings": found, "review": str(rv),
            **({"note": note} if note else {})}
     if a.json:
+        Path(a.json).parent.mkdir(parents=True, exist_ok=True)
         Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     emit(res)
     sys.exit(1 if res["verdict"] == "fail" else 0)

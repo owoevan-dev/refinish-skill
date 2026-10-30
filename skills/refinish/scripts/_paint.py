@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 
 import _lines as ln_
-from _core import (bgr8_of, boundary, clean_shape, ellipse_mask, grain, lab, lab8, piece_blur, protect_mask,
+from _core import (bgr8_of, boundary, clean_shape, die, ellipse_mask, grain, lab, lab8, piece_blur, protect_mask,
                    slow_noise)
 from _style import kind_of, rule
 
@@ -244,8 +244,9 @@ def run(subject, style, img, alpha, parts_u8, U, seed=None, palette_from=None):
     pal_src = [Ls[within & ~is_line].reshape(-1, 3)]
     if palette_from:                                                  # the scene the figure stands in
         scene = cv2.imread(str(palette_from))
-        if scene is not None:
-            pal_src.append(lab8(cv2.resize(scene, (scene.shape[1] // 4, scene.shape[0] // 4))).reshape(-1, 3))
+        if scene is None:                                             # asked for, so never skipped in silence
+            die(f"cannot read the palette picture {palette_from}")
+        pal_src.append(lab8(cv2.resize(scene, (scene.shape[1] // 4, scene.shape[0] // 4))).reshape(-1, 3))
     centres = []
     for smp in pal_src:
         smp = smp[rng.integers(0, len(smp), min(40000, len(smp)))].astype(np.float32)
@@ -294,6 +295,7 @@ def run(subject, style, img, alpha, parts_u8, U, seed=None, palette_from=None):
     sc = strokes_cfg.get("scale", 1.0) * s
 
     def paint_layer(spacing, length, width, sigma, threshold, gate, dryness, vary, curve=0.6):
+        spacing = max(1, int(spacing))                                # (a small picture: strokes a pixel apart)
         ref = piece_blur(Ls, piece, sigma)
         ref_mean = np.stack([np.bincount(fp, weights=ref[..., c].ravel(), minlength=n_p) for c in range(3)], 1) / pc[:, None]
         diff = np.linalg.norm(ref - canvas, axis=2)

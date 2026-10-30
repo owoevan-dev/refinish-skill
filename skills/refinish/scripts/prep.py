@@ -7,11 +7,14 @@
 
 Usage:
   python scripts/prep.py SRC.png OUT.png [--scale 2] [--box x0,y0,x1,y1] [--margin 10] [--grid]
+  python scripts/prep.py RESULT.png OUT.png --restore SRC.png --box x0,y0,x1,y1 [--scale 2]
 
 Enlarging is Lanczos on colour premultiplied by alpha (a cut-out's edge keeps no fringe); no neural upscaler, so
 nothing is invented. The engines redraw the lines and the paint at the new size, which is what makes the result
 crisp; record the factor as "upscaled" in the subject file. --grid also writes OUT_grid.jpg with a coordinate grid
 every 100 px, to place a subject file's samples and outlines by. Prints JSON: the crop box and the new size.
+--restore puts a finish of the prepped picture back on the source's canvas: reduced by --scale and laid at --box (both
+as this script printed them), transparent round it, so the delivered file has the source's size and place.
 Exit codes: 0 done, 2 bad input.
 """
 import argparse
@@ -37,6 +40,28 @@ def grid(bgr, step=100):
     return img
 
 
+def restore(a):
+    """A finish of the prepped picture, back on the source's canvas at the crop box and the source's scale."""
+    if not a.box:
+        die("--restore needs the --box this script printed when it prepared the picture")
+    x0, y0, x1, y1 = (int(v) for v in a.box.split(","))
+    _, src_alpha = load_rgba(a.restore)
+    H, W = src_alpha.shape
+    if not (0 <= x0 < x1 <= W and 0 <= y0 < y1 <= H):
+        die(f"--box {a.box} is not inside the {W}x{H} source")
+    img, alpha = load_rgba(a.src)
+    bw, bh = x1 - x0, y1 - y0
+    if alpha.shape != (bh * a.scale, bw * a.scale):
+        die(f"{a.src} is {alpha.shape[1]}x{alpha.shape[0]}, not the prepped picture's {bw * a.scale}x{bh * a.scale}: "
+            "only a finish of that size goes back (a sticker's, a neon's or a pixel sprite's does not)")
+    if a.scale > 1:
+        img, alpha = resize_premultiplied(img, alpha, (bw, bh), cv2.INTER_AREA)
+    canvas, canvas_a = np.zeros((H, W, 3), np.float32), np.zeros((H, W), np.float32)
+    canvas[y0:y1, x0:x1], canvas_a[y0:y1, x0:x1] = img, alpha
+    save_rgba(a.out, canvas, canvas_a)
+    emit({"out": a.out, "restored": a.src, "box": [x0, y0, x1, y1], "size": [W, H]})
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1], formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("src")
@@ -45,17 +70,21 @@ def main():
     ap.add_argument("--box", help="x0,y0,x1,y1 in the source; default: the figure's bounds plus the margin")
     ap.add_argument("--margin", type=int, default=10)
     ap.add_argument("--grid", action="store_true")
+    ap.add_argument("--restore", metavar="SRC", help="put the finish RESULT back on this source's canvas")
     a = ap.parse_args()
     if a.scale < 1 or a.scale > 4:
         die("--scale must be 1 to 4")
-    img, alpha = load_rgba(a.src)
-    h, w = alpha.shape
     if a.box:
         try:
             x0, y0, x1, y1 = (int(v) for v in a.box.split(","))
         except ValueError:
             die("--box takes four integers: x0,y0,x1,y1")
-    else:
+    if a.restore:
+        restore(a)
+        return
+    img, alpha = load_rgba(a.src)
+    h, w = alpha.shape
+    if not a.box:
         ys, xs = np.nonzero(alpha > 0.03)
         if not len(ys):
             die(f"{a.src} is fully transparent")

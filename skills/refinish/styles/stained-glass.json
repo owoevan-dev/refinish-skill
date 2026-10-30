@@ -5,5 +5,5 @@
  "engine": "glass",
  "base": "tv-cel",
  "summary": "pieces of coloured glass in lead: each tone area cut into glazier's pieces, every sheet a little different and lit from within, the line art painted on the glass in grisaille, the skin painted on whole glass, the eyes as drawn",
- "glass": {"piece": 70, "lead": 0.8, "lead_colour": [30, 30, 34], "paint": 0.85, "saturation": 1.25, "light": 0.25, "vary": 1.0, "texture": 0.5, "grisaille": ["skin"]}
+ "glass": {"piece": 70, "lead": 0.8, "lead_colour": [30, 30, 34], "paint": 0.85, "saturation": 1.25, "light": 0.25, "vary": 1.0, "texture": 0.5, "grisaille": ["skin", "eyes"]}
 }

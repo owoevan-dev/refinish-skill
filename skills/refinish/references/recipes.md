@@ -38,7 +38,7 @@ lies between two styles.
 | `post` | layers laid over the mix, as in a style file (references/style-format.md): `paper`, `grain`, `halation`, `soften`, `curve`, `focus`, ... |
 | `hour` | relights the mix for another hour (`night`, `sunset`, `dusk`, `film-night`) |
 
-A pixel style cannot be mixed: its sprite is a picture of another size.
+The pixel, sticker and neon styles cannot be mixed: each gives a picture of another size (a sprite, a sticker's border, a neon glow), and recipe.py refuses them before it renders anything.
 
 ## Where a layer applies
 

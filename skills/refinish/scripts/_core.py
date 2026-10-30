@@ -79,7 +79,9 @@ def unit_range(im):
 
 
 def load_rgba(path):
-    """A picture as (rgb 0..1, alpha 0..1), from 8 or 16 bits a channel. A picture without alpha is opaque."""
+    """A picture as (rgb 0..1, alpha 0..1), from 8 or 16 bits a channel. A picture without alpha is opaque. The colour
+    a file keeps under full transparency is hidden and differs from tool to tool (black, white, the last colour
+    painted); it is read as black, so no blur that reaches across the figure's edge takes it in."""
     im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if im is None:
         die(f"cannot read the image {path}")
@@ -91,7 +93,9 @@ def load_rgba(path):
     else:
         alpha = np.ones(im.shape[:2], np.float32)
         bgr = im
-    return cv2.cvtColor(unit_range(bgr), cv2.COLOR_BGR2RGB), alpha
+    rgb_img = cv2.cvtColor(unit_range(bgr), cv2.COLOR_BGR2RGB)
+    rgb_img[alpha <= 0] = 0
+    return rgb_img, alpha
 
 
 def write_image(path, img, params=()):

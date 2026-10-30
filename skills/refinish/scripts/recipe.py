@@ -49,10 +49,11 @@ def render(ref, sj, img, alpha, parts, U, check):
     """One finish of the picture, as refinish.py makes it: (RGB, alpha, record)."""
     if ref == "source":
         return img, alpha, {"style": "source"}
-    from refinish import finish
+    from refinish import RESIZING, finish
     st = load_style(resolve_style(ref))
-    if st["engine"] == "pixel":
-        die(f"'{ref}' is a pixel sprite, a picture of another size: it cannot be mixed")
+    if st["engine"] in RESIZING:
+        die(f"'{ref}' gives a picture of another size (a pixel sprite, a sticker's border, a neon glow): it cannot "
+            "be mixed")
     sj_g, parts_g, guard = sj, parts, {}
     if st["engine"] not in ("deai", "duotone"):
         from _guard import guard_parts
@@ -175,6 +176,13 @@ def blend(base, layer, mode):
     die(f"no blend mode '{mode}': {', '.join(BLENDS)}")
 
 
+def lay_over(mix, layer, layer_alpha, mask, opacity, mode):
+    """One layer over the mix, source-over: weighted by its mask, its opacity and its own alpha, so where a layer is
+    transparent (a paper cut's trimmed edge) the mix below shows, and a half-transparent layer counts half."""
+    k = (opacity * mask * np.clip(layer_alpha, 0, 1))[..., None]
+    return mix * (1 - k) + blend(mix, layer, mode) * k
+
+
 # ---------------------------------------------------------------------------------------------------------------- main
 
 def main():
@@ -189,6 +197,8 @@ def main():
         rc = json.loads(rp.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         die(f"cannot read the recipe {a.recipe}: {e}")
+    if not isinstance(rc, dict):
+        die(f"{a.recipe} is not a recipe: a recipe is one JSON object (references/recipes.md)")
     if rc.get("format") != RECIPE_FORMAT:
         die(f"{a.recipe}: 'format' must be \"{RECIPE_FORMAT}\" (references/recipes.md)")
     if "subject" not in rc or not rc.get("layers") and "base" not in rc:
@@ -221,13 +231,12 @@ def main():
     for i, lay in enumerate(rc.get("layers", [])):
         if "style" not in lay:
             die(f"layer {i} has no 'style'")
-        layer, _ = get(lay["style"])
+        layer, layer_alpha = get(lay["style"])
         m = sel.where(lay.get("where")).astype(np.float32)
         f = U.len(lay.get("feather", 1.5))
         if f > 0:
             m = cv2.GaussianBlur(m, (0, 0), f) * (alpha > 0.5)
-        k = (float(lay.get("opacity", 1.0)) * m)[..., None]
-        mix = mix * (1 - k) + blend(mix, layer, lay.get("blend", "normal")) * k
+        mix = lay_over(mix, layer, layer_alpha, m, float(lay.get("opacity", 1.0)), lay.get("blend", "normal"))
         covered.append({"layer": i, "style": lay["style"], "blend": lay.get("blend", "normal"),
                         "opacity": lay.get("opacity", 1.0),
                         "share": round(float((m > 0.5).sum() / max(1, (alpha > 0.5).sum())), 3)})
