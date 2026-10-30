@@ -32,6 +32,7 @@ Regenerating a picture in a new style gives you another character: another face,
 - **Composite.** `composite.py` lays figures over a background with depth of field and bokeh in linear light, light wrap, a region-by-region grade, bloom and grain.
 - **Mix finishes.** `recipe.py` lays finishes over one picture part by part, with blend modes and opacity: the clothes in watercolour and the face in TV cel, a screentone multiplied over a wash, 30 % of a film's look over a heavy cel.
 - **Repair the source.** `repair.py` fixes a source's defects without restyling it: a cut-out's fringe, stray specks, gaps in the line art, colour run across a material's edge.
+- **Cut a figure out of its scene.** `cutout.py` takes a character out of a picture with a background from a rough outline. The colours decide the exact edge (GrabCut), holes take out the gaps, and the background is filled behind the figure. Each can then be finished on its own, and the figure put back where it was.
 
 ## Measured, not guessed
 
@@ -46,14 +47,20 @@ Python 3.10+ with `numpy`, `opencv-python` and `scipy` (`Pillow` optional). No i
 
 ## Install
 
-As a Claude Code plugin:
+**Claude Code**
 
-```bash
-claude plugin marketplace add <path-or-url-of-this-repo>
-claude plugin install refinish-skill
+```
+/plugin marketplace add owoevan-dev/refinish-skill
+/plugin install refinish-skill@refinish-skill
 ```
 
-Or copy `skills/refinish` into a project's `.claude/skills/`.
+**Other agents**
+
+Copy or link `skills/refinish` into the agent's skills directory, or use [skills.sh](https://skills.sh):
+
+```
+npx skills add owoevan-dev/refinish-skill
+```
 
 ## Quick start
 

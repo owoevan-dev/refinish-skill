@@ -46,6 +46,7 @@
   - 分區調色、光暈、顆粒。
 - **混搭與局部處理**：`recipe.py` 依部位把多種完成方式疊在同一張圖上，可設混合模式與不透明度。例如衣服用水彩、臉用 TV 賽璐璐；網點用色彩增值疊在水彩上；濃厚賽璐璐上疊 30% 的電影感。
 - **修復原圖**：`repair.py` 不改畫風、只修原圖瑕疵：去背殘留的光暈、雜點、線稿斷口、材質交界的滲色。
+- **從場景摳出角色**：`cutout.py` 依一圈大概的外框，把角色從帶背景的圖裡摳出來。精確的邊緣由顏色決定（GrabCut），挖空多邊形去掉縫隙，背景也補好角色背後的位置。兩者可以各自完稿，再把角色原位放回。
 
 ## 量測過，不是猜的
 
@@ -63,14 +64,20 @@ Python 3.10 以上，安裝 `numpy`、`opencv-python`、`scipy`（`Pillow` 可�
 
 ## 安裝
 
-以 Claude Code 外掛安裝：
+**Claude Code**
 
-```bash
-claude plugin marketplace add <本 repo 的路徑或網址>
-claude plugin install refinish-skill
+```
+/plugin marketplace add owoevan-dev/refinish-skill
+/plugin install refinish-skill@refinish-skill
 ```
 
-或把 `skills/refinish` 複製到專案的 `.claude/skills/`。
+**其他 agent**
+
+把 `skills/refinish` 複製或連結到 agent 的 skills 資料夾，或用 [skills.sh](https://skills.sh)：
+
+```
+npx skills add owoevan-dev/refinish-skill
+```
 
 ## 快速開始
 
