@@ -92,7 +92,6 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 The figures below come from the project's own runs on pictures the code had never seen; those pictures are not in this repository. The code is frozen and the pass marks are written down before the pictures are opened, and a set that has been looked at is used for development only.
 
 - **Parts.** On two sets of new characters, parts drafted with an agent's hints were right for 39 of 41 within two rounds.
-- **Match a reference.** On a closed loop (references drawn in one bundled style, fitted from another on a different character), three rounds brought 6 of the 8 finish numbers within 10%. On frames from a TV anime, 4 to 5 of 8: the softness that compositing adds to the frames is beyond the cel finishes.
 - **All 37 finishes on 16 new characters** (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure:
   - every cel finish except the sunset and 90s ones;
   - both de-AI finishes;
@@ -106,6 +105,7 @@ The figures below come from the project's own runs on pictures the code had neve
   - the ukiyo-e print lightens tan skin;
   - soft airbrushed sources break into ragged shadows under every flat-tone finish.
 - **Against the real thing.** The woodblock, watercolour and ink finishes were compared with public-domain museum scans for paper colour, darkest ink, flat area and edge darkening.
+- **Match a reference** (development tests, not frozen runs). On a closed loop (references drawn in one bundled style, fitted from another on a different character), three rounds brought 6 of the 8 finish numbers within 10%. On frames from a TV anime, 4 to 5 of 8: the softness that compositing adds to the frames is beyond the cel finishes.
 
 ## Install
 
