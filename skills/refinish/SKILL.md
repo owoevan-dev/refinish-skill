@@ -20,7 +20,7 @@ What it can and cannot do (tell the user before starting):
 
 Copy this checklist and tick it off. Each step ends on its done-criterion.
 
-- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not, install them by their package names: `python -m pip install numpy scipy opencv-python`.
+- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not, install them by their package names: `python -m pip install numpy scipy opencv-python`; on a server or in a sandbox, `opencv-python-headless` instead, since the desktop build needs graphics libraries those often lack.
 - [ ] **1. Source**: `scripts/check_input.py` graded the picture; a figure is a cut-out (transparent background), or was cut out of its scene with `scripts/cutout.py`; below 2000 px tall it was enlarged with `scripts/prep.py`.
 - [ ] **2. Subject**: a subject file whose parts are right on the parts sheet (`scripts/auto_parts.py`, with a hints file for the cel, paint and print styles), or `scripts/scene_subject.py` for a background.
 - [ ] **3. Style**: chosen from [references/presets.md](references/presets.md) with the user, or written or measured (steps 7–8).

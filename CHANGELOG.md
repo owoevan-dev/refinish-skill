@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - A Codex listing: the plugin's own manifest (`.codex-plugin/plugin.json`) and marketplace (`.agents/plugins/marketplace.json`) give the plugin page a name, icon, description, website, screenshots, starter prompts and the Creativity category; the skill carries its own name and icons (`agents/openai.yaml`).
+- A display name, Refinish, in Claude's plugin manifest, for the plugin directory and `/plugin`.
+
+### Changed
+
+- Step 0 of SKILL.md installs `opencv-python-headless` on a server or in a sandbox, where `opencv-python` can fail to import for want of graphics libraries.
 
 ## [0.1.0] - 2026-10-30
 
