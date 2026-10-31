@@ -9,6 +9,7 @@
   },
   "homepage": "https://github.com/owoevan-dev/refinish-skill",
   "repository": "https://github.com/owoevan-dev/refinish-skill",
+  "privacyPolicyUrl": "https://github.com/owoevan-dev/refinish-skill/blob/main/PRIVACY.md",
   "license": "MIT",
   "icon": "./assets/brand/icon-512.png",
   "keywords": [

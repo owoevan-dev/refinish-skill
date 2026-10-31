@@ -35,6 +35,7 @@
     ],
     "websiteURL": "https://github.com/owoevan-dev/refinish-skill",
     "supportURL": "https://github.com/owoevan-dev/refinish-skill/issues",
+    "privacyPolicyURL": "https://github.com/owoevan-dev/refinish-skill/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Re-finish this character as a film-style anime cel, keeping the drawing as it is.",
       "Match the finish of the frames in refs/ on my character.",

@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - A Codex listing: the plugin's own manifest (`.codex-plugin/plugin.json`) and marketplace (`.agents/plugins/marketplace.json`) give the plugin page a name, icon, description, website, screenshots, starter prompts and the Creativity category; the skill carries its own name and icons (`agents/openai.yaml`).
 - A display name, Refinish, in Claude's plugin manifest, for the plugin directory and `/plugin`.
+- A privacy statement (`PRIVACY.md`), linked from both plugin manifests: the skill collects, sends and keeps nothing.
 
 ### Changed
 
