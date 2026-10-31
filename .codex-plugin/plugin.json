@@ -1,0 +1,51 @@
+{
+  "name": "refinish-skill",
+  "version": "0.1.0",
+  "description": "Re-finish character art and backgrounds in another style by code, never by regenerating them: 37 styles (anime cel and its film, night and 90s variants, a cleaner de-AI finish, duotone and risograph, watercolour, gouache, manga screentone, an animator's key drawing, screen print, ink wash, ukiyo-e woodblock, pop art, neon, stained glass, paper cut, pixel sprites), style matching by measurement, style tweaks from plain words, relighting, cutting a figure out of its scene, and a compositing camera.",
+  "author": {
+    "name": "owoevan-dev",
+    "url": "https://github.com/owoevan-dev"
+  },
+  "homepage": "https://github.com/owoevan-dev/refinish-skill",
+  "repository": "https://github.com/owoevan-dev/refinish-skill",
+  "license": "MIT",
+  "keywords": [
+    "art-style",
+    "anime",
+    "cel-shading",
+    "style-transfer",
+    "watercolour",
+    "manga",
+    "woodblock",
+    "pixel-art",
+    "duotone",
+    "game-dev",
+    "visual-novel"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Refinish",
+    "shortDescription": "Re-finish art in 37 styles",
+    "longDescription": "Refinish repaints the finish of character art and backgrounds you already have, in 37 styles so far: TV anime cel and its film, night, sunset, pastel and 90s variants, a cleaner de-AI finish, duotone, risograph and cyanotype, watercolour and gouache, manga screentone, an animator's key drawing, screen print, ink wash, woodblock, pop art, neon, stained glass, paper cut and pixel sprites. The drawing stays as it is. No image model is involved, and every result is checked against the source.\n\nIt also fits a cel finish to reference frames by measurement, adjusts a style from plain words (\"softer shadows\"), relights a picture for night or sunset, mixes finishes part by part, and cuts a figure out of its scene to composite it into another.\n\nMade for game developers, visual novel makers and anyone who wants a set of pictures in one consistent look. It runs locally in Python with NumPy and OpenCV; no GPU or network is needed.\n\nLimitations: the skin, hair and clothing parts are drafted automatically and are sometimes wrong. When they are, tell the agent what is wrong in a sentence and it fixes them. Closed or winking eyes can be missed. Known issues are listed in the changelog.",
+    "developerName": "owoevan-dev",
+    "category": "Creativity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/owoevan-dev/refinish-skill",
+    "supportURL": "https://github.com/owoevan-dev/refinish-skill/issues",
+    "defaultPrompt": [
+      "Re-finish this character as a film-style anime cel, keeping the drawing as it is.",
+      "Match the finish of the frames in refs/ on my character.",
+      "Show this picture in three finishes: watercolour, paper cut and pixel art."
+    ],
+    "brandColor": "#C8442F",
+    "composerIcon": "./assets/brand/icon-small.svg",
+    "logo": "./assets/brand/icon-512.png",
+    "screenshots": [
+      "./docs/images/hero.jpg",
+      "./docs/images/styles.jpg"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Refinish"
+  short_description: "Re-finish art in another style, keeping the drawing"
+  icon_small: "./assets/icon-small.svg"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#C8442F"
+  default_prompt: "Re-finish this character as a film-style anime cel, keeping the drawing as it is."

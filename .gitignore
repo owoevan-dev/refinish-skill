@@ -7,7 +7,7 @@ __pycache__/
 *-workspace/
 **/evals/results/
 
-# Pictures a user works on stay out of the repo; the eval cases' inputs are drawn by code and ship
+# Pictures a user works on stay out of the repo; the eval cases' inputs (drawn by code) and the icons ship
 *.png
 *.jpg
 *.webp
@@ -15,6 +15,7 @@ __pycache__/
 !docs/**/*.jpg
 !skills/refinish/evals/*/files/*.png
 !assets/brand/*.png
+!skills/refinish/assets/*.png
 
 # Local secrets
 .env

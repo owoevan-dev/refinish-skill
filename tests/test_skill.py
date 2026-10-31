@@ -46,6 +46,41 @@ def test_plugin_manifest():
         assert (ROOT / pj["icon"]).is_file()
 
 
+def square_icon(path):
+    """An icon a listing takes: square and at least 48 pixels, raster or SVG."""
+    if path.suffix == ".svg":
+        w, h = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', path.read_text(encoding="utf-8")).groups())
+    else:
+        h, w = cv2.imread(str(path), cv2.IMREAD_UNCHANGED).shape[:2]
+    return w == h >= 48
+
+
+def test_codex_listing():
+    """Codex reads its own manifest and marketplace: the same plugin as Claude's, every image it names, and the
+    listing's limits (a name and subtitle of 30 characters, up to three prompts of 128)."""
+    claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    for key in ("name", "version", "description", "author", "homepage", "repository", "license", "keywords"):
+        assert codex[key] == claude[key], key
+    ui = codex["interface"]
+    assert len(ui["displayName"]) <= 30 and len(ui["shortDescription"]) <= 30 and len(ui["longDescription"]) <= 4000
+    assert len(ui["defaultPrompt"]) <= 3 and all(len(p) <= 128 for p in ui["defaultPrompt"])
+    assert re.fullmatch(r"#[0-9A-Fa-f]{6}", ui["brandColor"])
+    assert square_icon(ROOT / ui["composerIcon"]) and square_icon(ROOT / ui["logo"])
+    assert all((ROOT / p).is_file() for p in ui["screenshots"])
+    market = json.loads((ROOT / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8"))
+    claude_market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    assert market["name"] == claude_market["name"] and [p["name"] for p in market["plugins"]] == [codex["name"]]
+
+
+def test_skill_carries_its_codex_icons():
+    """The skill's own Codex metadata travels with the folder: its icons are inside it, the brand's own."""
+    yaml = pytest.importorskip("yaml")
+    ui = yaml.safe_load((SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8"))["interface"]
+    for key, brand in (("icon_small", "icon-small.svg"), ("icon_large", "icon-512.png")):
+        assert (SKILL / ui[key]).read_bytes() == (ROOT / "assets" / "brand" / brand).read_bytes(), key
+
+
 def test_skill_folder_carries_the_licence():
     """The skill is often copied on its own, without the repository round it: its folder keeps the licence."""
     assert (SKILL / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- A Codex listing: the plugin's own manifest (`.codex-plugin/plugin.json`) and marketplace (`.agents/plugins/marketplace.json`) give the plugin page a name, icon, description, website, screenshots, starter prompts and the Creativity category; the skill carries its own name and icons (`agents/openai.yaml`).
+
 ## [0.1.0] - 2026-10-30
 
 ### Added
@@ -100,4 +106,5 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.
 
+[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/owoevan-dev/refinish-skill/releases/tag/v0.1.0
