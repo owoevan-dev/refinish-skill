@@ -16,6 +16,7 @@ __pycache__/
 !skills/refinish/evals/*/files/*.png
 !assets/brand/*.png
 !skills/refinish/assets/*.png
+!skills/recolor/assets/*.png
 
 # Local secrets
 .env

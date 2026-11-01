@@ -8,6 +8,7 @@ mouth boxed, the face made the focal area.
 
 Usage:
   python scripts/auto_parts.py IMAGE.png SUBJECT.json [--upscaled N] [--head-px N] [--hints HINTS.json] [--like OTHER.json]
+                               [--parse PARSE.png]
 
 The parts are found the way a colourist reads a drawing: the areas the lines enclose (a ball rolled through the
 picture, so a gap in a line does not let one area run into the next: trapped-ball filling), then the face (a
@@ -22,7 +23,9 @@ colours: a material mixed into the wrong part shows there). With --hints (what w
 points and rough boxes per part, the eyes and the mouth boxed; references/subject-file.md) the parts are those named,
 cut out exactly. A part owns the regions in its "regions" list; fix a mistake by adding a point or a box and running
 again, or by moving a region's number to another part's list. --like takes the names and the kinds of another subject
-of the same character, so a set of pictures gets the same parts.
+of the same character, so a set of pictures gets the same parts. --parse takes the head (the hair, the face, the eyes
+split into iris, white and lashes, the brows, glasses, headwear, earrings) from a part map two segmentation models
+read (scripts/seethrough_parse.py, optional; references/seethrough.md).
 Prints JSON: the parts (kind, colour, share of the figure), the boxes, and "doubts", the places to look at first.
 Exit codes: 0 done, 1 done with doubts, 2 bad input.
 """
@@ -42,6 +45,8 @@ from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E
 from _lines import find_lines  # noqa: E402
 
 REGIONS_FORMAT = 1
+# a part segmentation's labels (--parse), as seethrough_parse.py writes them
+from _parse_labels import EYE_PARTS, PARSE, PARSE_PARTS  # noqa: E402
 # the review's part colours: Kelly's colours of maximum contrast (Kelly 1965), as RGB, white and black left out
 KELLY = [(242, 243, 244), (243, 195, 0), (135, 86, 146), (243, 132, 0), (161, 202, 241), (190, 0, 50), (194, 178, 128),
          (132, 132, 130), (0, 136, 86), (230, 143, 172), (0, 103, 165), (249, 147, 121), (96, 78, 151), (246, 166, 0),
@@ -591,6 +596,83 @@ def find_face(L, within, reg, line, fig, s, hints=None):
             "mouth": None if mb is None else ([mb[0][0], mb[0][1] + y0, mb[0][2], mb[0][3] + y0], full(mb[1]))}
 
 
+def face_from_parse(parse, L, within, s):
+    """The face as a part segmentation read it (--parse): its skin the face, the ears and the nose; its eyes the two
+    largest pieces of 'eyes', their drawing alone (the skin round them left out); the smaller pieces above them its
+    brows, a piece beside an eye that eye's; an eye drawn closed (flat, with no white) marked so; its mouth the 'mouth'
+    part's drawing. An eye the parse split (EYE_PARTS) carries its iris, white and lashes as they were split ("exact"),
+    or is kept as drawn whole ("kept"). The skin's colour is read from the face away from its features. Returns (face,
+    brows) as find_face's face and a mask, or None when the parse holds no face."""
+    head = np.isin(parse, [PARSE["face"], PARSE["ears"], PARSE["nose"]]) & within
+    if head.sum() < 500:
+        return None
+    # the eyes and the mouth inside the head's box (its largest piece, widened a tenth): a stray label on the body
+    # would stretch the mouth's box down the figure, or be taken for an eye
+    k, _, st, _ = cv2.connectedComponentsWithStats(head.astype(np.uint8), connectivity=8)
+    c = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+    x, y, bw, bh = (int(v) for v in st[c][:4])
+    inbox = np.zeros(within.shape, bool)
+    inbox[max(0, y - bh // 10):y + bh + bh // 10, max(0, x - bw // 10):x + bw + bw // 10] = True
+    eyes_m = np.isin(parse, [PARSE[p] for p in ("eyes",) + EYE_PARTS]) & within & inbox
+    mouth_m = (parse == PARSE["mouth"]) & within & inbox
+    feats = cv2.dilate((eyes_m | mouth_m).astype(np.uint8), disk(max(3, 10 * s))) > 0
+    core = (cv2.erode(head.astype(np.uint8), disk(max(2, 4 * s))) > 0) & ~feats
+    skin_c = np.median(L[core if core.sum() > 100 else head], axis=0)
+    sk = skin_of(L, skin_c) & within
+    k, cc, st, cen = cv2.connectedComponentsWithStats(eyes_m.astype(np.uint8), connectivity=8)
+    comps = sorted(range(1, k), key=lambda c: -st[c, cv2.CC_STAT_AREA])
+    big = [c for c in comps[:2] if st[c, cv2.CC_STAT_AREA] >= 30 * s * s]
+    if len(big) == 2 and st[big[1], cv2.CC_STAT_AREA] < 0.25 * st[big[0], cv2.CC_STAT_AREA]:
+        big = big[:1]                                   # (the second piece a brow; the other eye hidden)
+    eyes, brows = [], np.zeros(within.shape, bool)
+    for c in sorted(big, key=lambda c: cen[c][0]):
+        x, y, bw, bh = (int(v) for v in st[c][:4])
+        eyes.append({"box": [x, y, x + bw, y + bh], "centre": [float(cen[c][0]), float(cen[c][1])], "piece": c})
+    for c in comps:
+        if c in big:
+            continue
+        x, y, bw, bh = (int(v) for v in st[c][:4])
+        near = [e for e in eyes if x < e["box"][2] + 0.3 * (e["box"][2] - e["box"][0])
+                and x + bw > e["box"][0] - 0.3 * (e["box"][2] - e["box"][0])]
+        if near and cen[c][1] < min(e["box"][1] for e in near):
+            brows |= cc == c
+        elif near:
+            e = min(near, key=lambda e: abs(e["centre"][0] - cen[c][0]) + abs(e["centre"][1] - cen[c][1]))
+            e.setdefault("more", []).append(c)
+    white = (L[..., 0] > 60) & (np.hypot(L[..., 1], L[..., 2]) < 8)
+    for e in eyes:
+        region = np.isin(cc, [e.pop("piece")] + e.pop("more", []))
+        m = region & ~sk
+        bw_, bh_ = e["box"][2] - e["box"][0], e["box"][3] - e["box"][1]
+        e.update({"area": int(m.sum()), "score": 1.0, "mask": m, "shine": False, "given": False,
+                  "look": np.median(L[m], axis=0) if m.any() else skin_c})
+        split = {k: region & (parse == PARSE[p]) for k, p in (("iris", "iris"), ("white", "eye-white"),
+                                                              ("lash", "lashes"))}
+        if any(v.any() for v in split.values()):
+            e["exact"] = split                          # (as split: a pale iris is no skin to leave out)
+        elif (region & (parse == PARSE["eye-kept"])).any():
+            e["kept"] = True                            # (kept whole: a pale white is no skin to leave out either)
+            e["mask"] = region & within
+            e["area"] = int(e["mask"].sum())
+        else:
+            e["closed"] = bool(bh_ < 0.35 * bw_ and (m & white).sum() < 0.05 * max(1, m.sum()))
+    mouth = None
+    if mouth_m.sum() >= 20 * s * s:
+        ys, xs = np.nonzero(mouth_m)
+        mouth = ([int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1], mouth_m & ~sk)
+    _, X = face_width(head)
+    ys, xs = np.nonzero(head)
+    return {"colour": skin_c, "eyes": eyes, "head": head, "X": X, "mouth": mouth,
+            "box": [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1]}, brows & ~sk
+
+
+def parse_votes(reg, parse, n):
+    """Each region's pixels per parse label, the eye split's included: (n + 1, len(PARSE) + 1) counts."""
+    m = len(PARSE) + 1
+    idx = reg.astype(np.int64) * m + parse.astype(np.int64)
+    return np.bincount(idx.ravel(), minlength=(n + 1) * m)[:(n + 1) * m].reshape(n + 1, m)
+
+
 def pad_box(b, frac, px, h, w):
     x0, y0, x1, y1 = b
     dx, dy = max(px, frac * (x1 - x0)), max(px, frac * (y1 - y0))
@@ -712,7 +794,7 @@ def tolerant(px, c):
     return np.sqrt((wl * (px[..., 0] - c[0])) ** 2 + (px[..., 1] - c[1]) ** 2 + (px[..., 2] - c[2]) ** 2)
 
 
-def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None):
+def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None, keep=()):
     """A region that holds points of two or more parts (the line finder missed the outline between them: a print on
     a shirt, a hair clip, a coat and trousers of one navy in a painting with few lines) is split among them by a
     watershed from markers (Beucher and Meyer 1993; computed as an image foresting transform, Falcao et al. 2004):
@@ -720,8 +802,9 @@ def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None)
     parts meet, the boundary falls on the strongest colour edge between them, however soft the shading on either side.
     What is far in colour from every point of the part that flooded it (a material nobody pointed at) is set apart as a
     region of its own for the parts' growth to settle; so is what is far from the points of the only part pointed at
-    in a region (a white collar flap in one region with the navy stripe pointed at on it). Returns the region map and
-    the regions it made (bounded by the watershed and the colour test, not by drawn lines)."""
+    in a region (a white collar flap in one region with the navy stripe pointed at on it). The regions in `keep`, carved
+    before the points (an iris a segmenter split, the mouth), stay whole. Returns the region map and the regions it
+    made (bounded by the watershed and the colour test, not by drawn lines)."""
     pts = {}
     for k, hp in enumerate(hint_parts):
         for x, y in hp.get("at", []):
@@ -734,7 +817,10 @@ def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None)
     r = max(1, int(round(2 * s)))
     min_area = max(40.0, 60.0 * s * s)
     made = set()
+    keep = set(keep)
     for j, found in pts.items():
+        if j in keep:
+            continue
         ks = sorted({k for k, _, _ in found})
         sl = boxes[j - 1]
         m = reg[sl] == j
@@ -1017,18 +1103,20 @@ def grab_parts(reg, hint_parts, img, within, locked, s, margin, soft=()):
     return reg, owner
 
 
-def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
+def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held=()):
     """The parts pointed at (by whoever looked at the picture: "the hair is here, here and here; the skirt here"),
     grown from the regions under the points, all at once, the way a colourist's bucket fills a drawing (scribble
     colouring, as in LazyBrush, Sykora et al. 2009): each region goes to the part that reaches it first, so a navy
     skirt and navy hair pointed at apart stay apart where they meet. A part grows into a touching region of its
     colour that it borders along a good part of its edge or that carries on below it, and into the small shines it
     rings; never into the locked regions (the eyes and the mouth already carved), nor into the regions owned already
-    (`fixed`: the parts found in their boxes), nor outside its boxes when it has them. Returns {region: index of the
+    (`fixed`: the parts found in their boxes), nor outside its boxes when it has them. Nor into the `held` regions (the
+    head as a part segmentation read it), which a part takes only where whoever looked said so: a point placed on one,
+    or its `within` box (a brush's handle the parse read as hair). Returns {region: index of the
     hint}."""
-    locked = set(locked)
+    locked, held, cut = set(locked), set(held), set(fixed or {})
     import heapq
-    owner, heap, colour = dict(fixed or {}), [], []
+    owner, heap, colour, seeded = dict(fixed or {}), [], [], []
     for k, hp in enumerate(hint_parts):
         # the region under each point is its seed, however small (a point on a line has the line's region, and a
         # line's pixels belong to the region beside them); a point outside the figure has none
@@ -1036,6 +1124,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
                  if 0 <= int(y) < reg.shape[0] and 0 <= int(x) < reg.shape[1] and reg[int(y), int(x)] > 0]
         w_ = np.array([st["area"][j] for j in seeds] or [1.0], np.float64)
         colour.append((st["lab"][seeds] * w_[:, None]).sum(0) / w_.sum() if seeds else np.zeros(3))
+        seeded.append(bool(seeds))
         for j in seeds:
             if j not in owner:
                 heapq.heappush(heap, (0.0, j, k))
@@ -1050,7 +1139,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
             continue
         owner[j] = k
         for q in nb.get(j, {}):
-            if q == 0 or q in owner or q in locked or not in_boxes(q, k):
+            if q == 0 or q in owner or q in locked or q in held or not in_boxes(q, k):
                 continue
             edge = sum(c for r, c in nb[q].items() if r != 0)
             shared = sum(c for r, c in nb[q].items() if owner.get(r) == k)
@@ -1070,13 +1159,19 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
                     continue
             heapq.heappush(heap, (cost + 1.0 + d / 10.0, q, k))
     # "within": every other region of the part's colour inside the box given (the scattered motifs of a print,
-    # a row of buttons), the way an editor selects similar colours inside a selection
+    # a row of buttons), the way an editor selects similar colours inside a selection; the held regions too, which
+    # only a selection or a point takes, and what another part's box cut gave it when its colour is nearer the
+    # selection's than that part's (a generous box round long hair takes a shirt's dark stripes by their grey; a
+    # selection of the shirt's white leaves the shirt's own cut alone; a part with no points keeps its cut)
     for k, hp in enumerate(hint_parts):
         if "within" not in hp:
             continue
         x0, y0, x1, y1 = hp["within"]
         for q in range(1, len(st["area"])):
-            if q in owner or q in locked or st["area"][q] == 0:
+            if q in locked or st["area"][q] == 0:
+                continue
+            if q in owner and (q not in cut or owner[q] == k or not seeded[owner[q]] or
+                               cdist(st["lab"][q], colour[k]) >= cdist(st["lab"][q], colour[owner[q]])):
                 continue
             if x0 <= st["cx"][q] <= x1 and y0 <= st["cy"][q] <= y1 and cdist(st["lab"][q], colour[k]) <= budget:
                 owner[q] = k
@@ -1104,11 +1199,13 @@ def box_masks(hint_parts, names, shape, pad):
     return out
 
 
-def keep_to_boxes(reg, parts, hint_parts, L, within, pad):
+def keep_to_boxes(reg, parts, hint_parts, L, within, pad, held=()):
     """The promise the boxes make, kept after every other step: no pixel outside a part's boxes (and a margin of
     `pad` pixels) is that part's. Each piece of a part lying outside its boxes goes to the part whose points are
     nearest in colour among those that may be there (their boxes hold most of the piece, or they have none); a piece
-    no other part may hold stays where it was. Regions are cut where their pixels change hands.
+    no other part may hold stays where it was. Regions are cut where their pixels change hands. The regions `held`
+    (the head's hair and skin as a part segmentation read it) stay with the hair and the skin; a part that took one
+    by a point or a selection keeps it inside its boxes only.
     Returns (region map, parts with their region lists renumbered, pixels moved)."""
     names = {p["name"]: i + 1 for i, p in enumerate(parts)}
     own = np.zeros(int(reg.max()) + 1, np.int32)
@@ -1117,9 +1214,11 @@ def keep_to_boxes(reg, parts, hint_parts, L, within, pad):
     label = own[reg] * (reg > 0)
     allow = box_masks(hint_parts, names, reg.shape, pad)
     seeds = {names[hp["name"]]: point_colours(hp, L, within) for hp in hint_parts if hp["name"] in names}
+    keep = np.isin(reg, np.asarray(list(held), dtype=np.int64)) if len(held) else np.zeros(reg.shape, bool)
+    holders = {names[n_] for n_ in ("hair", "skin") if n_ in names}
     moved = 0
     for k, m in allow.items():
-        bad = (label == k) & ~m
+        bad = (label == k) & ~m & (~keep if k in holders else True)
         if not bad.any():
             continue
         n_, comp = cv2.connectedComponents(bad.astype(np.uint8), connectivity=8)
@@ -1527,6 +1626,8 @@ def like_parts(parts, ref_path, st, fig):
             p = dict(p, name=best[0], kind=best[1])
         if p["name"] in out:
             out[p["name"]]["regions"] += p["regions"]
+            if not p.get("exact"):
+                out[p["name"]].pop("exact", None)      # (taken whole only while every piece of it was split whole)
         else:
             out[p["name"]] = p
     return list(out.values())
@@ -1541,6 +1642,9 @@ def main():
     ap.add_argument("--like", help="another subject of the same character: its part names and kinds are reused")
     ap.add_argument("--hints", help="what someone who looked at the picture pointed at: rough eye and mouth boxes, "
                                     "points on parts (references/subject-file.md)")
+    ap.add_argument("--parse", help="the head's parts read by a part segmentation (scripts/seethrough_parse.py; "
+                                    "references/seethrough.md): the hair, the face, the eyes, the brows, the mouth, "
+                                    "glasses, headwear and earrings taken from it")
     a = ap.parse_args()
     hints = {}
     if a.hints:
@@ -1567,9 +1671,47 @@ def main():
     reg, line, core = regions_of(img, within, L, s, a.upscaled)
     doubts = []
 
-    # 2. the face, found in the pixels; its eyes and its mouth carved into regions of their own
+    # 2. the face, found in the pixels (or read by a part segmentation, --parse); its eyes and its mouth carved into
+    # regions of their own
+    parse = None
+    if a.parse:
+        parse = cv2.imread(a.parse, cv2.IMREAD_GRAYSCALE)
+        if parse is None or parse.shape != within.shape:
+            die(f"{a.parse}: not a part map of this picture ({w}x{h}); make it from this picture with "
+                "scripts/seethrough_parse.py")
+        if int(parse.max()) > len(PARSE):
+            die(f"{a.parse}: label {int(parse.max())} is not one a parse writes (0 to {len(PARSE)}): a part map saved "
+                "as a lossy picture (JPEG), or another picture; make it with scripts/seethrough_parse.py, as a PNG")
     face = find_face(L, within, reg, line, fig, s, hints)
-    carved = {"white": [], "iris": [], "mouth": [], "black": []}
+    brows = None
+    if parse is not None:
+        got = face_from_parse(parse, L, within, s)
+        if got is None:
+            doubts.append("the parse holds no face: the face was found in the pixels")
+        else:
+            if face is not None and got[0]["mouth"] is None:
+                # the mouth the colours found, cut as they cut it: out of their skin (the parse's face holds it)
+                got[0]["mouth"], got[0]["mouth_skin"] = face["mouth"], face["head"]
+            face, brows = got
+            given = (hints or {}).get("eyes") or []
+            if len(face["eyes"]) < len(given):
+                # an eye the parse missed (read as glasses, or as a brow) that the hints give: its box stands for it,
+                # what in it is not skin its mask, as the colours' face finder does
+                sk_ = skin_of(L, face["colour"]) & within
+                for b in given:
+                    x0, y0, x1, y1 = (int(v) for v in b)
+                    if any(e["box"][0] < x1 and x0 < e["box"][2] and e["box"][1] < y1 and y0 < e["box"][3]
+                           for e in face["eyes"]):
+                        continue
+                    m = np.zeros(within.shape, bool)
+                    m[max(0, y0):max(0, y1), max(0, x0):max(0, x1)] = True
+                    px = L[m & within] if (m & within).any() else L[m]
+                    face["eyes"].append({"box": [x0, y0, x1, y1], "centre": [(x0 + x1) / 2.0, (y0 + y1) / 2.0],
+                                         "area": int((m & ~sk_).sum()), "score": 1.0, "mask": m & ~sk_,
+                                         "look": np.median(px.reshape(-1, 3), axis=0), "shine": False, "given": True})
+                face["eyes"].sort(key=lambda e: e["centre"][0])
+    carved = {"white": [], "iris": [], "mouth": [], "black": [], "closed": [], "brow": [], "eyewear": [],
+              "headwear": [], "earwear": [], "iris_x": [], "lash": [], "kept": []}
     # pure-black masses on light ground (a chin's cast shadow drawn in black, a black print on a white shirt) are carved
     # out as a kept part of their own, so no style paints them in the colours of the light part round them; black on
     # dark ground (the deep shadows of black hair or a black coat) stays with its part
@@ -1602,14 +1744,48 @@ def main():
         nid = int(reg.max())
         for e in face["eyes"]:
             m = e["mask"] & within
+            if e.get("kept"):
+                # an eye the parse keeps as drawn whole: no part of it recoloured or restyled
+                if m.sum() >= 12 * s * s:
+                    nid += 1
+                    reg[m] = nid
+                    carved["kept"].append(nid)
+                continue
+            if e.get("exact"):
+                # an eye a segmenter split: its iris, its white and its lashes as split
+                for key, part in (("iris_x", "iris"), ("white", "white"), ("lash", "lash")):
+                    mm = e["exact"][part] & within
+                    if mm.sum() >= 4 * s * s:
+                        nid += 1
+                        reg[mm] = nid
+                        carved[key].append(nid)
+                continue
+            if e.get("closed"):
+                # an eye drawn closed is its lashes alone: kept as drawn, never an iris
+                if m.sum() >= 12 * s * s:
+                    nid += 1
+                    reg[m] = nid
+                    carved["closed"].append(nid)
+                continue
             white = m & (L[..., 0] > 60) & (np.hypot(L[..., 1], L[..., 2]) < max(6.0, 0.7 * chroma(skin_c)))
             for key, mm in (("white", white), ("iris", m & ~white)):
                 if mm.sum() >= 12 * s * s:
                     nid += 1
                     reg[mm] = nid
                     carved[key].append(nid)
+        if parse is not None:
+            # what the parse names of the head beside the eyes: the brows (they go with the hair), glasses, headwear,
+            # earrings, each its own region, its skin left out
+            sk_ = skin_of(L, skin_c) & within
+            for key, mm in (("brow", brows), ("eyewear", parse == PARSE["eyewear"]),
+                            ("headwear", parse == PARSE["headwear"]), ("earwear", parse == PARSE["earwear"])):
+                mm = mm & within & ~sk_ if mm is not None else None
+                if mm is not None and mm.sum() >= 12 * s * s:
+                    nid += 1
+                    reg[mm] = nid
+                    carved[key].append(nid)
         if face["mouth"] is not None:
-            mm = face["mouth"][1] & within & ~face["head"]
+            mm = face["mouth"][1] & within & ~face.get("mouth_skin", face["head"])
             if mm.sum() >= 30 * s * s:
                 nid += 1
                 reg[mm] = nid
@@ -1627,13 +1803,29 @@ def main():
         reg[cut] = reg[cut] + nid
         reg, lut = relabel(reg, with_lut=True)
         carved = {k: [int(lut[i]) for i in v if lut[i] > 0] for k, v in carved.items()}
+        if parse is not None:
+            # and a region partly the parse's hair and partly not (a strand joined to a collar where a line is faint)
+            # along the hair's edge
+            on = (parse == PARSE["hair"]) & within
+            nid = int(reg.max())
+            area_r = np.bincount(reg.ravel(), minlength=nid + 1)
+            share = np.bincount(reg[on], minlength=nid + 1) / np.maximum(area_r, 1)
+            mixed = (share >= 0.15) & (share <= 0.85) & (area_r >= 400 * s * s)
+            mixed[0] = False
+            for key in carved:
+                mixed[carved[key]] = False
+            cut = mixed[reg] & ~on & within
+            reg[cut] = reg[cut] + nid
+            reg, lut = relabel(reg, with_lut=True)
+            carved = {k: [int(lut[i]) for i in v if lut[i] > 0] for k, v in carved.items()}
     grabbed = {}
     if hints.get("parts"):
         # the figure's own outline is line art too, though over the transparent (black) ground the line finder does not
         # see it: found once more over a white ground, near the figure's edge
         edge_d = cv2.distanceTransform(within.astype(np.uint8), cv2.DIST_L2, 3)
         rim = find_lines(img * alpha[..., None] + (1 - alpha[..., None]), a.upscaled) > 0.3
-        reg, soft = split_by_hints(reg, hints["parts"], L, s, line=line | (rim & within & (edge_d < 10 * s)))
+        reg, soft = split_by_hints(reg, hints["parts"], L, s, line=line | (rim & within & (edge_d < 10 * s)),
+                                   keep={i for v in carved.values() for i in v})
         reg, lut = relabel(reg, with_lut=True)
         carved = {k: [int(lut[i]) for i in v if i < len(lut) and lut[i] > 0] for k, v in carved.items()}
         soft = {int(lut[i]) for i in soft if i < len(lut) and lut[i] > 0}
@@ -1652,6 +1844,7 @@ def main():
         taken[ids] = True
     parts = []
     protect, focal, blush = [], [], []
+    parse_locked = []                                   # (the head's hair and skin as a parse read them: held)
     if face is None:
         if hints.get("eyes"):
             # the face hidden (a mask, a hood) or turned away: the boxes given are the eyes and the mouth
@@ -1687,7 +1880,16 @@ def main():
                      and is_skin(st["lab"][i], skin_c, 18.0)}
         hx0, hy0, hx1, _ = face["box"]
         eye_y = sum(e["centre"][1] for e in eyes) / len(eyes) if eyes else hy0 + 0.35 * X
-        hair, hair_c = grow_hair(reg, face_regs, eye_y, X, skin_c, st, nb, fig, taken)
+        if parse is not None:
+            # the hair as the parse reads it: the regions mostly its 'hair', and the brows
+            votes = parse_votes(reg, parse, n)
+            hair = {i for i in range(1, n + 1) if not taken[i] and votes[i, PARSE["hair"]] >= 0.5 * max(1, st["area"][i])}
+            hair |= set(carved["brow"])
+            hr = np.array(sorted(hair), dtype=np.int64)
+            hair_c = ((st["lab"][hr] * st["area"][hr][:, None]).sum(0) / st["area"][hr].sum()) if len(hr) else None
+            parse_locked = sorted(hair | face_regs)
+        else:
+            hair, hair_c = grow_hair(reg, face_regs, eye_y, X, skin_c, st, nb, fig, taken)
         if not hair:
             doubts.append("no hair found round the face: give the hair part by hand")
         taken[list(hair)] = True
@@ -1701,11 +1903,19 @@ def main():
         parts.append({"name": "skin", "kind": "skin", "regions": sorted(skin, key=lambda i: -st["area"][i])})
         if hair:
             parts.append({"name": "hair", "kind": "hair", "regions": sorted(hair, key=lambda i: -st["area"][i])})
-        for key, name in (("white", "eye-whites"), ("iris", "irises")):
+        if carved["iris_x"]:
+            # (the irises as a segmenter split them: taken whole by a card, never thinned by colour)
+            parts.append({"name": "irises", "kind": "eyes", "regions": carved["iris_x"], "exact": True})
+        for key, name in (("white", "eye-whites"), ("iris", "irises-by-colour" if carved["iris_x"] else "irises")):
             if carved[key]:
                 parts.append({"name": name, "kind": "eyes", "regions": carved[key]})
         if carved["mouth"]:
             parts.append({"name": "mouth", "kind": "accessory", "regions": carved["mouth"]})
+        for key, name, kind in (("closed", "closed-eyes", "accessory"), ("lash", "lashes", "accessory"),
+                                ("kept", "eyes-kept", "accessory"), ("eyewear", "eyewear", "metal"),
+                                ("headwear", "headwear", "accessory"), ("earwear", "earwear", "metal")):
+            if carved[key]:
+                parts.append({"name": name, "kind": kind, "regions": carved[key]})
         # the face's focal area, the blush spots under the eyes, the hands
         ex = sum(e["centre"][0] for e in eyes) / len(eyes) if eyes else (hx0 + hx1) / 2
         span = abs(eyes[-1]["centre"][0] - eyes[0]["centre"][0]) if len(eyes) == 2 else 0.45 * X
@@ -1747,7 +1957,7 @@ def main():
     # the parts pointed at take their regions from whatever part the draft gave them to
     if hints.get("parts"):
         locked = [i for v in carved.values() for i in v]
-        owner = claim(hints["parts"], reg, st, nb, fig, locked=locked, fixed=grabbed)
+        owner = claim(hints["parts"], reg, st, nb, fig, locked=locked, fixed=grabbed, held=parse_locked)
         if hints.get("complete"):
             # the reviewer named every part: what no point reached joins a touching named part by seeded region
             # growing (Adams and Bischof 1994): of all the unclaimed regions touching a part, the one nearest in colour
@@ -1771,7 +1981,7 @@ def main():
                     return 1e9
                 return min((cdist(st["lab"][i], c) for c in seeds_c[k]), default=1e9)
 
-            lockset = set(locked)
+            lockset = set(locked) | set(parse_locked)
             rest_ids = {i for i in range(1, n + 1) if i not in owner and i not in lockset and st["area"][i] > 0}
             heap = []
             for i in rest_ids:
@@ -1804,7 +2014,11 @@ def main():
                     ys_, xs_ = np.nonzero(reg == i)
                     if len(ys_) and near_lab[ys_[0], xs_[0]] > 0:
                         owner[i] = int(near_lab[ys_[0], xs_[0]]) - 1
-            keep = {"eye-whites", "irises", "mouth", "black-masses"} - {hp["name"] for hp in hints["parts"]}
+            # the parts carved before the points (and the head's hair and skin a parse read) stay; a hint part of
+            # the same name adds to one below, its kind replacing the draft's: their regions are locked, so its points
+            # could never take them back, and dropping the draft's part would leave them in no part
+            keep = {"eye-whites", "irises", "irises-by-colour", "mouth", "black-masses", "closed-eyes", "lashes",
+                    "eyes-kept", "eyewear", "headwear", "earwear"} | ({"hair", "skin"} if parse_locked else set())
             draft = {p["name"]: p for p in parts}
             # the colours' reading against the reviewer's: a large region the face says is skin or hair, named
             # otherwise
@@ -1817,6 +2031,8 @@ def main():
                         doubts.append(f"region {i} reads as {kind} but was named '{hints['parts'][k]['name']}': "
                                       f"check at [{sl[1].start}, {sl[0].start}, {sl[1].stop}, {sl[0].stop}]")
             parts = [p for p in parts if p["name"] in keep]
+        split_whole = {p["name"]: set(p["regions"]) for p in parts if p.get("exact")}   # (as the parse split them)
+        draft_owner = {i: p for p in parts for i in p["regions"]}
         for p in parts:
             p["regions"] = [i for i in p["regions"] if i not in owner]
         by_name = {p["name"]: p for p in parts}
@@ -1824,13 +2040,30 @@ def main():
             mine = sorted((i for i, o in owner.items() if o == k), key=lambda i: -st["area"][i])
             if hp["name"] in by_name:
                 q = by_name[hp["name"]]
+                stray = [i for i in mine if i not in split_whole.get(q["name"], set(mine))]
+                if q.get("exact") and stray:
+                    # an iris a segmenter split takes no region read by its colours (a lash line under a point at its
+                    # rim would be painted the iris's colour): those go back where the draft had them, or stay in no
+                    # part, as drawn
+                    for i in stray:
+                        if i in draft_owner and draft_owner[i] is not q:
+                            draft_owner[i]["regions"].append(i)
+                    mine = [i for i in mine if i not in stray]
+                    doubts.append(f"a point for '{hp['name']}' lies off the iris the parse split: that eye stays as "
+                                  "split (click it on the parse's sheet to change it)")
                 q["regions"] = mine + q["regions"]
                 q["kind"] = hp.get("kind", q["kind"])
             else:
                 q = {"name": hp["name"], "kind": hp.get("kind", "cloth"), "regions": mine}
                 parts.append(q)
                 by_name[q["name"]] = q
-            if not mine:
+            if hp.get("prop"):
+                q["prop"] = True
+            # (none of the regions under its points ended in the part: a draft part of the same name, merged in,
+            # would hide that behind its own regions)
+            at_regs = {int(reg[int(y), int(x)]) for x, y in hp.get("at", [])
+                       if 0 <= int(y) < h and 0 <= int(x) < w} - {0}
+            if not q["regions"] or (hp.get("at") and not at_regs & set(q["regions"])):
                 doubts.append(f"the points for '{hp['name']}' reached no region: check where they lie")
             for x, y in hp.get("at", []):
                 if not (0 <= int(y) < h and 0 <= int(x) < w and within[int(y), int(x)]):
@@ -1838,7 +2071,7 @@ def main():
                                   "(scripts/hints.py check shows where each point lands)")
         parts = [p for p in parts if p["regions"]]
         # the boxes' promise kept whatever the steps before did: nothing outside a part's boxes is that part
-        reg, parts, moved = keep_to_boxes(reg, parts, hints["parts"], L, within, 0.005 * fig["height"])
+        reg, parts, moved = keep_to_boxes(reg, parts, hints["parts"], L, within, 0.005 * fig["height"], parse_locked)
         if moved:
             st = region_stats(reg, L, core)
             nb = neighbours(adjacency(reg))
@@ -1897,7 +2130,8 @@ def main():
     except ValueError:
         image_rel = str(Path(a.image).resolve()).replace("\\", "/")
     fams = {p["name"]: samples(p["regions"], reg) for p in parts}
-    out_parts = [{"name": p["name"], "family": p["name"], "kind": p["kind"], "regions": [int(i) for i in p["regions"]]}
+    out_parts = [{"name": p["name"], "family": p["name"], "kind": p["kind"], "regions": [int(i) for i in p["regions"]],
+                  **({"exact": True} if p.get("exact") else {}), **({"prop": True} if p.get("prop") else {})}
                  for p in parts]
     sj = {"format": "refinish-subject/1", "image": image_rel, "upscaled": a.upscaled,
           **({"head_px": a.head_px} if a.head_px else {}),

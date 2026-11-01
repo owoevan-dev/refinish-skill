@@ -1,0 +1,7 @@
+interface:
+  display_name: "Recolor"
+  short_description: "Recolour a character to a colour card, keeping the drawing"
+  icon_small: "./assets/icon-small.svg"
+  icon_large: "./assets/icon-large.png"
+  brand_color: "#C8442F"
+  default_prompt: "Recolour this character with silver hair, red eyes and a black coat, keeping the drawing as it is."

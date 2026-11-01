@@ -77,6 +77,18 @@ So a background takes the cleaner de-AI finish or a landscape finish, and the ch
 
 A character drawn into a scene can be cut out first with `cutout.py`. You draw a rough outline, the colours decide the exact edge, and you also get the background back with the figure's place filled, ready to be finished on its own.
 
+## New colours, same drawing
+
+The plugin has a second skill, [Recolor](skills/recolor/SKILL.md). It keeps the picture and changes the colours. You name them, or hand it a colour card: by part ("silver hair, a black coat"), by kind (all the hair, all the metal) or as a main, sub and accent colour for whatever the character wears. Shadows and highlights you leave out are worked out the way an anime colour designer turns them: cooler for most materials, warmer for skin.
+
+<p align="center">
+  <img src="docs/images/recolor.jpg" alt="One character four times: the source picture, then recoloured to a colour card, to a vivid main, sub and accent scheme, and with her light and dark colours swapped. The paintbrush she holds keeps its colours.">
+</p>
+
+The lines take a dark shade of the new colours, and the irises are recoloured inside the face with their catchlights left white. Something the character holds can be marked as a prop, so a vivid scheme doesn't paint the paintbrush too. When a patch comes out wrong, a point on it is enough to fix it.
+
+The new colours are painted in one of the cel finishes. Changing the colours while keeping a picture's own rendering (its soft gradients and gloss) is planned but not there yet.
+
 ## Beyond a filter
 
 - **Parts, not pixels.** A subject file says what each part of the picture is: skin, hair, each garment. Every material is painted from its own colours, so a red ribbon never bleeds into the skin beside it. The file is drafted automatically and corrected with a few hint points.
@@ -92,6 +104,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 The figures below come from the project's own runs on pictures the code had never seen; those pictures are not in this repository. The code is frozen and the pass marks are written down before the pictures are opened, and a set that has been looked at is used for development only.
 
 - **Parts.** On two sets of new characters, parts drafted with an agent's hints were right for 39 of 41 within two rounds.
+- **Recolour.** Eight new characters, three colour cards each. 134 of the 135 recoloured parts came out within 3.0 (CIEDE2000) of their card colour, 132 before any touch-ups. With at most two rounds of clicks on the eye review sheet, every character's eyes took the new colour. The optional head models made the difference there: without them, a pair of eyes behind glasses was missed and an eye under bangs came out wrong. The first set of eight had missed on leftover colour, eyes and lines; the fixes were made on that set and a second one, then tested on this third set.
 - **All 37 finishes on 16 new characters** (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure:
   - every cel finish except the sunset and 90s ones;
   - both de-AI finishes;
@@ -118,13 +131,13 @@ The figures below come from the project's own runs on pictures the code had neve
 
 **Other agents**
 
-Copy or link `skills/refinish` into your agent's skills folder, or use [skills.sh](https://skills.sh):
+Copy or link `skills/refinish` and `skills/recolor` into your agent's skills folder, side by side (Recolor runs the scripts in `../refinish/scripts`), or use [skills.sh](https://skills.sh):
 
 ```
 npx skills add owoevan-dev/refinish-skill
 ```
 
-The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). No GPU, no network, no model downloads.
+The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). No GPU, no network, no model downloads. One step is optional: two segmentation models, See-Through and SAM 2 (both Apache-2.0, installed apart, best on an NVIDIA GPU), can read a figure's head and split its eyes into iris, white and lashes ([seethrough.md](skills/refinish/references/seethrough.md)). They label pixels and draw nothing.
 
 ## Using it
 
@@ -137,6 +150,8 @@ With the skill installed, ask your agent in plain words:
 > Cut the girl out of `street.png`, give her a 90s cel finish and put her back.
 
 > Match the finish of the frames in `refs/` on my character: the lines, the colours, the shading. Tell me what does not carry over.
+
+> Recolour her with silver hair, red eyes and a black coat, as a TV anime cel.
 
 The agent follows [SKILL.md](skills/refinish/SKILL.md). It checks the picture, makes the subject file, runs the finish, and looks at the result before showing it to you. The scripts also work on their own:
 
@@ -153,6 +168,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 - The parts are drafted automatically, and the draft is often wrong somewhere: an eye missed when it is closed or winking, a lock of hair read as the clothes it lies on. A patch in another material's colour (that lock painted like the clothes) almost always comes from such a mistake, and goes once the parts are right. Whenever you see one, say what is wrong in a sentence, such as "this lock is hair". You never need to give boxes or points: the agent turns the sentence into hints and runs again. Clean cel pictures settle within two rounds; semi-realistic paintings, dense patterns and black on black are harder. When the parts will not come right, the agent merges parts, finishes only the parts that are right, or uses a finish that needs no parts ([subject-file.md](skills/refinish/references/subject-file.md)).
 - Soft airbrushed shading gives the flat cel finishes less to work with; the paint finishes cope better. Blotches inside one material come from it, not from the parts. [source-spec.md](skills/refinish/references/source-spec.md) explains how to ask an image model for a picture that finishes well.
 - Cut-outs have hard edges. A veil, a lens or smoke comes out as wholly figure or wholly background.
+- Recolouring repaints in a cel finish, so a soft, glossy rendering is replaced rather than kept. Dense dark line work, such as black box braids, comes out darker than its card colour because the lines keep their ink.
 - It doesn't hide where a picture came from. A generated picture is still generated after any finish here, the de-AI ones included, and none of them is tuned against any detector.
 
 ## Documentation
@@ -167,6 +183,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | Backgrounds, depth of field and light wrap |
 | [style-format.md](skills/refinish/references/style-format.md) | Writing or changing a style file |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | Style and copyright, and what Steam and pixiv ask for |
+| [Recolor's SKILL.md](skills/recolor/SKILL.md) | Recolouring a character to a colour card |
+| [palette-format.md](skills/recolor/references/palette-format.md) | The colour card: entries, matching, derived shadows |
+| [palette-design.md](skills/recolor/references/palette-design.md) | Choosing a card's colours, and the sources behind the rules |
+| [seethrough.md](skills/refinish/references/seethrough.md) | Reading the head and the eyes with two segmentation models (optional) |
 
 ## Contributing
 
@@ -174,4 +194,4 @@ Bug reports and requests for new finishes are welcome as [issues](https://github
 
 ## Licence
 
-[MIT](LICENSE). The sample character in the pictures above was made with an image model for this README; every finish shown is this skill's output. The test pictures in the skill's `evals` folder are drawn by code, and the logo's lettering is Noto Serif TC (SIL Open Font License) turned into outlines.
+[MIT](LICENSE). The sample characters in the pictures above were made with an image model; every finish and recolour shown is this skill's output. The test pictures in the skill's `evals` folder are drawn by code, and the logo's lettering is Noto Serif TC (SIL Open Font License) turned into outlines.

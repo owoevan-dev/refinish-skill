@@ -77,6 +77,18 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 
 画在场景里的角色，可以先用 `cutout.py` 抠出来：画一圈大致的外框，精确的边缘交给颜色判断，同时还能拿到补好角色位置的背景，可以单独完稿。
 
+## 换颜色，不换画
+
+这个插件还有第二个技能 [Recolor](skills/recolor/SKILL.md)：画保持原样，只换颜色。直接说想要的颜色，或者给它一张色卡都行：按部位（"银色头发、黑色外套"）、按种类（所有头发、所有金属），或者给服装一组主色、副色、点缀色。没指定的阴影和高光，会按动画色彩设计的习惯推出来：大多数材质的阴影偏冷，皮肤偏暖。
+
+<p align="center">
+  <img src="docs/images/recolor.jpg" alt="同一个角色四次：原图，接着按色卡换色、换成鲜艳的主色副色点缀色配色，以及深浅对调。她手里的画笔保持原色。">
+</p>
+
+线条会换成新颜色的深色版本，虹膜在脸部范围内换色，眼睛里的高光点保持白色。角色手里拿的东西可以标成道具，鲜艳的配色就不会连画笔一起染。哪一块换错了，在上面点一个点就能修。
+
+新颜色是用赛璐璐完稿画出来的。保留原图自身的画法（柔和渐变、光泽）只换颜色，已经在计划里，但还没做好。
+
 ## 不只是滤镜
 
 - **按部位处理，而不是按像素。** 主体文件（subject file）标出图中每个部位是什么：皮肤、头发、每件衣服。每种材质都用它自己的颜色上色，红色缎带不会渗进旁边的皮肤。主体文件会自动生成草稿，再用几个提示点修正。
@@ -92,6 +104,7 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 下面的数字来自项目自己的测试，用的是代码没见过的图（这些图不在仓库里）：开图前先冻结代码、写好通过标准；看过的图之后只用于开发。
 
 - **部位。** 在两组新角色上，配合 agent 的提示点，41 张中有 39 张在两轮内所有部位都正确。
+- **重新配色。** 8 个新角色，每个套 3 张色卡。135 个换色部件中，有 134 个与色卡颜色的差距在 3.0（CIEDE2000）以内，未做任何修补前是 132 个。在眼睛检查表上最多点两轮之后，每个角色的眼睛都换上了新颜色。这一点靠的是可选的头部模型：不装的话，一双在眼镜后面的眼睛会被漏掉，一只被刘海挡住的眼睛会换错。第一组 8 个角色在残留旧色、眼睛和线条上没有通过；修正是在那一组和第二组上做的，最后用这第三组验证。
 - **37 种完稿用在 16 个新角色上**（10 个肤色较深，4 个是柔和的喷枪上色），21 种完稿通过了全部测量：
   - 除黄昏和 90 年代以外的所有赛璐璐完稿；
   - 两种去 AI 感完稿；
@@ -118,13 +131,13 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 
 **其他 agent**
 
-把 `skills/refinish` 复制或链接到 agent 的 skills 文件夹，或者使用 [skills.sh](https://skills.sh)：
+把 `skills/refinish` 和 `skills/recolor` 一起复制或链接到 agent 的 skills 文件夹，两个放在同一层（Recolor 会用 `../refinish/scripts` 里的脚本），或者使用 [skills.sh](https://skills.sh)：
 
 ```
 npx skills add owoevan-dev/refinish-skill
 ```
 
-脚本需要 Python 3.10 及以上版本，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可选）。不需要 GPU、网络，也不用下载模型。
+脚本需要 Python 3.10 及以上版本，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可选）。不需要 GPU、网络，也不用下载模型。只有一个步骤可选：两个分割模型 See-Through 与 SAM 2（均为 Apache-2.0，另行安装，最好有 NVIDIA 显卡）能读出角色的头部，并把眼睛分成虹膜、眼白和睫毛（[seethrough.md](skills/refinish/references/seethrough.md)）。它们只标记像素，不画任何东西。
 
 ## 使用方法
 
@@ -137,6 +150,8 @@ npx skills add owoevan-dev/refinish-skill
 > 把 `street.png` 里的女孩抠出来，改成 90 年代赛璐璐，再放回原位。
 
 > 照 `refs/` 里那几张截图的完稿，套到我的角色上：线条、配色、阴影都要像。也告诉我哪些带不过来。
+
+> 帮她换成银发、红眼、黑外套，做成电视动画赛璐璐风格。
 
 agent 会按 [SKILL.md](skills/refinish/SKILL.md) 的流程：先检查原图、建立主体文件、执行完稿，自己看过结果再交给你。脚本也可以单独使用：
 
@@ -153,6 +168,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 - 部位由程序自动拆分，草稿常有某处拆错：闭眼或眨眼时漏掉眼睛、把盖在衣服上的一缕头发当成衣服。成品里出现另一种材质的颜色（那缕头发被涂成衣服色），几乎都是这类拆错造成的，部位修正后就会恢复。看到时直接用一句话说哪里错，例如“这缕是头发”，不需要给框或坐标，agent 会自己转成提示点再重跑。干净的赛璐璐图在两轮提示点内大多会正确；半写实、密集花纹、黑上黑这类比较难。还是拆不好时，就合并部位、只完稿拆对的部分，或改用不需要部位的完稿（[subject-file.md](skills/refinish/references/subject-file.md)）。
 - 柔和的喷枪上色让平涂类的赛璐璐完稿较难处理，绘画类完稿更能应付。同一种材质内的斑块来自这种上色，不是部位的问题。[source-spec.md](skills/refinish/references/source-spec.md) 说明了怎样让图像模型画出容易完稿的图。
 - 抠图是硬边。面纱、镜片、烟雾，要么整块算角色，要么整块算背景。
+- 重新配色是用赛璐璐完稿重画，柔和、有光泽的原画法会被替换，而不是保留。很密的深色线稿（比如黑色的细编辫）会比色卡颜色深，因为线条保留了原来的墨色。
 - 不会隐藏图片的来源。AI 生成的图经过任何完稿（包括去 AI 感）仍然是 AI 生成的，这些完稿也没有针对任何检测工具做调整。
 
 ## 文档
@@ -167,6 +183,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 背景、景深和光线包裹 |
 | [style-format.md](skills/refinish/references/style-format.md) | 编写或修改风格文件 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 画风与著作权，以及 Steam 和 pixiv 的要求 |
+| [Recolor 的 SKILL.md](skills/recolor/SKILL.md) | 按色卡给角色换色 |
+| [palette-format.md](skills/recolor/references/palette-format.md) | 色卡格式：条目、匹配方式、推导出的阴影 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | 怎么挑色卡的颜色，以及这些规则的出处 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 用两个分割模型读出头部与眼睛（可选） |
 
 文档正文以英文撰写。
 
@@ -176,4 +196,4 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 
 ## 许可证
 
-[MIT](LICENSE)。上方图片中的示例角色，是为这份 README 用图像模型生成的；图中所有完稿都是这个 skill 的输出。skill 的 `evals` 文件夹中的测试图由代码绘制；标志的文字是 Noto Serif TC（SIL Open Font License）转成的轮廓。
+[MIT](LICENSE)。上方图片中的示例角色都是用图像模型生成的；图中所有完稿和换色都是这个 skill 的输出。skill 的 `evals` 文件夹中的测试图由代码绘制；标志的文字是 Noto Serif TC（SIL Open Font License）转成的轮廓。

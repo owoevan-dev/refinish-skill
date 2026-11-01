@@ -4,15 +4,36 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 ### Added
 
-- A Codex listing: the plugin's own manifest (`.codex-plugin/plugin.json`) and marketplace (`.agents/plugins/marketplace.json`) give the plugin page a name, icon, description, website, screenshots, starter prompts and the Creativity category; the skill carries its own name and icons (`agents/openai.yaml`).
-- A display name, Refinish, in Claude's plugin manifest, for the plugin directory and `/plugin`.
-- A privacy statement (`PRIVACY.md`), linked from both plugin manifests: the skill collects, sends and keeps nothing.
+- **Recolor**, a second skill in the plugin (`skills/recolor`). It gives a character new colours from a colour card and keeps the drawing as it is. A card can name colours by part ("silver hair"), by kind (all the hair, all the metal) or by role (a main, a sub and an accent colour for the costume). Any shadow, second shadow or highlight the card leaves out is worked out from the base, cooler for most materials and warmer for skin. The result comes out in one of the cel finishes.
+  - `palette.py apply` writes a card into a subject; `board` draws the card as swatches to approve; `read` picks the swatches off a colour card picture; `derive` shows what a base colour turns into.
+  - The lines take a dark shade of the new colour, and a dark outline stays dark under a light new colour. The irises are recoloured inside the protected face, with the catchlights left white and the lashes and the whites left as drawn.
+  - Touches: after looking at a result, put a point on a patch that came out wrong and say what it is (`as` a part, `keep` as drawn, or `to` a colour). `palette.py apply --touch` applies them and shows each one's reach; `palette.py zoom` helps you read the points off.
+  - Props: mark something the character holds with `"prop": true` (a brush, a cup) and a card's kinds and roles leave it alone. A card can still recolour it by name.
+  - Five checks for a recolour, RC1 to RC5: a part painted off its card colour, the old colour left over, irises off the card, patches of a neighbour drawn like the recoloured part, and small far pieces kept in their old colour.
+- **An optional head parse** (`seethrough_parse.py`, [seethrough.md](skills/refinish/references/seethrough.md)). See-Through reads the head's parts and SAM 2 splits each eye into iris, white and lashes. Eyes it is unsure about are listed on a review sheet, and a small click file fixes them. `auto_parts.py --parse` builds the subject's head from it. Neither model ships with the skill: both are Apache-2.0 and installed separately, ideally with an NVIDIA GPU. Without them the head is read from its colours, as before.
+- Colour science in `_colour.py`: Oklab and OkLCh, CSS Color 4 gamut mapping, and CIEDE2000 checked against the 34 test pairs of Sharma, Wu and Dalal.
+- A Codex listing (`.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `agents/openai.yaml` for each skill), a display name in Claude's plugin manifest, and a privacy statement ([PRIVACY.md](PRIVACY.md)): the skills collect, send and keep nothing.
 
 ### Changed
 
-- Step 0 of SKILL.md installs `opencv-python-headless` on a server or in a sandbox, where `opencv-python` can fail to import for want of graphics libraries.
+- With a colour card, every check reads the part map the finish actually painted from, touches included, so a patch a touch moved is checked as the part it was given.
+- O7 leaves out a skin that a colour card recoloured: the card asked for the change, and RC1 measures it.
+- Step 0 of SKILL.md suggests `opencv-python-headless` on servers and in sandboxes, where `opencv-python` can fail to load for lack of graphics libraries.
+- Given the same subject file and no colour card, every cel finish gives exactly the same output as 0.1.0, byte for byte.
+
+### Fixed
+
+- A part's `within` selection can take back a region another part's box cut into that part, when the region's colour is closer to the selection's. A generous box round long hair used to keep a striped shirt's dark stripes in the hair.
+- Hints that name every part (`complete`) no longer drop a part the draft carved before the points (the irises, the mouth); naming it now adds to it.
+
+### Known issues
+
+- A recolour paints into a cel finish, so a picture's own rendering (soft gradients, gloss) is replaced rather than kept.
+- Dense dark line work, such as black box braids, comes out darker than its card colour: the lines keep their ink, and they cover most of the part.
 
 ## [0.1.0] - 2026-10-30
 
@@ -112,5 +133,6 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.
 
-[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/owoevan-dev/refinish-skill/releases/tag/v0.1.0

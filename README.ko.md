@@ -77,6 +77,18 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 
 장면 안에 그려진 캐릭터는 먼저 `cutout.py`로 오려 낼 수 있습니다. 대략적인 윤곽을 그리면 정확한 경계는 색이 정합니다. 캐릭터가 있던 자리를 메운 배경도 함께 나오므로 배경만 따로 마감할 수 있습니다.
 
+## 그림은 그대로, 색만 바꾸기
+
+이 플러그인에는 두 번째 스킬 [Recolor](skills/recolor/SKILL.md)가 있습니다. 그림은 그대로 두고 색만 바꿉니다. 원하는 색을 말로 해도 되고, 컬러 카드를 건네도 됩니다. 부위별("은발, 검은 코트"), 종류별(머리카락 전체, 금속 전체), 또는 의상의 메인·서브·포인트 색으로 지정할 수 있습니다. 지정하지 않은 그림자와 하이라이트는 애니메이션 색채 설계 방식대로 정해집니다. 대부분의 소재는 그림자를 차갑게, 피부는 따뜻하게 잡습니다.
+
+<p align="center">
+  <img src="docs/images/recolor.jpg" alt="같은 캐릭터 네 장: 원본, 컬러 카드로 바꾼 색, 메인·서브·포인트의 화려한 배색, 밝고 어두운 색을 맞바꾼 버전. 손에 든 붓은 원래 색 그대로입니다.">
+</p>
+
+선은 새 색의 짙은 색으로 바뀌고, 눈동자는 얼굴 안에서 색이 바뀌며 하이라이트는 흰색 그대로 남습니다. 캐릭터가 손에 든 물건은 소품으로 지정할 수 있어서, 화려한 배색에서도 붓까지 칠해지지 않습니다. 색이 잘못 나온 곳은 그 위를 한 점 짚으면 고칠 수 있습니다.
+
+새 색은 셀 마감으로 칠해집니다. 원래 그림의 표현(부드러운 그라데이션, 광택)을 살린 채 색만 바꾸는 기능은 계획되어 있지만 아직 없습니다.
+
 ## 필터와 다른 점
 
 - **픽셀이 아니라 부위 단위로.** 서브젝트 파일에 그림의 각 부위가 무엇인지(피부, 머리카락, 옷 하나하나) 적습니다. 재료마다 그 재료의 색으로 칠하기 때문에 빨간 리본 색이 옆 피부로 번지지 않습니다. 파일은 자동으로 초안이 만들어지고, 힌트 몇 점으로 고칩니다.
@@ -92,6 +104,7 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 아래 수치는 이 프로젝트가 자체적으로, 코드가 한 번도 본 적 없는 그림으로 측정한 결과입니다(그림은 저장소에 포함하지 않았습니다). 그림을 열기 전에 코드를 고정하고 합격 기준을 적어 두며, 한 번 본 그림은 개발용으로만 씁니다.
 
 - **부위.** 새 캐릭터 두 세트에서 에이전트의 힌트를 더한 초안은 41장 중 39장이 두 번 안에 모든 부위가 맞았습니다.
+- **색 바꾸기.** 새 캐릭터 8명, 각각 컬러 카드 3장. 색을 바꾼 135개 부위 중 134개가 카드 색과의 차이 3.0(CIEDE2000) 이내였고, 손보기 전에는 132개였습니다. 눈 검토 시트에서 최대 두 번 클릭해 고친 뒤에는 모든 캐릭터의 눈이 새 색으로 바뀌었습니다. 여기에는 선택 사항인 머리 모델이 결정적이었습니다. 모델 없이는 안경 너머의 두 눈을 놓쳤고, 앞머리에 가려진 한쪽 눈은 색이 잘못 나왔습니다. 첫 번째 8명은 남은 옛 색, 눈, 선에서 기준에 못 미쳤고, 수정은 그 세트와 두 번째 세트에서 한 뒤 이 세 번째 세트로 검증했습니다.
 - **37가지 마감을 새 캐릭터 16명에게** (피부색이 짙은 10명, 부드러운 에어브러시 채색 4명 포함). 모든 측정을 통과한 마감은 21가지입니다.
   - 노을과 90년대를 제외한 모든 셀 마감
   - AI 느낌 제거 두 가지
@@ -118,13 +131,13 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 
 **다른 에이전트**
 
-`skills/refinish`를 에이전트의 skills 폴더에 복사하거나 링크하세요. [skills.sh](https://skills.sh)를 써도 됩니다.
+`skills/refinish`와 `skills/recolor`를 나란히 에이전트의 skills 폴더에 복사하거나 링크하세요(Recolor는 `../refinish/scripts`의 스크립트를 씁니다). [skills.sh](https://skills.sh)를 써도 됩니다.
 
 ```
 npx skills add owoevan-dev/refinish-skill
 ```
 
-스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). GPU, 네트워크, 모델 다운로드는 필요 없습니다.
+스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). GPU, 네트워크, 모델 다운로드는 필요 없습니다. 선택 단계가 하나 있습니다. 두 분할 모델 See-Through와 SAM 2(둘 다 Apache-2.0, 따로 설치, NVIDIA GPU 권장)가 캐릭터의 머리를 읽고 눈을 홍채, 흰자, 속눈썹으로 나눕니다([seethrough.md](skills/refinish/references/seethrough.md)). 모델은 픽셀에 표시만 할 뿐 아무것도 그리지 않습니다.
 
 ## 사용법
 
@@ -137,6 +150,8 @@ npx skills add owoevan-dev/refinish-skill
 > `street.png`에서 여자아이를 오려 내서 90년대 셀로 바꾸고 원래 자리에 다시 넣어 줘.
 
 > `refs/`에 있는 프레임들의 마감을 내 캐릭터에 맞춰 줘. 선, 색, 그림자까지. 옮겨지지 않는 부분도 알려 줘.
+
+> 은발, 빨간 눈, 검은 코트로 색을 바꿔 줘. TV 애니메이션 셀 마감으로.
 
 에이전트는 [SKILL.md](skills/refinish/SKILL.md)의 절차를 따릅니다. 그림을 검사하고, 서브젝트 파일을 만들고, 마감을 적용한 뒤 결과를 직접 확인하고 나서 보여 줍니다. 스크립트만 따로 써도 됩니다.
 
@@ -153,6 +168,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 - 부위는 자동으로 초안이 만들어지며, 초안은 어딘가 틀리는 경우가 많습니다. 감은 눈이나 윙크한 눈을 놓치거나, 옷 위에 걸친 머리카락 한 가닥을 옷으로 읽는 식입니다. 다른 재질의 색으로 칠해진 얼룩(그 머리카락이 옷 색으로 칠해짐)은 거의 모두 이런 실수에서 나오며, 부위가 바로잡히면 사라집니다. 보이면 "이 가닥은 머리카락"처럼 한 문장으로 알려 주세요. 상자나 좌표는 필요 없고, 에이전트가 그 문장을 힌트로 바꿔 다시 실행합니다. 깔끔한 셀 그림은 두 번 안에 대부분 맞지만, 반실사 그림, 촘촘한 무늬, 검정 위의 검정은 더 어렵습니다. 그래도 안 되면 부위를 합치거나, 제대로 나뉜 부분만 마감하거나, 부위가 필요 없는 마감을 씁니다([subject-file.md](skills/refinish/references/subject-file.md)).
 - 부드러운 에어브러시 채색은 평평한 셀 마감이 다루기 어렵고, 회화 계열 마감이 더 잘 대응합니다. 한 재질 안에 생기는 얼룩은 이 채색 때문이지 부위 문제가 아닙니다. 마감하기 좋은 그림을 이미지 생성 모델에 요청하는 방법은 [source-spec.md](skills/refinish/references/source-spec.md)에 있습니다.
 - 오려 내기의 경계는 딱딱합니다. 베일, 렌즈, 연기는 전부 캐릭터이거나 전부 배경이 됩니다.
+- 색 바꾸기는 셀 마감으로 다시 칠하므로, 부드럽고 광택 있는 원래 표현은 남지 않고 바뀝니다. 검은 박스 브레이드처럼 짙은 선이 빽빽한 부분은 선이 원래 잉크 색을 유지해서 카드 색보다 어둡게 나옵니다.
 - 그림의 출처를 숨기지 않습니다. 생성 이미지는 어떤 마감(AI 느낌 제거 포함)을 거쳐도 생성 이미지이며, 어떤 마감도 탐지 도구를 피하도록 조정하지 않았습니다.
 
 ## 문서
@@ -167,6 +183,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 배경, 피사계 심도, 라이트 랩 |
 | [style-format.md](skills/refinish/references/style-format.md) | 스타일 파일 작성과 수정 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 화풍과 저작권, Steam과 pixiv의 요구 사항 |
+| [Recolor의 SKILL.md](skills/recolor/SKILL.md) | 컬러 카드로 캐릭터의 색 바꾸기 |
+| [palette-format.md](skills/recolor/references/palette-format.md) | 컬러 카드 형식: 항목, 맞추는 방식, 이끌어 낸 그림자 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | 카드의 색을 고르는 법과 그 규칙의 출처 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 두 분할 모델로 머리와 눈 읽기(선택) |
 
 문서 본문은 영어로 작성되어 있습니다.
 
@@ -176,4 +196,4 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 
 ## 라이선스
 
-[MIT](LICENSE). 위 그림의 샘플 캐릭터는 이 README를 위해 이미지 생성 모델로 만든 것이며, 그림 속 마감은 모두 이 스킬의 출력입니다. 스킬의 `evals` 폴더에 있는 테스트 그림은 코드로 그렸고, 로고의 글자는 Noto Serif TC(SIL Open Font License)를 윤곽선으로 바꾼 것입니다.
+[MIT](LICENSE). 위 그림의 샘플 캐릭터는 모두 이미지 생성 모델로 만든 것이며, 그림 속 마감과 색 바꾸기는 모두 이 스킬의 출력입니다. 스킬의 `evals` 폴더에 있는 테스트 그림은 코드로 그렸고, 로고의 글자는 Noto Serif TC(SIL Open Font License)를 윤곽선으로 바꾼 것입니다.

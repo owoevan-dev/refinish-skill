@@ -77,6 +77,18 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 
 畫在場景裡的角色，可以先用 `cutout.py` 摳出來：畫一圈大概的外框，精確的邊緣交給顏色判斷，同時拿回補好角色位置的背景，可以另外完稿。
 
+## 換顏色，不換畫
+
+這個外掛還有第二個技能 [Recolor](skills/recolor/SKILL.md)：圖保持原樣，只換顏色。直接說要什麼顏色，或給它一張色卡都可以：按部位（「銀色頭髮、黑色外套」）、按種類（所有頭髮、所有金屬），或是給服裝一組主色、副色、點綴色。沒指定的陰影和高光，會照動畫色彩設計的習慣推出來：多數材質的陰影偏冷，皮膚偏暖。
+
+<p align="center">
+  <img src="docs/images/recolor.jpg" alt="同一個角色四次：原圖，接著依色卡換色、換成鮮豔的主色副色點綴色配色，以及深淺對調。她手上的畫筆保持原色。">
+</p>
+
+線條會換成新顏色的深色版本，虹膜在臉部範圍內換色，眼睛裡的反光點保持白色。角色手上拿的東西可以標成道具，鮮豔的配色就不會連畫筆一起染。哪一塊換錯了，在上面點一個點就能修。
+
+新顏色是用賽璐璐完稿畫出來的。保留原圖本身的畫法（柔和漸層、光澤）只換顏色，已經在計畫中，但還沒做好。
+
 ## 不只是濾鏡
 
 - **以部位為單位，不是以像素。** 主體檔（subject file）標出圖裡每個部位是什麼：皮膚、頭髮、每件衣服。每種材質用它自己的顏色上色，紅色緞帶不會滲進旁邊的皮膚。主體檔會自動起草，再用幾個提示點修正。
@@ -92,6 +104,7 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 下面的數字來自專案自己的測試，用的是程式沒看過的圖（這些圖不在 repo 裡）：開圖前先凍結程式、寫好合格標準；看過的圖之後只用於開發。
 
 - **部位。** 在兩組新角色上，搭配 agent 的提示點，41 張中有 39 張在兩輪內每個部位都正確。
+- **重新配色。** 8 個新角色，每個套 3 張色卡。135 個換色部位中，有 134 個和色卡顏色的差距在 3.0（CIEDE2000）以內，沒做任何修補前是 132 個。在眼睛審查表上最多點兩輪之後，每個角色的眼睛都換上了新顏色。這部分靠的是選配的頭部模型：沒裝的話，一雙在眼鏡後面的眼睛會被漏掉，一隻被瀏海蓋住的眼睛會換錯。第一組 8 個角色在殘留舊色、眼睛和線條上沒過；修正是在那一組和第二組上做的，最後用這第三組驗證。
 - **37 種完稿套用在 16 個新角色上**（10 個膚色較深，4 個是柔和的噴槍上色），21 種完稿通過所有量測：
   - 除了夕陽與 90 年代以外的所有賽璐璐完稿；
   - 兩種去 AI 味完稿；
@@ -118,13 +131,13 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 
 **其他 agent**
 
-把 `skills/refinish` 複製或連結到 agent 的 skills 資料夾，或使用 [skills.sh](https://skills.sh)：
+把 `skills/refinish` 和 `skills/recolor` 一起複製或連結到 agent 的 skills 資料夾，兩個放在同一層（Recolor 會用 `../refinish/scripts` 裡的腳本），或使用 [skills.sh](https://skills.sh)：
 
 ```
 npx skills add owoevan-dev/refinish-skill
 ```
 
-腳本需要 Python 3.10 以上，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。不需要 GPU、網路，也不用下載模型。
+腳本需要 Python 3.10 以上，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。不需要 GPU、網路，也不用下載模型。只有一個步驟可選：兩個分割模型 See-Through 與 SAM 2（皆為 Apache-2.0，另外安裝，最好有 NVIDIA 顯示卡）能讀出角色的頭部，並把眼睛分成虹膜、眼白和睫毛（[seethrough.md](skills/refinish/references/seethrough.md)）。它們只標記像素，不畫任何東西。
 
 ## 使用方式
 
@@ -137,6 +150,8 @@ npx skills add owoevan-dev/refinish-skill
 > 把 `street.png` 裡的女孩摳出來，改成 90 年代賽璐璐，再放回原位。
 
 > 照 `refs/` 裡那幾張截圖的完稿，套到我的角色上：線條、配色、陰影都要像。也告訴我哪些帶不過來。
+
+> 幫她換成銀髮、紅眼、黑外套，做成電視動畫賽璐璐風格。
 
 agent 會照 [SKILL.md](skills/refinish/SKILL.md) 的流程：先檢查原圖、建立主體檔、套用完稿，自己看過結果才交給你。腳本也可以單獨使用：
 
@@ -153,6 +168,7 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 - 部位由程式自動拆分，草稿常有某處拆錯：閉眼或眨眼時漏掉眼睛、把蓋在衣服上的一縷頭髮當成衣服。成品裡出現另一種材質的顏色（那縷頭髮被塗成衣服色），幾乎都是這類拆錯造成的，部位修正後就會恢復。看到時直接用一句話說哪裡錯，例如「這縷是頭髮」，不需要給框或座標，agent 會自己轉成提示點再重跑。乾淨的賽璐璐圖在兩輪提示點內大多會正確；半寫實、密集花紋、黑上黑這類比較難。還是拆不好時，就合併部位、只完稿拆對的部分，或改用不需要部位的完稿（[subject-file.md](skills/refinish/references/subject-file.md)）。
 - 柔和的噴槍上色讓平塗類的賽璐璐完稿較難處理，繪畫類完稿比較能應付。同一種材質內的斑塊來自這種上色，不是部位的問題。[source-spec.md](skills/refinish/references/source-spec.md) 說明怎麼請影像模型畫出容易完稿的圖。
 - 去背是硬邊。面紗、鏡片、煙霧，不是整塊算角色，就是整塊算背景。
+- 重新配色是用賽璐璐完稿重畫，柔和、有光澤的原畫法會被取代，而不是保留。很密的深色線稿（例如黑色的細編辮）會比色卡顏色深，因為線條保留了原本的墨色。
 - 不會隱藏圖片的來源。AI 生成的圖經過任何完稿（包括去 AI 味）都仍然是 AI 生成的，這些完稿也沒有針對任何偵測工具調整。
 
 ## 文件
@@ -167,6 +183,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 背景、景深與光線包覆 |
 | [style-format.md](skills/refinish/references/style-format.md) | 撰寫或修改風格檔 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 畫風與著作權，以及 Steam 和 pixiv 的要求 |
+| [Recolor 的 SKILL.md](skills/recolor/SKILL.md) | 依色卡替角色換色 |
+| [palette-format.md](skills/recolor/references/palette-format.md) | 色卡格式：條目、比對方式、推導出的陰影 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | 怎麼挑色卡的顏色，以及這些規則的出處 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 用兩個分割模型讀出頭部與眼睛（可選） |
 
 文件本身以英文撰寫。
 
@@ -176,4 +196,4 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 
 ## 授權
 
-[MIT](LICENSE)。上方圖片中的範例角色，是為這份 README 用影像模型生成的；圖中所有完稿都是這個 skill 的輸出。skill 的 `evals` 資料夾裡的測試圖是程式畫的；標誌的字是 Noto Serif TC（SIL Open Font License）轉成的外框。
+[MIT](LICENSE)。上方圖片中的範例角色都是用影像模型生成的；圖中所有完稿和換色都是這個 skill 的輸出。skill 的 `evals` 資料夾裡的測試圖是程式畫的；標誌的字是 Noto Serif TC（SIL Open Font License）轉成的外框。

@@ -23,14 +23,18 @@ def run(script, *args):
 
 # ---------------------------------------------------------------------------------------------------------- packaging
 
-def test_skill_frontmatter():
+SKILLS = sorted(p.parent for p in (ROOT / "skills").glob("*/SKILL.md"))
+
+
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_skill_frontmatter(skill):
     yaml = pytest.importorskip("yaml")
-    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    text = (skill / "SKILL.md").read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     assert m, "SKILL.md starts with a YAML frontmatter"
     # a strict parser, as the agents' skill loaders use: an unquoted value holding ": " does not load
     front = yaml.safe_load(m.group(1))
-    assert front["name"] == SKILL.name and re.fullmatch(r"[a-z0-9-]{1,64}", front["name"])
+    assert front["name"] == skill.name and re.fullmatch(r"[a-z0-9-]{1,64}", front["name"])
     assert 0 < len(front["description"]) <= 1024
     assert "<" not in front["description"] and ">" not in front["description"]
     assert len(front.get("compatibility", "")) <= 500
@@ -42,6 +46,7 @@ def test_plugin_manifest():
     pj = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     for path in pj["skills"]:
         assert (ROOT / path / "SKILL.md").is_file()
+    assert sorted((ROOT / p).resolve() for p in pj["skills"]) == [s.resolve() for s in SKILLS]
     if "icon" in pj:
         assert (ROOT / pj["icon"]).is_file()
 
@@ -73,23 +78,27 @@ def test_codex_listing():
     assert market["name"] == claude_market["name"] and [p["name"] for p in market["plugins"]] == [codex["name"]]
 
 
-def test_skill_carries_its_codex_icons():
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_skill_carries_its_codex_icons(skill):
     """The skill's own Codex metadata travels with the folder: its icons are inside it, the brand's own."""
     yaml = pytest.importorskip("yaml")
-    ui = yaml.safe_load((SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8"))["interface"]
+    ui = yaml.safe_load((skill / "agents" / "openai.yaml").read_text(encoding="utf-8"))["interface"]
     for key, brand in (("icon_small", "icon-small.svg"), ("icon_large", "icon-512.png")):
-        assert (SKILL / ui[key]).read_bytes() == (ROOT / "assets" / "brand" / brand).read_bytes(), key
+        assert (skill / ui[key]).read_bytes() == (ROOT / "assets" / "brand" / brand).read_bytes(), key
 
 
-def test_skill_folder_carries_the_licence():
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_skill_folder_carries_the_licence(skill):
     """The skill is often copied on its own, without the repository round it: its folder keeps the licence."""
-    assert (SKILL / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert (skill / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")
 
 
-def test_references_linked_from_skill_exist():
-    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-    for rel in set(re.findall(r"\]\((references/[^)#]+)\)", text)):
-        assert (SKILL / rel).is_file(), rel
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_references_linked_from_skill_exist(skill):
+    """Every page a skill links to is there, its own references and its neighbour's alike."""
+    for page in [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]:
+        for rel in set(re.findall(r"\]\(((?:\.\./)*[\w./-]+\.md)(?:#[^)]*)?\)", page.read_text(encoding="utf-8"))):
+            assert (page.parent / rel).is_file(), (page.name, rel)
 
 
 def test_no_personal_data():
@@ -278,15 +287,18 @@ def test_workflow(figure, tmp_path):
     assert r.returncode in (0, 1), r.stderr[-400:]
     assert {"skin", "hair", "eyes"} <= {p["kind"] for p in d["parts"]}
 
-    # the hints part them, each material whole: its lit and shaded tones together, whichever side was pointed at
+    # the hints part them, each material whole: its lit and shaded tones together, whichever side was pointed at (and
+    # a part's prop flag reaches the subject; the shoes stand in for a held thing here)
     hints = {"eyes": [at(*b[:2]) + at(*b[2:]) for b in HINTS["eyes"]],
              "mouth": at(*HINTS["mouth"][:2]) + at(*HINTS["mouth"][2:]),
-             "parts": [{**p, "at": [at(*q) for q in p["at"]]} for p in HINTS["parts"]]}
+             "parts": [{**p, "at": [at(*q) for q in p["at"]], **({"prop": True} if p["name"] == "shoes" else {})}
+                       for p in HINTS["parts"]]}
     hp = tmp_path / "hints.json"
     hp.write_text(json.dumps(hints), encoding="utf-8")
     r, d = run("auto_parts.py", image, tmp_path / "subject.json", "--upscaled", "2", "--hints", hp)
     assert r.returncode in (0, 1), r.stderr[-400:]
     sj = load_subject(tmp_path / "subject.json")
+    assert [p["name"] for p in sj["parts"] if p.get("prop")] == ["shoes"]
     _, _, parts = load_or_build(sj)
     names = [""] + [p["name"] for p in sj["parts"]]
     wrong = []
@@ -977,3 +989,1175 @@ def test_more_bad_input_stops_with_a_message(draft, figure, tmp_path):
     r, d = run("auto_parts.py", tmp_path / "noface.png", tmp_path / "noface_sub.json")
     assert r.returncode in (0, 1) and d["review"] and all(Path(f).is_file() for f in d["review"])
     assert not (tmp_path / "noface_sub.face.jpg").exists()
+
+
+# ----------------------------------------------------------------------------------------------------------- recolour
+
+# CIEDE2000's test pairs (CIELAB 1, CIELAB 2, the difference): Sharma, Wu and Dalal, "The CIEDE2000 color-difference
+# formula: implementation notes, supplementary test data, and mathematical observations", Color Research &
+# Application 30(1), 2005, table 1
+SHARMA = """
+50.0000 2.6772 -79.7751 50.0000 0.0000 -82.7485 2.0425
+50.0000 3.1571 -77.2803 50.0000 0.0000 -82.7485 2.8615
+50.0000 2.8361 -74.0200 50.0000 0.0000 -82.7485 3.4412
+50.0000 -1.3802 -84.2814 50.0000 0.0000 -82.7485 1.0000
+50.0000 -1.1848 -84.8006 50.0000 0.0000 -82.7485 1.0000
+50.0000 -0.9009 -85.5211 50.0000 0.0000 -82.7485 1.0000
+50.0000 0.0000 0.0000 50.0000 -1.0000 2.0000 2.3669
+50.0000 -1.0000 2.0000 50.0000 0.0000 0.0000 2.3669
+50.0000 2.4900 -0.0010 50.0000 -2.4900 0.0009 7.1792
+50.0000 2.4900 -0.0010 50.0000 -2.4900 0.0010 7.1792
+50.0000 2.4900 -0.0010 50.0000 -2.4900 0.0011 7.2195
+50.0000 2.4900 -0.0010 50.0000 -2.4900 0.0012 7.2195
+50.0000 -0.0010 2.4900 50.0000 0.0009 -2.4900 4.8045
+50.0000 -0.0010 2.4900 50.0000 0.0010 -2.4900 4.8045
+50.0000 -0.0010 2.4900 50.0000 0.0011 -2.4900 4.7461
+50.0000 2.5000 0.0000 50.0000 0.0000 -2.5000 4.3065
+50.0000 2.5000 0.0000 73.0000 25.0000 -18.0000 27.1492
+50.0000 2.5000 0.0000 61.0000 -5.0000 29.0000 22.8977
+50.0000 2.5000 0.0000 56.0000 -27.0000 -3.0000 31.9030
+50.0000 2.5000 0.0000 58.0000 24.0000 15.0000 19.4535
+50.0000 2.5000 0.0000 50.0000 3.1736 0.5854 1.0000
+50.0000 2.5000 0.0000 50.0000 3.2972 0.0000 1.0000
+50.0000 2.5000 0.0000 50.0000 1.8634 0.5757 1.0000
+50.0000 2.5000 0.0000 50.0000 3.2592 0.3350 1.0000
+60.2574 -34.0099 36.2677 60.4626 -34.1751 39.4387 1.2644
+63.0109 -31.0961 -5.8663 62.8187 -29.7946 -4.0864 1.2630
+61.2901 3.7196 -5.3901 61.4292 2.2480 -4.9620 1.8731
+35.0831 -44.1164 3.7933 35.0232 -40.0716 1.5901 1.8645
+22.7233 20.0904 -46.6940 23.0331 14.9730 -42.5619 2.0373
+36.4612 47.8580 18.3852 36.2715 50.5065 21.2231 1.4146
+90.8027 -2.0831 1.4410 91.1528 -1.6435 0.0447 1.4441
+90.9257 -0.5406 -0.9208 88.6381 -0.8985 -0.7239 1.5381
+6.7747 -0.2908 -2.4247 5.8714 -0.0985 -2.2286 0.6377
+2.0776 0.0795 -1.1350 0.9033 -0.0636 -0.5514 0.9082
+"""
+
+
+def test_ciede2000_matches_the_published_pairs():
+    import _colour as C
+    t = np.array([[float(v) for v in ln.split()] for ln in SHARMA.strip().splitlines()])
+    assert t.shape == (34, 7)
+    got = C.ciede2000(t[:, :3], t[:, 3:6])
+    assert np.abs(got - t[:, 6]).max() < 1e-3
+    assert np.allclose(C.ciede2000(t[:, 3:6], t[:, :3]), got)
+
+
+def test_oklab_reference_values():
+    """sRGB's white and primaries in Oklab, as CSS Color 4 gives them, and back."""
+    import _colour as C
+    rgb = np.array([[1, 1, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1]], float)
+    ref = np.array([[1.0, 0.0, 0.0], [0.62796, 0.22486, 0.12585], [0.86644, -0.23389, 0.1795],
+                    [0.45201, -0.03246, -0.31153]])
+    ok = C.srgb_to_oklab(rgb)
+    assert np.abs(ok - ref).max() < 2e-4
+    assert np.abs(C.oklab_to_srgb(ok) - rgb).max() < 1e-4
+
+
+def test_gamut_map_keeps_lightness_and_hue():
+    """A colour sRGB cannot show is brought in by chroma alone (CSS Color 4): the result shows, has less chroma, and
+    lies within a just noticeable difference of the colour of the same lightness and hue at that chroma."""
+    import _colour as C
+    lch = np.array([[0.7, 0.35, h] for h in range(0, 360, 30)] + [[0.3, 0.3, 140.0], [0.95, 0.2, 260.0]])
+    rgb = C.oklab_to_srgb(C.from_lch(lch))
+    assert rgb.min() >= 0 and rgb.max() <= 1
+    back = C.to_lch(C.srgb_to_oklab(rgb))
+    assert (back[:, 1] < lch[:, 1]).all()
+    on_hue = C.from_lch(np.stack([lch[:, 0], back[:, 1], lch[:, 2]], -1))
+    assert C.delta_eok(C.srgb_to_oklab(rgb), on_hue).max() <= C.JND + 1e-3
+    inside = np.array([[0.5, 0.05, 40.0]])                         # a colour sRGB shows is left as it is
+    assert np.abs(C.to_lch(C.srgb_to_oklab(C.oklab_to_srgb(C.from_lch(inside)))) - inside).max() < 1e-4
+
+
+def test_derived_shadows_turn_cool_skin_warm_whites_tinted():
+    """A base's shadow is a step darker and richer with its hue turned toward blue-violet (at most 18 degrees), skin's
+    toward red (at most 10), a near-white's given a cool tint; the second shadow lies below it, the light above."""
+    import _colour as C
+    import _palette as P
+
+    def lch(rgb):
+        return C.to_lch(C.srgb_to_oklab(np.asarray(rgb, float)))
+
+    def turn(a, b):
+        return (b - a + 180) % 360 - 180
+
+    for hexc, kind, toward, cap in (("#d08040", "cloth", 290.0, 18.0), ("#3a6fd0", "cloth", 290.0, 18.0),
+                                    ("#f0c8a8", "skin", 30.0, 10.0)):
+        base = C.parse_hex(hexc)
+        d = P.derive(base, kind)
+        b, s, dp, hl = lch(base), lch(d["shadow"]), lch(d["deep"]), lch(d["highlight"])
+        assert dp[0] < s[0] < b[0] < hl[0], hexc
+        assert s[1] > b[1], hexc
+        t = turn(b[2], s[2])
+        assert 0 < abs(t) <= cap + 0.5 and abs(turn(s[2], toward)) < abs(turn(b[2], toward)), hexc
+    white = lch(P.derive(C.parse_hex("#f4f4f4"), "cloth-white")["shadow"])
+    assert abs(white[1] - P.RULE["neutral_tint"]) < 0.005 and abs(turn(white[2], 290.0)) < 2
+
+
+def card_file(tmp_path, card, name="card.json"):
+    p = tmp_path / name
+    p.write_text(json.dumps({"format": "refinish-palette/1", **card}), encoding="utf-8")
+    return p
+
+
+def test_card_entries_match_by_name_then_iris_kind_and_role(tmp_path):
+    """A part named on the card wins; then an iris; then the part's kind; the roles go to the clothes by area (the
+    largest the main colour, the next the sub colour, the rest the accent), never to a feature of the face or to
+    solid black ink; a hair clip is no lip."""
+    import _palette as P
+    parts = (("hair", "hair", 9000, (40, 10, 10)), ("coat", "cloth", 20000, (50, 5, -20)),
+             ("scarf", "cloth", 6000, (60, 30, 20)), ("clip", "accessory", 300, (70, 0, 40)),
+             ("lips", "accessory", 200, (45, 30, 10)), ("ink", "accessory", 4000, (3, 0, 0)),
+             ("iris", "eyes", 400, (35, 5, 20)), ("eye-white", "eyes", 300, (95, 0, -2)),
+             ("skin", "skin", 15000, (85, 12, 18)), ("boots", "gloss", 3000, (20, 2, 2)))
+    sj = {"parts": [{"name": n, "kind": k} for n, k, _, _ in parts]}
+    stats = {n: {"area": a, "kind": k, "lab": np.array(c, float), "in_boxes": 1.0 if n == "lips" else 0.0}
+             for n, k, a, c in parts}
+    card = P.load_palette(card_file(tmp_path, {"parts": {"Boots": "#202040"}, "kinds": {"hair": "#e0b040"},
+                                               "iris": "#d04040",
+                                               "roles": {"main": "#2e7d5b", "sub": "#c03050", "accent": "#f0d040"}}))
+    got = {n: w for n, (_, w) in P.match(sj, card, stats).items()}
+    assert got == {"boots": "parts", "iris": "iris", "hair": "kinds", "coat": "roles.main", "scarf": "roles.sub",
+                   "clip": "roles.accent"}
+
+
+def test_a_prop_keeps_its_colours_unless_the_card_names_it(tmp_path):
+    """A thing the character holds (a painter's brush, a cup) is no part of the costume: the kinds and the roles pass
+    it by, and only a card that names it recolours it."""
+    import _palette as P
+    parts = (("coat", "cloth", 20000, (50, 5, -20)), ("brush", "cloth", 9000, (40, 10, 30)),
+             ("sword", "metal", 3000, (70, 0, 0)), ("cup", "cloth", 2000, (80, 5, 5)))
+    sj = {"parts": [{"name": n, "kind": k, **({} if n == "coat" else {"prop": True})} for n, k, _, _ in parts]}
+    stats = {n: {"area": a, "kind": k, "lab": np.array(c, float), "in_boxes": 0.0} for n, k, a, c in parts}
+    card = P.load_palette(card_file(tmp_path, {"parts": {"cup": "#f0d040"}, "kinds": {"metal": "#c0c0d0"},
+                                               "roles": {"main": "#2e7d5b", "sub": "#c03050"}}))
+    got = {n: w for n, (_, w) in P.match(sj, card, stats).items()}
+    assert got == {"coat": "roles.main", "cup": "parts"}
+
+
+def test_card_mistakes_stop_with_a_message(tmp_path):
+    for card in ({"parts": {"hair": "c8442"}}, {"roles": {"primary": "#c8442f"}}, {"grade": "loud"}, {"parts": []},
+                 {"kinds": {"clothes": "#c8442f"}}, {"shadow_rule": {"darkness": 0.2}},
+                 {"shadow_rule": {"drop": 0.1}}, {"shadow_rule": {"turn_cap": "12"}},
+                 {"parts": {"hair": {"base": "#c8442f", "gradient": {"along": "down", "stops": []}}}}):
+        p = card_file(tmp_path, card)
+        r, _ = run("palette.py", "board", p, tmp_path / "b.png")
+        assert r.returncode == 2 and "Traceback" not in r.stderr, card
+    p = tmp_path / "old.json"
+    p.write_text(json.dumps({"parts": {"hair": "#c8442f"}}), encoding="utf-8")
+    r, _ = run("palette.py", "board", p, tmp_path / "b.png")
+    assert r.returncode == 2 and "refinish-palette/1" in r.stderr
+
+
+def test_palette_derive_board_and_read(tmp_path):
+    r, d = run("palette.py", "derive", "#c8442f", "--kind", "skin")
+    assert r.returncode == 0 and all(re.fullmatch(r"#[0-9a-f]{6}", d[k]) for k in ("shadow", "deep", "highlight"))
+    card = card_file(tmp_path, {"parts": {"hair": "#c8442f", "coat": {"base": "#2e7d5b", "shadow": "#1d5a40"}},
+                                "iris": "#3a8fd0"})
+    r, d = run("palette.py", "board", card, tmp_path / "board.png")
+    assert r.returncode == 0 and d["rows"] == 3 and (tmp_path / "board.png").is_file()
+    # a picture of flat swatches read back: their colours, each once
+    im = np.full((220, 640, 3), 255, np.uint8)
+    cols = ((200, 68, 47), (46, 125, 91), (240, 200, 60))
+    for i, c in enumerate(cols):
+        cv2.rectangle(im, (20 + i * 210, 40), (200 + i * 210, 180), c[::-1], -1)
+    cv2.imwrite(str(tmp_path / "swatches.png"), im)
+    r, d = run("palette.py", "read", tmp_path / "swatches.png")
+    assert r.returncode == 0
+    assert sorted(s["hex"] for s in d["swatches"] if s["hex"] != "#ffffff") == sorted(
+        "#%02x%02x%02x" % c for c in cols)
+
+
+def test_transfer_keeps_the_order_of_tones_and_lands_on_the_knots():
+    """A part's own tones carried onto the card: lighter stays lighter, its usual lit tone lands on the base, the
+    darkest stays darker than the second shadow, and an eye's catchlight stays white."""
+    import _colour as C
+    import _palette as P
+    import _recolour as rc
+    rng = np.random.default_rng(3)
+    grey = np.sort(rng.uniform(0.12, 0.85, 3999))
+    img = np.concatenate([np.repeat(grey[:, None], 3, 1), [[1.0, 1.0, 1.0]]]).reshape(40, 100, 3).astype(np.float32)
+    mask = np.ones((40, 100), bool)
+    base = C.parse_hex("#3a8fd0")
+    rec = {"base": C.to_hex(base), **{k: C.to_hex(v) for k, v in P.derive(base, "eyes").items()}}
+    out = rc.transfer(img, mask, rc.knots(rec), keep=0.0, white_keep=True)
+    Ls, Lo = C.srgb_to_oklab(img[mask])[:, 0], C.srgb_to_oklab(out)[:, 0]
+    order = np.argsort(Ls[:-1], kind="stable")
+    assert (np.diff(Lo[:-1][order]) > -2e-3).all()
+    kL = {k: C.srgb_to_oklab(C.parse_hex(rec[k]))[0] for k in ("deep", "base")}
+    assert abs(np.percentile(Lo[:-1], 62) - kL["base"]) < 0.02
+    assert Lo[:-1].min() < kL["deep"]
+    assert np.allclose(out[-1], 1.0)
+
+
+def test_only_the_iris_of_an_eye_part_takes_the_iris_colour():
+    """An eye part drawn wide over the white of the eye and the skin: only its iris-like pixels are the iris's (a pale
+    blue iris as light as the skin is still one; a grey white of the eye and the skin's own colour are not)."""
+    import _recolour as rc
+    skin = np.array([80.0, 12.0, 18.0])
+    px = np.array([[[35.0, 10.0, 25.0],      # a brown iris
+                    [78.0, -8.0, -20.0],     # a pale blue iris, as light as the skin
+                    [79.0, 11.0, 17.0],      # the skin
+                    [82.0, -1.0, -3.0],      # the white of the eye, grey-blue
+                    [97.0, 0.0, 0.0]]])      # a catchlight
+    assert rc.iris_like(px, skin).tolist() == [[True, True, False, False, False]]
+    assert rc.iris_like(px, None).all()
+
+
+def test_the_iris_is_the_eye_parts_thick_mass():
+    """A dark iris part the part map joined to the upper lash line, a lash's tail and a strand of hair running out of
+    the eye's box: the iris keeps its whole disc, its catchlight a hole in it; the lash line, the thin strips and what
+    lies beyond the box are not the iris. With no eye box, the part as it is. (A lash line that closes a gap with the
+    iris and another strip is held as the iris's: the gap is filled as a catchlight would be.)"""
+    import _recolour as rc
+    h, w = 200, 200
+    yy, xx = np.mgrid[:h, :w]
+    disc = (yy - 100) ** 2 + (xx - 100) ** 2 <= 30 ** 2          # the iris
+    light = (yy - 92) ** 2 + (xx - 108) ** 2 <= 10 ** 2           # its catchlight, not iris-like
+    m = disc & ~light
+    m[50:72, 60:140] = True                                       # the upper lash line, over the iris's top
+    m[78:100, 128:132] = True                                     # a lash's tail, off the iris's side
+    m[0:75, 50:53] = True                                         # a strand from above, out of the box
+    subject = {"protect": [{"name": "left eye", "box": [55, 60, 145, 140]}]}
+    core = rc.iris_core(subject, m)
+    assert core[disc & ~light].mean() > 0.99 and not core[light].any()
+    assert not core[50:64, 60:140].any()
+    assert not core[78:85, 128:132].any() and not core[0:75, 50:53].any()
+    assert (rc.iris_core({}, m) == m).all()
+
+
+def test_the_part_map_is_mended_for_a_card():
+    """A small piece of the recoloured hair far from it, inside a book (gold ornaments read as blonde hair), is kept as
+    drawn, unless the card paints it; the hair an iris part took round the eye goes back to the hair."""
+    import _recolour as rc
+    from _core import Units
+    h, w = 400, 300
+    img = np.full((h, w, 3), 0.92, np.float32)
+    alpha = np.zeros((h, w), np.float32)
+    alpha[20:390, 20:280] = 1
+    parts = np.zeros((h, w), np.uint8)
+    parts[20:390, 20:280] = 3                                     # 3: the coat
+    parts[20:140, 20:280] = 1                                     # 1: the hair, the top of the figure
+    img[parts == 1] = (0.85, 0.7, 0.3)
+    img[parts == 3] = (0.2, 0.25, 0.5)
+    parts[250:330, 60:200] = 2                                    # 2: a book on the coat
+    img[250:330, 60:200] = (0.1, 0.15, 0.35)
+    parts[280:296, 120:136] = 1                                   # a gold ornament, read as hair
+    img[280:296, 120:136] = (0.85, 0.7, 0.3)
+    parts[100:120, 130:170] = 4                                   # 4: an iris part that took the hair over the eye
+    parts[110:118, 140:160] = 4
+    img[100:110, 130:170] = (0.85, 0.7, 0.3)                      # (the hair's colour, joined to the hair above)
+    img[110:118, 140:160] = (0.2, 0.4, 0.8)                       # (the iris itself, blue)
+    img[109, 130:170] = 0.05                                      # (the lash line between them)
+    subject = {"parts": [{"name": "hair", "kind": "hair"}, {"name": "book", "kind": "cloth-dark"},
+                         {"name": "coat", "kind": "cloth"}, {"name": "iris", "kind": "eyes"}],
+               "protect": [{"name": "left eye", "box": [120, 95, 180, 125]}],
+               "recolour": {"parts": {"hair": {"base": "#c8442f"}, "iris": {"base": "#30a060"}}}}
+    kinds = [None, "hair", "cloth-dark", "cloth", "eyes"]
+    U = Units(alpha)
+    mended, kept, pieces = rc.mend_parts(subject, img, alpha, parts, U, kinds)
+    assert kept[285, 125] and not kept[60, 60] and [p[:2] for p in pieces] == [("hair", "book")]
+    assert mended[102, 150] == 1 and mended[114, 150] == 4
+    subject["recolour"]["parts"]["hair"]["pieces"] = "paint"
+    assert not rc.mend_parts(subject, img, alpha, parts, U, kinds)[1].any()
+
+
+def test_a_touch_reaches_the_fill_round_its_point():
+    """A touch's point reaches the colour round it, as far as that colour goes without crossing a line: within its tol,
+    inside its box; a point on a line reaches the line itself, inside its box or close round the point."""
+    import _recolour as rc
+    from _core import Units
+    h, w = 200, 300
+    img = np.zeros((h, w, 3), np.float32)
+    img[:] = (0.8, 0.3, 0.3)                                      # red
+    img[100:, :100] = (0.74, 0.3, 0.3)                            # a slightly darker red, the lower left
+    img[:, 150:] = (0.3, 0.3, 0.8)                                # blue
+    img[:, 100:103] = 0.02                                        # a line through the red
+    line = np.zeros((h, w), bool)
+    line[:, 100:103] = True
+    alpha = np.ones((h, w), np.float32)
+    touches = [{"at": [[50, 50]], "as": "x"}, {"at": [[120, 50]], "as": "x"}, {"at": [[50, 50]], "as": "x", "tol": 2},
+               {"at": [[50, 50]], "as": "x", "box": [0, 0, 80, 200]}, {"at": [[101, 50]], "keep": True,
+                                                                       "box": [90, 40, 120, 60]},
+               {"at": [[101, 150]], "keep": True}, {"at": [[500, 50]], "keep": True}]
+    m = [m_ for m_, _ in rc.touch_masks({"recolour": {"touch": touches}}, img, alpha, Units(alpha), line=line)]
+    assert m[0][:, :100].all() and not m[0][:, 100:].any()        # the red left of the line, both reds
+    assert m[1][:, 103:150].all() and not m[1][:, :103].any() and not m[1][:, 150:].any()
+    assert m[2][:100, :100].all() and not m[2][100:].any()        # a tight tol: one red
+    assert m[3][:, :80].all() and not m[3][:, 80:].any()          # its box
+    assert m[4][40:60, 100:103].all() and m[4].sum() == 60        # on the line: the line, in the box
+    assert m[5].any() and not m[5][:140].any() and not m[5][161:].any()
+    assert not m[6].any()                                         # off the picture: nothing
+
+
+def test_touches_mend_the_part_map_last():
+    """The touches are the agent's word over the part map: a patch given to another part goes to it, a patch kept is
+    kept as drawn, a patch given a colour of its own is left out of every part."""
+    import _recolour as rc
+    from _core import Units
+    h, w = 120, 120
+    img = np.full((h, w, 3), 0.55, np.float32)
+    alpha = np.ones((h, w), np.float32)
+    parts = np.ones((h, w), np.uint8)                             # 1: coat
+    parts[:, 60:] = 2                                             # 2: skirt
+    img[:, 60:] = (0.25, 0.3, 0.6)
+    img[20:40, 20:40] = (0.8, 0.7, 0.2)                           # a patch in the coat, given to the skirt
+    img[70:90, 70:90] = (0.9, 0.9, 0.9)                           # a patch in the skirt, kept as drawn
+    img[90:110, 20:40] = (0.2, 0.6, 0.2)                          # a patch in the coat, a colour of its own
+    to = {"base": "#2050c0", "shadow": "#183c90", "deep": "#102a70", "highlight": "#8aa8ff"}
+    subject = {"parts": [{"name": "coat", "kind": "cloth"}, {"name": "skirt", "kind": "cloth"}],
+               "recolour": {"parts": {"coat": {"base": "#c8442f"}},
+                            "touch": [{"at": [[30, 30]], "as": "skirt"}, {"at": [[80, 80]], "keep": True},
+                                      {"at": [[30, 100]], "to": to}]}}
+    mended, kept, _ = rc.mend_parts(subject, img, alpha, parts, Units(alpha), [None, "cloth", "cloth"])
+    assert (mended[20:40, 20:40] == 2).all() and not kept[20:40, 20:40].any()
+    assert kept[70:90, 70:90].all() and kept[90:110, 20:40].all()
+    assert (mended[0:15, 0:15] == 1).all() and not kept[0:15, 0:15].any()
+
+
+def test_boxes_give_way_only_to_parts_reaching_in():
+    """Inside an eye's protected box, the hair that reaches in from outside (bangs) takes the card's colours; a lash
+    the part map gave to the hair (drawn darker than any of the hair's own tones) and a speck labelled hair only inside
+    the box stay as drawn. An iris labelled hair is reported, and that eye is left as drawn."""
+    import _recolour as rc
+    h, w = 100, 100
+    parts = np.full((h, w), 2, np.uint8)                          # 2: skin
+    Lv = np.full((h, w), 85.0, np.float32)
+    parts[0:40, 20:80] = 1                                        # 1: hair, the bangs into the box's top
+    Lv[0:40, 20:80] = 35.0
+    parts[40:44, 30:70] = 1                                       # a lash, labelled hair, touching the bangs
+    Lv[40:44, 30:70] = 12.0
+    parts[55:58, 60:63] = 1                                       # a speck labelled hair, alone in the box
+    Lv[55:58, 60:63] = 35.0
+    subject = {"protect": [{"name": "left eye", "box": [30, 30, 70, 70]}]}
+    within = np.ones((h, w), bool)
+    got = rc.reaching_in(subject, parts, [1], within, Lv)
+    assert got[32:40, 35:65].all()
+    assert not got[40:44].any() and not got[55:58, 60:63].any() and not got[:30].any()
+    kinds = [None, "hair", "skin", "eyes"]
+    lab_ = np.stack([Lv, np.where(parts == 2, 12.0, 4.0), np.where(parts == 2, 18.0, 4.0)], -1).astype(np.float32)
+    parts[44:60, 40:60] = 3                                       # 3: the iris, under the lash
+    lab_[44:60, 40:60] = (40.0, 10.0, 25.0)
+    assert rc.mislabelled_irises(subject, lab_, within, parts, kinds, parts == 2) == []
+    parts[44:60, 40:60] = 1                                       # the iris labelled hair
+    assert rc.mislabelled_irises(subject, lab_, within, parts, kinds, parts == 2) == [[30, 30, 70, 70]]
+
+
+@pytest.fixture(scope="module")
+def hinted(figure, tmp_path_factory):
+    """The figure enlarged and parted with the hints, as the workflow does; and its finish without a card."""
+    d = tmp_path_factory.mktemp("hinted")
+    image = d / "image.png"
+    r, p = run("prep.py", figure, image, "--scale", "2")
+    assert r.returncode == 0, r.stderr[-400:]
+    x0, y0 = p["box"][:2]
+
+    def at(x, y):
+        return [(x - x0) * 2, (y - y0) * 2]
+
+    hints = {"eyes": [at(*b[:2]) + at(*b[2:]) for b in HINTS["eyes"]],
+             "mouth": at(*HINTS["mouth"][:2]) + at(*HINTS["mouth"][2:]),
+             "parts": [{**q, "at": [at(*xy) for xy in q["at"]]} for q in HINTS["parts"]]}
+    (d / "hints.json").write_text(json.dumps(hints), encoding="utf-8")
+    r, _ = run("auto_parts.py", image, d / "subject.json", "--upscaled", "2", "--hints", d / "hints.json")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    r, _ = run("refinish.py", d / "subject.json", "tv-cel", d / "plain.png", "--no-check")
+    assert r.returncode == 0, r.stderr[-400:]
+    return d / "subject.json", d / "plain.png", at
+
+
+def test_a_card_recolours_its_parts_and_their_lines(hinted, tmp_path):
+    """The card's parts come out in its colours (no RC finding), the rest as the finish paints them without a card,
+    the lines round the hair leaning to the new hair's hue (色トレス), the irises in the card's."""
+    import _colour as C
+    from _core import lab, load_rgba
+    from _style import load_subject
+    from parts import load_or_build
+    subject, plain_png, at = hinted
+    card = card_file(tmp_path, {"name": "test", "parts": {"jacket": "#2e7d5b"}, "kinds": {"hair": "#e0b040"},
+                                "iris": "#d04040"})
+    r, d = run("palette.py", "apply", subject, card, tmp_path / "carded.json")
+    assert r.returncode == 0, r.stderr[-400:]
+    assert d["recoloured"]["jacket"]["from"] == "parts" and d["recoloured"]["hair"]["from"] == "kinds"
+    assert [n for n, v in d["recoloured"].items() if v["from"] == "iris"]
+    assert {"trousers", "shoes", "skin"} <= set(d["kept_as_drawn"])
+    out = tmp_path / "out.png"
+    r, d = run("refinish.py", tmp_path / "carded.json", "tv-cel", out)
+    assert r.returncode in (0, 1), r.stderr[-600:]
+    assert not [f for f in d["check"]["findings"] if f.startswith("RC")], d["check"]["findings"]
+    res, _ = load_rgba(out)
+    plain, _ = load_rgba(plain_png)
+    x, y = at(180, 700)                                            # the trousers: as without a card
+    assert np.abs(res[y - 4:y + 5, x - 4:x + 5] - plain[y - 4:y + 5, x - 4:x + 5]).max() < 0.02
+    sj = load_subject(tmp_path / "carded.json")
+    _, alpha, parts = load_or_build(sj)
+    names = [p["name"] for p in sj["parts"]]
+    hair = parts == names.index("hair") + 1
+    ring = cv2.dilate(hair.astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool) & ~hair & (alpha > 0.5)
+    f_new = lab(res)
+    dark = ring & (f_new[..., 0] < 45)
+    new_ab = C.srgb_to_oklab(C.parse_hex("#e0b040"))[1:]
+    line_ab = C.srgb_to_oklab(res[dark]).mean(0)[1:]
+    old_ab = C.srgb_to_oklab(plain[dark]).mean(0)[1:]
+    assert dark.sum() > 50 and np.dot(line_ab, new_ab) > np.dot(old_ab, new_ab) + 1e-3
+    iris = np.zeros(parts.shape, bool)
+    for p in sj["protect"]:
+        if "eye" in p["name"]:
+            x0, y0, x1, y1 = p["box"]
+            iris[y0:y1, x0:x1] = True
+    iris &= np.hypot(f_new[..., 1], f_new[..., 2]) > 8
+    h_card = np.degrees(np.arctan2(*C.srgb_to_oklab(C.parse_hex("#d04040"))[[2, 1]])) % 360
+    h_iris = np.degrees(np.arctan2(*np.median(C.srgb_to_oklab(res[iris]), 0)[[2, 1]])) % 360
+    assert iris.sum() > 50 and abs((h_iris - h_card + 180) % 360 - 180) < 25
+
+
+def test_touches_after_a_look(hinted, tmp_path):
+    """Touches written after looking at a result: a piece of the trousers given to the jacket takes the jacket's card
+    colour, a shoe given a colour of its own takes it, a piece of the jacket kept stays as drawn. The report gives each
+    touch's reach and the preview shows it; zoom draws a box of the result with its coordinates."""
+    import _colour as C
+    from _core import load_rgba
+    subject, _, at = hinted
+    card = card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}})
+    touch = tmp_path / "touch.json"
+    touch.write_text(json.dumps({"format": "refinish-touch/1", "touch": [
+        {"at": at(310, 760), "as": "Jacket"}, {"at": at(175, 848), "to": "#c8442f"},
+        {"at": [at(320, 450)], "keep": True}]}), encoding="utf-8")
+    r, d = run("palette.py", "apply", subject, card, tmp_path / "carded.json", "--touch", touch)
+    assert r.returncode == 0, r.stderr[-400:]
+    assert [t["px"] > 0 for t in d["touches"]] == [True] * 3 and d["touches"][0]["as"] == "jacket"
+    assert (tmp_path / "carded.touch.jpg").is_file()
+    out = tmp_path / "out.png"
+    r, _ = run("refinish.py", tmp_path / "carded.json", "tv-cel", out)
+    assert r.returncode in (0, 1), r.stderr[-600:]
+    res, _ = load_rgba(out)
+    src, _ = load_rgba(subject.parent / "image.png")
+
+    def hue(ok):
+        return np.degrees(np.arctan2(ok[2], ok[1])) % 360
+
+    def near(xy, hexc):
+        x, y = xy
+        got = np.median(C.srgb_to_oklab(res[y - 3:y + 4, x - 3:x + 4].reshape(-1, 3)), 0)
+        return abs((hue(got) - hue(C.srgb_to_oklab(C.parse_hex(hexc))) + 180) % 360 - 180) < 30
+
+    assert near(at(310, 760), "#2e7d5b") and near(at(175, 848), "#c8442f")
+    x, y = at(320, 450)
+    assert np.abs(res[y - 1:y + 2, x - 1:x + 2] - src[y - 1:y + 2, x - 1:x + 2]).max() < 0.02
+    r, z = run("palette.py", "zoom", out, ",".join(str(v) for v in at(150, 400) + at(350, 500)),
+               "--out", tmp_path / "zoom.jpg")
+    assert r.returncode == 0 and (tmp_path / "zoom.jpg").is_file() and z["grid"] > 0
+
+
+def test_touch_mistakes_stop_with_a_message(hinted, tmp_path):
+    subject, _, _ = hinted
+    card = card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}})
+    p = tmp_path / "touch.json"
+    for touch in ({"touch": [{"as": "jacket"}]}, {"touch": [{"at": [1, 2], "as": "jacket", "keep": True}]},
+                  {"touch": [{"at": [1, 2], "as": "cape"}]}, {"touch": [{"at": [1, 2], "to": "red"}]},
+                  {"touch": [{"at": [1, 2], "keep": True, "tol": 0}]},
+                  {"touch": [{"at": [1, 2], "keep": True, "box": [5, 5, 1, 1]}]}, {"touch": {"at": [1, 2]}},
+                  {"touch": [{"at": [1, 2], "to": "#c8442f", "kind": "plastic"}]}):
+        p.write_text(json.dumps({"format": "refinish-touch/1", **touch}), encoding="utf-8")
+        r, _ = run("palette.py", "apply", subject, card, tmp_path / "carded.json", "--touch", p)
+        assert r.returncode == 2 and "Traceback" not in r.stderr, touch
+    p.write_text(json.dumps({"touch": []}), encoding="utf-8")
+    r, _ = run("palette.py", "apply", subject, card, tmp_path / "carded.json", "--touch", p)
+    assert r.returncode == 2 and "refinish-touch/1" in r.stderr
+
+
+def test_an_eye_is_split_by_its_iris_shape():
+    """A pale grey-blue iris beside a white shaded grey, a dark lash line above: the click lands on the iris, the
+    segmenter's round mask there is taken for it, the white is clicked and taken out, and the lashes are the dark that
+    is left. Clicked by hand, a click on the white is a click off the iris too."""
+    import _eyes
+    h, w = 120, 200
+    yy, xx = np.mgrid[:h, :w]
+    eye = ((xx - 100) / 90.0) ** 2 + ((yy - 62) / 40.0) ** 2 <= 1
+    iris = ((xx - 100) ** 2 + (yy - 68) ** 2 <= 34 ** 2) & eye            # (down to the eye's rim: two whites)
+    lashes = eye & (yy < 34)
+    img = np.zeros((h, w, 3), np.float32)
+    img[:] = (0.78, 0.78, 0.80)                                   # the white, shaded grey
+    img[iris] = (0.50, 0.58, 0.72)                                # a pale grey-blue iris
+    img[lashes] = (0.08, 0.07, 0.08)                              # the lash line
+    white_l = eye & ~iris & ~lashes & (xx < 100)
+    white_r = eye & ~iris & ~lashes & (xx >= 100)
+    calls = []
+
+    def predict(points, labels):
+        calls.append((points.copy(), labels.copy()))
+        x, y = points[0]
+        if iris[int(y), int(x)]:
+            return [np.zeros_like(eye), iris, eye], [0.6, 0.9, 0.7]
+        side = white_l if white_l[int(y), int(x)] else white_r
+        return [side, white_l | white_r, eye], [0.9, 0.6, 0.5]
+
+    got_iris, got_white, got_lash = _eyes.split(predict, img, eye)
+    assert (got_iris & iris).sum() / (got_iris | iris).sum() > 0.9
+    assert (got_white & (white_l | white_r)).sum() > 0.8 * (white_l | white_r).sum()
+    assert (got_lash & lashes).sum() > 0.8 * lashes.sum() and not (got_lash & iris).any()
+    assert _eyes.doubts(got_iris, got_white, got_lash, eye) == []
+    calls.clear()
+    _eyes.split(predict, img, eye, iris_at=[(100, 68)], white_at=[(30, 62)])
+    pts, labels = calls[0]
+    assert labels.tolist() == [1, 0] and tuple(pts[1]) == (30, 62)
+
+
+def test_eye_doubts_flag_a_split_that_looks_wrong():
+    import _eyes
+    eye = np.zeros((100, 100), bool)
+    eye[20:80, 10:90] = True
+    iris = np.zeros_like(eye)
+    iris[30:70, 35:65] = True
+    white = np.zeros_like(eye)
+    white[30:70, 15:35] = True
+    lash = np.zeros_like(eye)
+    lash[20:30, 10:90] = True
+    assert _eyes.doubts(iris, white, lash, eye) == []
+    assert _eyes.doubts(None, white, lash, eye)[0].startswith("no iris")
+    speck = np.zeros_like(eye)
+    speck[45:55, 45:55] = True
+    assert any("small" in d for d in _eyes.doubts(speck, white, lash, eye))
+    assert any("lashes" in d for d in _eyes.doubts(iris, white, eye & ~iris & ~white, eye))
+    assert any("white" in d for d in _eyes.doubts(iris, np.zeros_like(eye), lash, eye))
+
+
+def test_a_point_or_within_takes_what_the_parse_holds():
+    """The parse holds the head's hair, and a part's growth stops at it; a point placed on a region it holds, or the
+    part's within box, takes it (a brush's handle the parse read as hair, in pieces between the fingers)."""
+    import auto_parts as ap
+    reg = np.zeros((40, 40), np.int32)
+    reg[0:10], reg[10:15], reg[15:20], reg[20:40] = 1, 2, 3, 4      # hair, two dark stripes, the white shirt
+    n = 5
+    lab_ = np.zeros((n, 3))
+    lab_[1], lab_[2], lab_[3], lab_[4] = (70, 0, -2), (38, 1, -3), (39, 1, -3), (92, 0, 0)
+    ys, xs = np.mgrid[0:40, 0:40]
+    st = {"area": np.bincount(reg.ravel(), minlength=n).astype(float), "lab": lab_,
+          "cx": np.array([xs[reg == i].mean() if i else 0 for i in range(n)]),
+          "cy": np.array([ys[reg == i].mean() if i else 0 for i in range(n)]),
+          "box": [(slice(int(ys[reg == i].min()), int(ys[reg == i].max()) + 1),
+                   slice(0, 40)) for i in range(1, n)]}
+    nb = {1: {2: 40}, 2: {1: 40, 3: 40}, 3: {2: 40, 4: 40}, 4: {3: 40}}
+    fig = {"area": 1e6}
+    point = [{"name": "stripes", "kind": "cloth-dark", "at": [[20, 12]]}]
+    assert ap.claim(point, reg, st, nb, fig, held=[1, 2, 3]) == {2: 0}          # the point's region, no growth
+    assert ap.claim(point, reg, st, nb, fig).get(3) == 0                        # (nothing held: it grows)
+    sel = [{**point[0], "within": [0, 0, 40, 40]}]
+    assert ap.claim(sel, reg, st, nb, fig, held=[1, 2, 3]) == {2: 0, 3: 0}      # the stripes, not the hair
+    # a selection is surer than another part's box cut (a generous box round long hair takes the stripes by colour)
+    two = [{"name": "hair", "kind": "hair", "at": [[20, 5]]}, sel[0]]
+    assert ap.claim(two, reg, st, nb, fig, fixed={3: 0}, held=[1, 2, 3]).get(3) == 1
+    # but not a region nearer the cutting part's colour: a selection of white leaves the white shirt's own cut alone
+    white = [{"name": "shirt", "kind": "cloth-white", "at": [[20, 30]]},
+             {"name": "pick", "kind": "accessory", "at": [[20, 30]], "within": [0, 0, 40, 40]}]
+    assert ap.claim(white, reg, st, nb, fig, fixed={4: 0}).get(4) == 0
+    # nor what a part with no points cut: it has no colour to compare
+    boxed_only = [{"name": "shirt", "kind": "cloth-white", "boxes": [[0, 0, 40, 40]]}, sel[0]]
+    assert ap.claim(boxed_only, reg, st, nb, fig, fixed={3: 0}).get(3) == 0
+
+
+def test_an_eye_below_the_nose_is_the_mouth():
+    """The part segmentation read a laughing mouth as an eye (its teeth a white, its tongue an iris): what it calls an
+    eye below the nose goes to the mouth; the eyes above stay, the lower eye of a tilted head too."""
+    import seethrough_parse as stp
+    P = {p: k + 1 for k, p in enumerate(stp.PARSE_PARTS)}
+    lab = np.zeros((300, 300), np.uint8)
+    lab[40:260, 60:240] = P["face"]
+    lab[100:115, 90:130] = P["eyes"]                                 # an eye
+    lab[118:132, 170:210] = P["eyes"]                                # the lower eye of a tilted head
+    lab[125:140, 145:155] = P["nose"]
+    lab[180:220, 110:190] = P["eyes"]                                # the open mouth, read as an eye
+    assert stp.eyes_below_nose(lab) == 1
+    assert (lab[180:220, 110:190] == P["mouth"]).all()
+    assert (lab[100:115, 90:130] == P["eyes"]).all() and (lab[118:132, 170:210] == P["eyes"]).all()
+    lab[lab == P["nose"]] = P["face"]                                # no nose: the face's lowest 30 %
+    lab[200:230, 120:180] = P["eyes"]
+    assert stp.eyes_below_nose(lab) == 1 and (lab[200:230, 120:180] == P["mouth"]).all()
+    lab[280:290, 100:120] = P["eyes"]                                # below the chin: no part of the face
+    assert stp.eyes_below_nose(lab) == 1 and (lab[280:290, 100:120] == 0).all()
+
+
+def test_eyes_file_mistakes_stop(tmp_path):
+    import seethrough_parse as stp
+    p = tmp_path / "eyes.json"
+    for bad in ({"eyes": []}, {"format": "refinish-eyes/1", "eyes": [{"iris": [[1, 2]]}]},
+                {"format": "refinish-eyes/1", "eyes": [{"eye": 0}]},
+                {"format": "refinish-eyes/1", "eyes": [{"eye": 0, "iris": [1, 2]}]}):
+        p.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(SystemExit):
+            stp.load_fixes(p)
+    p.write_text(json.dumps({"format": "refinish-eyes/1", "eyes": [
+        {"eye": 1, "keep": True}, {"eye": 0, "iris": [[5, 6]], "white": [[1, 2]]}]}), encoding="utf-8")
+    assert set(stp.load_fixes(p)) == {0, 1}
+
+
+def test_auto_parts_takes_eyes_a_segmenter_split(hinted, tmp_path):
+    """A parse whose eyes a segmenter split (seethrough_parse.py): the irises are taken whole (exact), the whites are a
+    part of their own, the eyes are boxed; a card recolours the irises with no RC finding."""
+    from _style import load_subject
+    from parts import load_or_build
+    import auto_parts as ap
+    subject, _, at = hinted
+    sj = load_subject(subject)
+    _, _, parts = load_or_build(sj)
+    names = [p["name"] for p in sj["parts"]]
+
+    def of(n):
+        return parts == names.index(n) + 1
+
+    parse = np.zeros(parts.shape, np.uint8)
+    for n, label in (("jacket", "topwear"), ("trousers", "bottomwear"), ("shoes", "footwear"), ("hair", "hair"),
+                     ("mouth", "mouth"), ("irises", "iris"), ("eye-whites", "eye-white")):
+        parse[of(n)] = ap.PARSE[label]
+    yy = np.arange(parts.shape[0])[:, None]
+    parse[of("skin") & (yy < at(0, 290)[1])] = ap.PARSE["face"]
+    parse[of("skin") & (yy >= at(0, 290)[1])] = ap.PARSE["handwear"]
+    cv2.imwrite(str(tmp_path / "parse.png"), parse)
+    hints = json.loads((subject.parent / "hints.json").read_text(encoding="utf-8"))
+    hints = {"parts": [q for q in hints["parts"] if q["name"] not in ("hair",)]}
+    (tmp_path / "hints.json").write_text(json.dumps(hints), encoding="utf-8")
+    r, d = run("auto_parts.py", subject.parent / "image.png", tmp_path / "subject.json", "--upscaled", "2",
+               "--hints", tmp_path / "hints.json", "--parse", tmp_path / "parse.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    got = json.loads((tmp_path / "subject.json").read_text(encoding="utf-8"))
+    by = {p["name"]: p for p in got["parts"]}
+    assert by["irises"].get("exact") and "eye-whites" in by
+    assert len([b for b in got["protect"] if "eye" in b["name"]]) == 2
+    # hints naming every part, one of them as the parse's irises: it adds to them (it once dropped them, their
+    # regions then in no part)
+    _, eye1 = cv2.connectedComponents(of("irises").astype(np.uint8))
+    inside = np.argwhere(eye1 == 1)                               # (a point well inside one iris, not on its rim)
+    iy, ix = min(inside, key=lambda q: float(((q - inside.mean(0)) ** 2).sum()))
+    full = {"complete": True, "parts": hints["parts"] + [{"name": "irises", "kind": "eyes",
+                                                          "at": [[int(ix), int(iy)]]}]}
+    (tmp_path / "hints2.json").write_text(json.dumps(full), encoding="utf-8")
+    r, _ = run("auto_parts.py", subject.parent / "image.png", tmp_path / "subject2.json", "--upscaled", "2",
+               "--hints", tmp_path / "hints2.json", "--parse", tmp_path / "parse.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    by2 = {p["name"]: p for p in json.loads((tmp_path / "subject2.json").read_text(encoding="utf-8"))["parts"]}
+    assert by2["irises"].get("exact") and set(by["irises"]["regions"]) <= set(by2["irises"]["regions"])
+    assert "eye-whites" in by2
+    # a point on a region the parse did not split: it does not join the split irises, which stay whole
+    sy, sx = np.nonzero(of("skin") & (yy < at(0, 290)[1]))
+    odd = {"complete": True, "parts": hints["parts"] + [{"name": "irises", "kind": "eyes", "at": [
+        [int(ix), int(iy)], [int(sx[len(sx) // 2]), int(sy[len(sy) // 2])]]}]}
+    (tmp_path / "hints3.json").write_text(json.dumps(odd), encoding="utf-8")
+    r, d3 = run("auto_parts.py", subject.parent / "image.png", tmp_path / "subject3.json", "--upscaled", "2",
+                "--hints", tmp_path / "hints3.json", "--parse", tmp_path / "parse.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    by3 = {p["name"]: p for p in json.loads((tmp_path / "subject3.json").read_text(encoding="utf-8"))["parts"]}
+    assert by3["irises"].get("exact")
+    assert any("lies off the iris the parse split" in x for x in d3.get("doubts", []))
+    card = card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}, "iris": "#d04040"})
+    r, _ = run("palette.py", "apply", tmp_path / "subject.json", card, tmp_path / "carded.json")
+    assert r.returncode == 0, r.stderr[-400:]
+    r, d = run("refinish.py", tmp_path / "carded.json", "tv-cel", tmp_path / "out.png")
+    assert r.returncode in (0, 1), r.stderr[-600:]
+    assert not [f for f in d["check"]["findings"] if f.startswith("RC3")], d["check"]["findings"]
+
+
+def test_a_card_that_matches_nothing_changes_nothing(hinted, tmp_path):
+    from _core import load_rgba
+    subject, plain_png, _ = hinted
+    r, d = run("palette.py", "apply", subject, card_file(tmp_path, {"parts": {"no-such-part": "#ff0000"}}),
+               tmp_path / "carded.json")
+    assert r.returncode == 0 and d["recoloured"] == {}
+    r, _ = run("refinish.py", tmp_path / "carded.json", "tv-cel", tmp_path / "out.png", "--no-check")
+    assert r.returncode == 0, r.stderr[-400:]
+    assert np.array_equal(load_rgba(tmp_path / "out.png")[0], load_rgba(plain_png)[0])
+
+
+def test_a_flat_fill_takes_the_cards_base():
+    """A part of one flat colour takes the card's base, not its darkest colour; of two flat tones the lower takes the
+    shadow and the upper the base (knots anchored on one lightness count once)."""
+    import _colour as C
+    import _recolour as rc
+    from _core import lab
+    rec = {"deep": "#4a0a1a", "shadow": "#8a1a30", "base": "#c8442f", "highlight": "#f0a080"}
+
+    def de(rgb_, hexc):
+        return C.ciede2000(lab(np.float32(rgb_).reshape(1, 1, 3))[0, 0],
+                           lab(C.parse_hex(hexc).astype(np.float32).reshape(1, 1, 3))[0, 0])
+
+    flat = np.full((20, 20, 3), 0.6, np.float32)
+    assert de(rc.transfer(flat, np.ones((20, 20), bool), rc.knots(rec)).mean(0), "#c8442f") < 2.0
+    two = np.full((20, 20, 3), 0.7, np.float32)
+    two[:10] = 0.35
+    got = rc.transfer(two, np.ones((20, 20), bool), rc.knots(rec)).reshape(20, 20, 3)
+    assert de(got[:10].mean((0, 1)), "#8a1a30") < 2.0 and de(got[10:].mean((0, 1)), "#c8442f") < 2.0
+
+
+def test_a_white_takes_a_touchs_colour_but_a_catchlight_stays_white():
+    """A `to` touch's colour reaches whites (a white shirt); only the whites inside a protected box (a catchlight)
+    keep their white."""
+    import _recolour as rc
+    rec = {"deep": "#4a0a1a", "shadow": "#8a1a30", "base": "#c8442f", "highlight": "#f0a080"}
+    img = np.full((10, 20, 3), 0.97, np.float32)
+    mask = np.ones((10, 20), bool)
+    inside = np.zeros(200, bool)
+    inside[:100] = True                                           # the first rows lie inside a protected box
+    got = rc.transfer(img, mask, rc.knots(rec), white_keep=inside)
+    assert np.allclose(got[:100], 0.97) and (np.abs(got[100:] - 0.97).max(1) > 0.2).all()
+    assert np.allclose(rc.transfer(img, mask, rc.knots(rec), white_keep=True), 0.97)
+
+
+def test_kinds_and_roles_pass_ink_and_read_face_words_whole(tmp_path):
+    """Solid black ink is passed by a card's kinds as by its roles; a face word counts only whole ('brown-coat' is no
+    brow, 'eyewear' no eye, 'upper_lip' a lip); a kind given the old way (`as`) is read as the finish reads it."""
+    import _palette as P
+    rows = (("ink", {"kind": "accessory"}, 6, (0.01, 0.01, 0.01)), ("bow", {"kind": "accessory"}, 6, (0.9, 0.5, 0.2)),
+            ("brown-coat", {"kind": "cloth"}, 24, (0.45, 0.3, 0.2)), ("eyewear", {"kind": "metal"}, 6, (0.2, 0.2, 0.2)),
+            ("upper_lip", {"kind": "accessory"}, 6, (0.8, 0.45, 0.45)), ("face", {"as": "skin"}, 12, (0.95, 0.8, 0.7)))
+    h, w = sum(r[2] for r in rows), 40
+    img = np.zeros((h, w, 3), np.float32)
+    parts = np.zeros((h, w), np.uint8)
+    y = 0
+    for j, (_, _, n, c) in enumerate(rows, start=1):
+        img[y:y + n], parts[y:y + n] = c, j
+        y += n
+    sj = {"parts": [{"name": nm, **kd} for nm, kd, _, _ in rows]}
+    stats = P.part_stats(sj, img, np.ones((h, w), np.float32), parts)
+    assert stats["face"]["kind"] == "skin"
+    card = P.load_palette(card_file(tmp_path, {"kinds": {"accessory": "#c8442f", "metal": "#c0c0d0"},
+                                               "roles": {"main": "#2e7d5b", "sub": "#3050c0", "accent": "#f0d040"}}))
+    got = {n: wh for n, (_, wh) in P.match(sj, card, stats).items()}
+    assert got == {"bow": "kinds", "brown-coat": "roles.main", "eyewear": "kinds"}
+
+
+def test_touches_run_without_a_matched_part_and_the_later_wins(hinted, tmp_path):
+    """A card that names no part still runs its touches; where touches overlap the later one wins (a colour, then a
+    keep: as drawn; a keep, then a colour: the colour; a colour, then a part: the part's colour)."""
+    import _colour as C
+    from _core import load_rgba
+    subject, _, at = hinted
+    src, _ = load_rgba(subject.parent / "image.png")
+    x, y = p = at(320, 450)
+
+    def finish(card, touches, name):
+        d = tmp_path / name
+        d.mkdir()
+        t = d / "touch.json"
+        t.write_text(json.dumps({"format": "refinish-touch/1", "touch": touches}), encoding="utf-8")
+        r, _ = run("palette.py", "apply", subject, card_file(d, card), d / "carded.json", "--touch", t)
+        assert r.returncode == 0, r.stderr[-400:]
+        r, _ = run("refinish.py", d / "carded.json", "tv-cel", d / "out.png", "--no-check")
+        assert r.returncode == 0, r.stderr[-400:]
+        return load_rgba(d / "out.png")[0]
+
+    def hue(ok):
+        return np.degrees(np.arctan2(ok[2], ok[1])) % 360
+
+    def near(res, hexc):
+        got = np.median(C.srgb_to_oklab(res[y - 3:y + 4, x - 3:x + 4].reshape(-1, 3)), 0)
+        return abs((hue(got) - hue(C.srgb_to_oklab(C.parse_hex(hexc))) + 180) % 360 - 180) < 30
+
+    def as_drawn(res):
+        return np.abs(res[y - 1:y + 2, x - 1:x + 2] - src[y - 1:y + 2, x - 1:x + 2]).max() < 0.02
+
+    red, green = "#c8442f", "#2e7d5b"
+    assert near(finish({}, [{"at": p, "to": red}], "a"), red)
+    assert as_drawn(finish({}, [{"at": p, "to": red}, {"at": p, "keep": True}], "b"))
+    assert near(finish({}, [{"at": p, "keep": True}, {"at": p, "to": red}], "c"), red)
+    assert near(finish({"parts": {"jacket": green}}, [{"at": p, "to": red}, {"at": p, "as": "jacket"}], "d"), green)
+
+
+def test_the_card_checks_run_only_where_a_card_is_applied(hinted, tmp_path):
+    """The paint engines do not apply a colour card: the card's checks are skipped and the report says so. The auto
+    duotone, which paints the figure as one part, finishes a carded subject that has touches."""
+    subject, _, at = hinted
+    touch = tmp_path / "touch.json"
+    touch.write_text(json.dumps({"format": "refinish-touch/1", "touch": [{"at": at(310, 760), "as": "jacket"}]}),
+                     encoding="utf-8")
+    r, _ = run("palette.py", "apply", subject, card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}}),
+               tmp_path / "carded.json", "--touch", touch)
+    assert r.returncode == 0, r.stderr[-400:]
+    r, d = run("refinish.py", tmp_path / "carded.json", "gouache", tmp_path / "paint.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    assert "not applied" in d["check"]["card"] and not any(f.startswith("RC") for f in d["check"]["findings"])
+    r, _ = run("refinish.py", tmp_path / "carded.json", "duotone-auto", tmp_path / "duo.png", "--no-check")
+    assert r.returncode == 0 and "Traceback" not in r.stderr, r.stderr[-400:]
+
+
+def test_o7_leaves_a_skin_the_card_recoloured_to_rc1():
+    """A darker skin printed far lighter fails O7, unless a colour card asked for that skin (RC1 measures it)."""
+    import _check as K
+    from _core import Units
+    h, w = 200, 200
+    img = np.full((h, w, 3), 0.9, np.float32)
+    alpha = np.zeros((h, w), np.float32)
+    alpha[20:180, 40:160] = 1
+    parts = np.zeros((h, w), np.uint8)
+    parts[20:180, 40:160] = 2
+    parts[30:110, 60:140] = 1
+    img[parts == 2] = (0.3, 0.3, 0.5)
+    img[parts == 1] = (0.435, 0.27, 0.184)                        # #6f452f
+    out = img.copy()
+    out[parts == 1] = (0.957, 0.812, 0.671)                       # #f4cfab
+    subject = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "coat", "kind": "cloth"}],
+               "focal": [{"name": "face", "centre": [100, 70], "radii": [40, 40], "strength": 1.0}]}
+    U = Units(alpha)
+    assert any(f["id"] == "O7" for f in K.look_checks(subject, img, alpha, parts, out, U, "cel"))
+    subject["recolour"] = {"parts": {"skin": {"base": "#f4cfab"}}}
+    assert not any(f["id"] == "O7" for f in K.look_checks(subject, img, alpha, parts, out, U, "cel"))
+
+
+def test_rc1_reads_the_hue_under_a_style_grade_and_rc3_lets_eyes_differ():
+    """Under `grade: style` the style sets a card colour's lightness and chroma, so RC1 compares the hue: a coat in its
+    card colour desaturated passes there and fails under `grade: card`; a coat 40 degrees off fails both. RC3 compares
+    the two eyes only when the card gives them one colour: eyes of two colours, each its own, pass."""
+    import _check as K
+    import _colour as C
+    from _core import Units
+
+    def rgb(L, a, b):
+        return cv2.cvtColor(np.float32([[[L, a, b]]]), cv2.COLOR_Lab2RGB)[0, 0]
+
+    tones = {"base": (65, 40, 30), "shadow": (25, 30, 20), "deep": (12, 15, 10), "highlight": (95, 10, 8)}
+    entry = {s: C.to_hex(rgb(*v)) for s, v in tones.items()}
+    eyes = {"left-iris": {"base": "#d04040", "shadow": "#a03030", "deep": "#702020", "highlight": "#f08080"},
+            "right-iris": {"base": "#3a8fd0", "shadow": "#2a6fa0", "deep": "#1a4f70", "highlight": "#8ac0f0"}}
+    h, w = 220, 300
+    alpha = np.ones((h, w), np.float32)
+    parts = np.full((h, w), 4, np.uint8)                          # 4: the skin
+    parts[110:] = 1                                               # 1: the coat
+    parts[40:60, 60:80], parts[40:60, 200:220] = 2, 3             # 2, 3: the irises
+    img = np.zeros((h, w, 3), np.float32)
+    img[parts == 4], img[parts == 1] = (0.95, 0.8, 0.7), (0.3, 0.35, 0.6)
+    img[(parts == 2) | (parts == 3)] = (0.45, 0.3, 0.15)
+    subject = {"parts": [{"name": "coat", "kind": "cloth"}, {"name": "left-iris", "kind": "eyes"},
+                         {"name": "right-iris", "kind": "eyes"}, {"name": "skin", "kind": "skin"}],
+               "protect": [{"name": "left eye", "box": [50, 30, 90, 70]},
+                           {"name": "right eye", "box": [190, 30, 230, 70]}],
+               "recolour": {"parts": {"coat": entry, **eyes}}}
+
+    def paint(scale=1.0, rot=0.0, right="#3a8fd0"):
+        out = img.copy()
+        th = np.radians(rot)
+        for (lo, hi), s in (((110, 176), "base"), ((176, 206), "shadow"), ((206, 220), "deep")):
+            L, a, b = tones[s]
+            a, b = scale * a, scale * b
+            out[lo:hi] = rgb(L, a * np.cos(th) - b * np.sin(th), a * np.sin(th) + b * np.cos(th))
+        out[parts == 2], out[parts == 3] = C.parse_hex("#d04040"), C.parse_hex(right)
+        return out
+
+    U = Units(alpha)
+
+    def ids(out, grade):
+        subject["recolour"]["grade"] = grade
+        return [f["id"] for f in K.recolour_checks(subject, img, alpha, parts, out, U)]
+
+    assert "RC1" in ids(paint(0.5), "card") and "RC1" not in ids(paint(0.5), "style")
+    assert "RC1" in ids(paint(rot=40), "style") and "RC1" in ids(paint(rot=40), "card")
+    assert "RC3" not in ids(paint(), "card")                      # eyes of two colours, each its own
+    subject["recolour"]["parts"]["right-iris"] = dict(eyes["left-iris"])
+    assert "RC3" in ids(paint(right="#702020"), "card")           # one colour asked, one eye far darker
+
+
+def test_parse_votes_count_the_eye_labels_apart():
+    """The eye split's labels (iris 20 to eye-kept 23) have bins of their own, not the next region's hair."""
+    import auto_parts as ap
+    reg = np.array([[1, 1, 2, 2]], np.int32)
+    parse = np.array([[ap.PARSE["eye-white"], ap.PARSE["eye-white"], 0, 0]], np.uint8)
+    v = ap.parse_votes(reg, parse, 2)
+    assert v[2, ap.PARSE["hair"]] == 0 and v[1, ap.PARSE["eye-white"]] == 2
+
+
+def test_a_held_region_keeps_to_the_boxes_of_a_part_that_took_it():
+    """The regions a head parse holds stay with the hair and the skin whatever their boxes say; a part that took one
+    by a point keeps it only inside its own boxes (a lock of hair joined to a brush's handle goes back to the hair)."""
+    import auto_parts as ap
+    reg = np.zeros((40, 40), np.int32)
+    reg[:, :20], reg[:, 20:] = 1, 2
+    L = np.zeros((40, 40, 3), np.float32)
+    L[:, :20], L[:, 20:] = (40, 20, 20), (42, 18, 18)
+    within = np.ones((40, 40), bool)
+    parts = [{"name": "hair", "kind": "hair", "regions": [2]}, {"name": "brush", "kind": "accessory", "regions": [1]}]
+    hints = [{"name": "hair", "at": [[30, 20]]}, {"name": "brush", "at": [[10, 10]], "boxes": [[0, 0, 20, 20]]}]
+    reg2, parts2, moved = ap.keep_to_boxes(reg, parts, hints, L, within, 0, held=[1, 2])
+    name = {i: p["name"] for p in parts2 for i in p["regions"]}
+    assert moved > 0 and name[int(reg2[10, 10])] == "brush" and name[int(reg2[30, 10])] == "hair"
+
+
+def test_an_eyes_crop_holds_its_clicks_and_a_missing_iris_stays_doubtful():
+    """The crop an eye is split in widens to hold every click given for it, inside the picture. Clicks settle the
+    doubts about a split's proportions, but an eye whose iris did not come out stays doubtful."""
+    import seethrough_parse as sp
+    assert sp.eye_crop(100, 100, 40, 20, 500, 500) == (80, 88, 160, 132)
+    assert sp.eye_crop(100, 100, 40, 20, 500, 500, [(120, 60), (-5, 700)]) == (0, 58, 160, 500)
+    iris = np.ones((4, 4), bool)
+    assert sp.settle("fixed", None, ["no iris found"]) == "doubtful"
+    assert sp.settle("fixed", np.zeros((4, 4), bool), []) == "doubtful"
+    assert sp.settle("fixed", iris, ["the iris is small"]) == "fixed"
+    assert sp.settle("auto", iris, ["the iris is small"]) == "doubtful" and sp.settle("auto", iris, []) == "auto"
+
+
+def test_palette_read_stops_on_a_point_off_the_picture(tmp_path):
+    p = tmp_path / "card.png"
+    cv2.imwrite(str(p), np.full((40, 30, 3), 128, np.uint8))
+    r, _ = run("palette.py", "read", p, "--at", "9000,9000,coat")
+    assert r.returncode == 2 and "outside the picture" in r.stderr
+    r, d = run("palette.py", "read", p, "--at", "10,10,coat")
+    assert r.returncode == 0 and d["swatches"][0]["hex"] == "#808080"
+
+
+def test_the_engines_built_on_a_cel_finish_read_the_map_it_painted_from():
+    """With a card, what reads the cel finish by part afterwards (a woodblock, a wash, the post layers) gets the map
+    that finish painted from: a touch's patch in the part it was given, a patch kept as drawn a part of its own."""
+    import refinish
+    from _core import Units
+    h, w = 120, 120
+    img = np.full((h, w, 3), 0.55, np.float32)
+    img[:, 60:] = (0.3, 0.3, 0.6)
+    alpha = np.ones((h, w), np.float32)
+    parts = np.ones((h, w), np.uint8)
+    parts[:, 60:] = 2
+    sj = {"parts": [{"name": "coat", "kind": "cloth"}, {"name": "skirt", "kind": "cloth"}],
+          "recolour": {"parts": {"coat": {"base": "#c8442f"}},
+                       "touch": [{"at": [[90, 20]], "as": "coat", "box": [80, 10, 100, 30]},
+                                 {"at": [[90, 100]], "keep": True, "box": [80, 90, 100, 110]}]}}
+    sj2, p2 = refinish.card_map(sj, img, alpha, parts, Units(alpha))
+    names = [p["name"] for p in sj2["parts"]]
+    assert p2[20, 90] == 1 and names[p2[100, 90] - 1] == "kept-as-drawn" and p2[60, 30] == 1 and p2[60, 90] == 2
+    plain = {k: v for k, v in sj.items() if k != "recolour"}
+    assert refinish.card_map(plain, img, alpha, parts, Units(alpha))[1] is parts
+
+
+def _skin_case():
+    """A darker skin printed far lighter: the source, the result and the subject for the O7 and engine tests."""
+    from _core import Units
+    h, w = 200, 200
+    img = np.full((h, w, 3), 0.9, np.float32)
+    alpha = np.zeros((h, w), np.float32)
+    alpha[20:180, 40:160] = 1
+    parts = np.zeros((h, w), np.uint8)
+    parts[20:180, 40:160] = 2
+    parts[30:110, 60:140] = 1
+    img[parts == 2] = (0.3, 0.3, 0.5)
+    img[parts == 1] = (0.435, 0.27, 0.184)                        # #6f452f
+    out = img.copy()
+    out[parts == 1] = (0.957, 0.812, 0.671)                       # #f4cfab
+    subject = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "coat", "kind": "cloth"}],
+               "focal": [{"name": "face", "centre": [100, 70], "radii": [40, 40], "strength": 1.0}],
+               "recolour": {"parts": {"skin": {"base": "#f4cfab", "shadow": "#d9a982", "deep": "#b98a66",
+                                               "highlight": "#fff0e0"}}}}
+    return subject, img, alpha, parts, out, Units(alpha)
+
+
+def test_checks_ignore_a_card_the_engine_does_not_apply():
+    """A paint finish applies no card, so it is checked as if there were none: a skin printed far lighter fails O7
+    there, though the card names that skin (under a cel finish, which applies the card, it does not). A touch naming a
+    part the subject no longer has is passed by, not a crash."""
+    import _check as K
+    from refinish import run_finish_checks
+    subject, img, alpha, parts, out, U = _skin_case()
+
+    def ids(engine):
+        return [f["id"] for f in run_finish_checks(subject, {"engine": engine}, img, alpha, parts, U, out, alpha,
+                                                   None)[0]]
+
+    assert "O7" in ids("paint") and "O7" not in ids("cel")
+    subject["recolour"]["touch"] = [{"at": [[100, 150]], "as": "gone"}]
+    assert isinstance(K.recolour_checks(subject, img, alpha, parts, out, U), list)
+
+
+def test_rc2_leaves_a_styles_grey_alone_under_a_style_grade():
+    """Under `grade: style` a white shirt made red and greyed by the style is the style's grade, not a white left;
+    under `grade: card` a shirt left white is."""
+    import _check as K
+    from _core import Units
+    h, w = 120, 160
+    alpha = np.ones((h, w), np.float32)
+    parts = np.ones((h, w), np.uint8)
+    img = np.full((h, w, 3), 0.93, np.float32)
+    subject = {"parts": [{"name": "shirt", "kind": "cloth-white"}],
+               "recolour": {"parts": {"shirt": {"base": "#c8442f", "shadow": "#8a2a20", "deep": "#5a1a14",
+                                                "highlight": "#f08060"}}}}
+    U = Units(alpha)
+
+    def ids(out, grade):
+        subject["recolour"]["grade"] = grade
+        return [f["id"] for f in K.recolour_checks(subject, img, alpha, parts, out, U)]
+
+    assert not {"RC1", "RC2"} & set(ids(np.full((h, w, 3), 0.55, np.float32), "style"))
+    assert "RC2" in ids(img.copy(), "card")
+
+
+def test_a_kept_eye_keeps_its_whole_mask():
+    """An eye the parse keeps as drawn (eye-kept) keeps every pixel of it, its whites as pale as the skin included."""
+    import auto_parts as ap
+    h, w = 200, 200
+    within = np.ones((h, w), bool)
+    parse = np.zeros((h, w), np.uint8)
+    parse[40:170, 40:160] = ap.PARSE["face"]
+    parse[80:95, 60:90] = parse[80:95, 110:140] = ap.PARSE["eye-kept"]
+    L = np.zeros((h, w, 3), np.float32)
+    L[...] = (85, 10, 18)                                         # the skin
+    L[80:95, 60:75] = L[80:95, 110:125] = (84, 9, 17)             # whites as pale as the skin
+    L[80:95, 75:90] = L[80:95, 125:140] = (25, 5, 5)              # the irises
+    face, _ = ap.face_from_parse(parse, L, within, 1.0)
+    assert len(face["eyes"]) == 2 and all(e.get("kept") and e["mask"].sum() == 15 * 30 for e in face["eyes"])
+
+
+def test_a_parse_missing_the_mouth_or_an_eye_falls_back(hinted, tmp_path):
+    """With a parse that labels no mouth, the mouth the colours find is carved out of their skin, as without a parse;
+    with a parse that misses an eye, the eye box the hints give stands for it."""
+    from _style import load_subject
+    from parts import load_or_build
+    import auto_parts as ap
+    subject, _, at = hinted
+    sj = load_subject(subject)
+    _, _, parts = load_or_build(sj)
+    names = [p["name"] for p in sj["parts"]]
+
+    def of(n):
+        return parts == names.index(n) + 1
+
+    parse = np.zeros(parts.shape, np.uint8)
+    for n, label in (("jacket", "topwear"), ("trousers", "bottomwear"), ("shoes", "footwear"), ("hair", "hair"),
+                     ("irises", "iris"), ("eye-whites", "eye-white")):
+        parse[of(n)] = ap.PARSE[label]
+    yy = np.arange(parts.shape[0])[:, None]
+    xx = np.arange(parts.shape[1])[None, :]
+    parse[(of("skin") | of("mouth")) & (yy < at(0, 290)[1])] = ap.PARSE["face"]       # no mouth label
+    parse[of("skin") & (yy >= at(0, 290)[1])] = ap.PARSE["handwear"]
+    _, xs = np.nonzero(of("irises"))
+    parse[(xx < xs.mean()) & np.isin(parse, [ap.PARSE["iris"], ap.PARSE["eye-white"]])] = ap.PARSE["face"]
+    cv2.imwrite(str(tmp_path / "parse.png"), parse)                                     # (the left eye missed)
+    hints = json.loads((subject.parent / "hints.json").read_text(encoding="utf-8"))
+    hints = {"eyes": hints["eyes"], "mouth": hints["mouth"],
+             "parts": [q for q in hints["parts"] if q["name"] != "hair"]}
+    (tmp_path / "hints.json").write_text(json.dumps(hints), encoding="utf-8")
+    r, _ = run("auto_parts.py", subject.parent / "image.png", tmp_path / "subject.json", "--upscaled", "2",
+               "--hints", tmp_path / "hints.json", "--parse", tmp_path / "parse.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    got = json.loads((tmp_path / "subject.json").read_text(encoding="utf-8"))
+    assert "mouth" in {p["name"] for p in got["parts"]}
+    assert len([b for b in got["protect"] if "eye" in b["name"]]) == 2
+
+
+def test_a_feature_the_card_names_keeps_its_colour_in_its_box(hinted, tmp_path):
+    """A face feature a card names (the mouth here) lies inside a protected box; it keeps the card's colour, where the
+    box puts every unnamed feature back as drawn."""
+    import _colour as C
+    from _core import load_rgba
+    from _style import load_subject
+    from parts import load_or_build
+    subject, plain_png, _ = hinted
+    sj = load_subject(subject)
+    _, _, parts = load_or_build(sj)
+    mouth = parts == [p["name"] for p in sj["parts"]].index("mouth") + 1
+    r, _ = run("palette.py", "apply", subject, card_file(tmp_path, {"parts": {"mouth": "#2e7d5b"}}),
+               tmp_path / "carded.json")
+    assert r.returncode == 0, r.stderr[-400:]
+    r, _ = run("refinish.py", tmp_path / "carded.json", "tv-cel", tmp_path / "out.png", "--no-check")
+    assert r.returncode == 0, r.stderr[-400:]
+    res, plain = load_rgba(tmp_path / "out.png")[0], load_rgba(plain_png)[0]
+    changed = mouth & (np.abs(res - plain).max(-1) > 0.05)
+    assert changed.sum() >= 20
+    got = np.median(C.srgb_to_oklab(res[changed]), 0)
+    want = C.srgb_to_oklab(C.parse_hex("#2e7d5b"))
+    hue = np.degrees(np.arctan2([got[2], want[2]], [got[1], want[1]])) % 360
+    assert abs((hue[0] - hue[1] + 180) % 360 - 180) < 30          # the card's colour, not just any change
+    eyes = np.zeros(mouth.shape, bool)
+    for b in sj["protect"]:
+        if "eye" in b["name"]:
+            x0, y0, x1, y1 = (int(v) for v in b["box"])
+            eyes[y0:y1, x0:x1] = True
+    assert eyes.any() and np.abs(res[eyes] - plain[eyes]).max() < 0.02    # the features it does not name, as drawn
+
+
+def test_a_small_card_part_is_recoloured_too():
+    """A card's part too small for a colour model (a stud, a thin ribbon) takes the card's colours all the same."""
+    import _cel
+    from _core import Units
+    from _style import load_style, resolve_style
+    h, w = 160, 160
+    img = np.full((h, w, 3), 0.92, np.float32)
+    alpha = np.zeros((h, w), np.float32)
+    alpha[20:140, 30:130] = 1
+    parts = np.zeros((h, w), np.uint8)
+    parts[20:140, 30:130] = 1
+    img[parts == 1] = (0.25, 0.3, 0.55)                           # the coat
+    parts[70:76, 70:76] = 2                                       # a stud of 36 pixels
+    img[70:76, 70:76] = (0.9, 0.8, 0.2)
+    subject = {"parts": [{"name": "coat", "kind": "cloth"}, {"name": "stud", "kind": "cloth"}],
+               "recolour": {"parts": {"stud": {"base": "#c8442f", "shadow": "#8a2a20", "deep": "#5a1a14",
+                                               "highlight": "#f08060"}}}}
+    out, _ = _cel.run(subject, load_style(resolve_style("tv-cel")), img, alpha, parts, Units(alpha))
+    got = out[71:75, 71:75].reshape(-1, 3).mean(0)
+    assert got[0] > got[1] + 0.2 and got[0] > got[2] + 0.2      # red, no longer yellow
+
+
+def test_a_second_card_takes_the_first_ones_colours_off(tmp_path):
+    """A card applied over another takes the first card's colours off the parts it leaves alone; without_card gives the
+    subject back as it was before any card, for the engines that apply none."""
+    import _palette as P
+    sj = {"parts": [{"name": "hair", "kind": "hair"}, {"name": "coat", "kind": "cloth"}],
+          "rules": {"hair": {"base_lab": [50, 40, 30], "shadow_lab": [40, 30, 20], "deep_lab": [30, 20, 10],
+                             "highlight": {"mode": "crisp", "colour_lab": [70, 20, 10]}}},
+          "recolour": {"parts": {"hair": {"base": "#c8442f"}}}}
+    stats = {"hair": {"area": 100, "kind": "hair", "lab": np.array([30.0, 5, 5]), "in_boxes": 0.0},
+             "coat": {"area": 500, "kind": "cloth", "lab": np.array([40.0, 0, -20]), "in_boxes": 0.0}}
+    got = P.apply(sj, P.load_palette(card_file(tmp_path, {"parts": {"coat": "#2e7d5b"}})), stats)
+    assert got["rules"]["hair"] == {"highlight": {"mode": "crisp"}} and "base_lab" in got["rules"]["coat"]
+    assert set(got["recolour"]["parts"]) == {"coat"}
+    plain = P.without_card(got)
+    assert "recolour" not in plain and "base_lab" not in plain["rules"].get("coat", {})
+
+
+def test_a_touch_that_colours_the_skin_is_no_o7_fault():
+    """A touch giving the face a colour of its own asked for that colour: the look checks read the map the finish
+    painted from, so O7 lets it be, while the same lightening with no touch still fails."""
+    import _palette as P
+    from refinish import run_finish_checks
+    subject, img, alpha, parts, out, U = _skin_case()
+    subject = P.without_card(subject)
+    st = {"engine": "cel"}
+    assert "O7" in [f["id"] for f in run_finish_checks(subject, st, img, alpha, parts, U, out, alpha, None)[0]]
+    subject["recolour"] = {"parts": {}, "touch": [{"at": [[100, 70]], "tol": 30, "box": [60, 30, 140, 110], "to": {
+        "base": "#f4cfab", "shadow": "#d9a982", "deep": "#b98a66", "highlight": "#fff0e0"}}]}
+    assert "O7" not in [f["id"] for f in run_finish_checks(subject, st, img, alpha, parts, U, out, alpha, None)[0]]
+
+
+def test_a_parse_must_be_a_lossless_label_map(hinted, tmp_path):
+    """A parse map holds the labels 0 to 23: a lossy copy (JPEG) or another picture of its size stops auto_parts.py,
+    and seethrough_parse.py writes a PNG only."""
+    subject, _, _ = hinted
+    image = subject.parent / "image.png"
+    h, w = cv2.imread(str(image), cv2.IMREAD_UNCHANGED).shape[:2]
+    bad = np.zeros((h, w), np.uint8)
+    bad[10:20, 10:20] = 30
+    cv2.imwrite(str(tmp_path / "bad.png"), bad)
+    r, _ = run("auto_parts.py", image, tmp_path / "s.json", "--upscaled", "2", "--parse", tmp_path / "bad.png")
+    assert r.returncode == 2 and "not one a parse writes" in r.stderr
+    r, _ = run("seethrough_parse.py", image, tmp_path / "parse.jpg")
+    assert r.returncode == 2 and "save it as a .png" in r.stderr
+
+
+def test_a_recipe_selects_a_cards_parts_as_its_finish_paints_them(hinted, tmp_path):
+    """A recipe's layers select a carded subject's parts on the map its cel finish painted from: a patch a touch gave
+    to the jacket takes a layer limited to the jacket."""
+    import _colour as C
+    from _core import load_rgba
+    subject, _, at = hinted
+    touch = tmp_path / "touch.json"
+    touch.write_text(json.dumps({"format": "refinish-touch/1", "touch": [{"at": at(310, 760), "as": "jacket"}]}),
+                     encoding="utf-8")
+    r, _ = run("palette.py", "apply", subject, card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}}),
+               tmp_path / "carded.json", "--touch", touch)
+    assert r.returncode == 0, r.stderr[-400:]
+    recipe = tmp_path / "recipe.json"
+    recipe.write_text(json.dumps({"format": "refinish-recipe/1", "subject": str(tmp_path / "carded.json"),
+                                  "base": "source", "layers": [{"style": "tv-cel", "where": ["jacket"],
+                                                                "feather": 0}]}), encoding="utf-8")
+    r, _ = run("recipe.py", recipe, tmp_path / "out.png", "--no-check")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    res = load_rgba(tmp_path / "out.png")[0]
+    x, y = at(310, 760)
+    got = np.median(C.srgb_to_oklab(res[y - 3:y + 4, x - 3:x + 4].reshape(-1, 3)), 0)
+    want = C.srgb_to_oklab(C.parse_hex("#2e7d5b"))
+
+    def hue(ok):
+        return np.degrees(np.arctan2(ok[2], ok[1])) % 360
+
+    assert abs((hue(got) - hue(want) + 180) % 360 - 180) < 30

@@ -15,6 +15,12 @@ picture can point at them.
             O7 a darker skin printed far lighter (every skin one pale colour); a light one far darker        FAIL/WARN
             O8 a box round the face's features: the face's tone stepping along a protected box's edge       FAIL
             O9 a dark part broken into patches (a wash's drift, a texture's mottle)                          WARN
+  card      (recolour_checks: when a colour card recoloured parts, palette.py apply)
+            RC1 a part's base colour off the card's (CIEDE2000 over 3 WARN, over 6 FAIL)                     WARN/FAIL
+            RC2 a patch of the old colour left in a recoloured part (a line, a box, a fleck)               FAIL
+            RC3 an iris off the card's hue, or the two eyes in different colours                           FAIL
+            RC4 patches of a part the card left alone, inside one it recoloured and drawn like it         WARN
+            RC5 pieces of a recoloured part far from it inside another, kept as drawn                    WARN
 """
 import cv2
 import numpy as np
@@ -70,9 +76,21 @@ def _clusters(px, k=4, seed=0):
     return [cen[i] / w for i in range(k) if share[i] >= 0.08]
 
 
-def part_map_checks(subject, img, alpha, parts, U, line):
-    """P1, P2, M1: the part map's likely mistakes."""
+def finish_map(subject, img, alpha, parts, U):
+    """The part map a finish painted from, and the pixels it kept as drawn by rule: with a colour card, the map as
+    _recolour.mend_parts mended it (an iris part's hair given back, a part's far pieces kept as drawn, the touches);
+    without one, the map as it is. (parts, kept, the pieces kept: mend_parts's.)"""
+    if not subject.get("recolour"):
+        return parts, np.zeros(parts.shape, bool), []
+    import _recolour as rc_
+    return rc_.mend_parts(subject, img, alpha, parts, U, [None] + [kind_of(p) for p in subject["parts"]])
+
+
+def part_map_checks(subject, img, alpha, parts, U, line, mended=None):
+    """P1, P2, M1: the part map's likely mistakes, on the map the finish painted from (finish_map: with a card, a
+    touch's patch is checked as the part it was given)."""
     found = []
+    parts = (mended or finish_map(subject, img, alpha, parts, U))[0]
     for f in misfits(subject, img, alpha, parts, scale=U.s):
         found.append({"id": "P1", "level": "WARN", "part": f["part"], "box": f["box"], "area": f["area"],
                       "what": f"{f['what']} (a misfit: add a sample or a hint point)"})
@@ -84,6 +102,7 @@ def part_map_checks(subject, img, alpha, parts, U, line):
     skin_c = np.median(L[skin], axis=0) if skin.sum() > 50 else None
     # P2: the middle of an eye's box is its iris (the bangs and the lashes lie round it); labelled hair or cloth, it
     # changes with them under a style that moves their colours
+    parts_p2 = parts
     for p in subject.get("protect", []):
         if "eye" not in p["name"] or skin_c is None:
             continue
@@ -91,7 +110,7 @@ def part_map_checks(subject, img, alpha, parts, U, line):
         feat = within[box] & (np.linalg.norm(L[box] - skin_c, axis=2) > 14)
         if feat.sum() < 20:
             continue
-        k = kinds[parts[box][feat]]
+        k = kinds[parts_p2[box][feat]]
         wrong = float(np.isin(k, ("hair", "cloth", "cloth-dark", "cloth-white", "sheer", "gloss")).mean())
         if wrong > 0.5:
             found.append({"id": "P2", "level": "WARN", "part": p["name"], "box": xyxy, "area": int(feat.sum()),
@@ -159,9 +178,10 @@ def _middle(b, frac=0.4):
     return (slice(xyxy[1], xyxy[3]), slice(xyxy[0], xyxy[2])), xyxy
 
 
-def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
-    """O1 to O6: what went wrong in the finished picture."""
+def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None, mended=None):
+    """O1 to O6: what went wrong in the finished picture, on the map the finish painted from (finish_map)."""
     found = []
+    parts, kept_by_rule = (mended or finish_map(subject, img, alpha, parts, U))[:2]
     Ls, Lo = lab(img), lab(out)
     within = (alpha > 0.5) & (out_alpha > 0.5)
     plist = subject["parts"]
@@ -172,14 +192,15 @@ def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
     black = Ls[..., 0] < 15
     white = (Ls[..., 0] > 92) & (np.hypot(Ls[..., 1], Ls[..., 2]) < 6)
     # O1: a patch left as drawn inside a part whose other pixels all moved (a box that kept the old hair colour); the
-    # lines, pure black and pure white (a shine) stay as drawn by design and do not count
+    # lines, pure black and pure white (a shine) stay as drawn by design and do not count, nor what a card's finish
+    # keeps as drawn by rule (a part's far pieces, which RC5 names; a touch's `keep`)
     for j, p in enumerate(plist, start=1):
         if kind_of(p) not in PAINTED_KINDS:
             continue
         m = within & (parts == j)
         if m.sum() < 500:
             continue
-        free = m & ~line & ~black & ~white
+        free = m & ~line & ~black & ~white & ~kept_by_rule
         moved = float(np.median(dE[free])) if free.any() else 0.0
         if moved < 8:
             continue
@@ -231,6 +252,24 @@ def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
     black_lines = black & within & line & ~mass
     black_point = float(np.median(Lo[black_lines][:, 0] - Ls[black_lines][:, 0])) if black_lines.sum() > 200 else 0.0
     lifted = mass & (Lo[..., 0] - Ls[..., 0] - max(0.0, black_point) > 30)
+    rec = (subject.get("recolour") or {}).get("parts", {})
+    if rec and lifted.any():
+        # a colour card that makes a dark part light: a part that was black all over (black tights, black hair) is
+        # painted in the card's colours, its black with them; in a part that was not, a black painted no lighter
+        # than the card's darkest colour for the part (+10) is the card's own shadow. Only a black mass in a part of
+        # another colour, painted lighter than that, is still a misread part (a keyhole in gold)
+        import _colour as C_
+        floor = np.full(lifted.shape, -1.0, np.float32)
+        for j, q in enumerate(plist, start=1):
+            r_ = rec.get(q["name"])
+            m_ = (parts == j) & within
+            if r_ and m_.any():
+                if float(np.median(Ls[m_][:, 0])) < 40:
+                    floor[m_] = 101.0
+                else:
+                    floor[m_] = 10.0 + min(lab(C_.parse_hex(r_[s]).astype(np.float32).reshape(1, 1, 3))[0, 0, 0]
+                                           for s in ("deep", "shadow", "base") if s in r_)
+        lifted &= ~((floor >= 0) & (Lo[..., 0] <= floor))
     for box, a in _patches(lifted, min_area, max(1, U.k(1))):
         x0, y0, x1, y1 = box
         sub = lifted[y0:y1, x0:x1]
@@ -264,12 +303,22 @@ def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
     band = max(2, int(round(U.len(3.0))))
     sides = {"top": (slice(0, band), slice(None)), "bottom": (slice(h - band, h), slice(None)),
              "left": (slice(None), slice(0, band)), "right": (slice(None), slice(w - band, w))}
+    inside = {"top": (slice(band, 2 * band), slice(None)), "bottom": (slice(h - 2 * band, h - band), slice(None)),
+              "left": (slice(None), slice(band, 2 * band)), "right": (slice(None), slice(w - 2 * band, w - band))}
+    rec_names = set((subject.get("recolour") or {}).get("parts", {}))
+    rec_m = np.isin(parts, [j for j, p in enumerate(subject["parts"], start=1) if p["name"] in rec_names])
     for name, sl in sides.items():
         m = within[sl]
         edge = {"top": alpha[0], "bottom": alpha[-1], "left": alpha[:, 0], "right": alpha[:, -1]}[name] > 0.5
         if edge.mean() < 0.05 or m.sum() < 50:
             continue
-        darker = (Ls[sl][..., 0] - Lo[sl][..., 0] > 25) & m
+        ref = Ls[sl][..., 0].copy()
+        if rec_m.any() and min(h, w) > 4 * band:
+            # a colour card's part made dark is dark to the frame's edge: there the line is measured against the
+            # result's own colour just inside the band (with the step the source itself had there)
+            r_ = rec_m[sl]
+            ref[r_] = (Lo[inside[name]][..., 0] + Ls[sl][..., 0] - Ls[inside[name]][..., 0])[r_]
+        darker = (ref - Lo[sl][..., 0] > 25) & m
         share = float(darker.sum() / m.sum())
         if share > 0.3:
             ys, xs = np.nonzero(m)
@@ -294,6 +343,12 @@ def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
         ny, nx = lut_y[idx[sy, sx]], lut_x[idx[sy, sx]]
         jump_o = np.abs(Lo[sy, sx, 0] - Lo[ny, nx, 0])
         jump_s = np.abs(Ls[sy, sx, 0] - Ls[ny, nx, 0])
+        if rec_m.any():
+            # beside a colour card's part the source's step means little (its outline is now a dark shade of a new
+            # colour, light hair round a dark line): there only a soft edge lighter than the part is a halo
+            r_ = rec_m[ny, nx]
+            jump_o = np.where(r_, Lo[sy, sx, 0] - Lo[ny, nx, 0], jump_o)
+            jump_s = np.where(r_, Ls[sy, sx, 0] - Ls[ny, nx, 0], jump_s)
         more = float((jump_o > 30).mean() - (jump_s > 30).mean())
         if more > 0.15:
             found.append({"id": "O4", "level": "WARN", "part": "-", "box": [int(sx.min()), int(sy.min()),
@@ -330,7 +385,7 @@ NO_SKIN_CHECK = ("neon", "pencil")          # the look sinks or empties every fi
 NO_MOTTLE_CHECK = ("neon", "pixel", "tone")  # dark ground, flat pixel blocks, solid black with white lights: by design
 
 
-def look_checks(subject, img, alpha, parts, out, U, engine=None):
+def look_checks(subject, img, alpha, parts, out, U, engine=None, mended=None):
     """O7 to O9, on the result itself, for every engine (the prints, washes and drawings too, whose other checks read
     their cel base): what a style's own look did to the figure.
 
@@ -353,9 +408,15 @@ def look_checks(subject, img, alpha, parts, out, U, engine=None):
     # O7: a darker skin printed far lighter (every skin painted the period's pale), or a light one far darker than the
     # rest of the figure went
     from _core import ellipse_mask
-    face = skin & (ellipse_mask(h, w, subject.get("focal", [])) > 0.5)
+    # (a skin a colour card recoloured was asked to change: RC1 measures it against the card; so was what a touch
+    # gave a colour of its own or kept as drawn, read on the map the finish painted from)
+    carded = (subject.get("recolour") or {}).get("parts", {})
+    p7, kept7 = (mended[0], mended[1]) if mended else (parts, np.zeros(parts.shape, bool))
+    skin7 = within & (kinds[p7] == "skin") & ~kept7 & ~np.isin(p7, [j for j, p in enumerate(plist, start=1)
+                                                                      if p["name"] in carded])
+    face = skin7 & (ellipse_mask(h, w, subject.get("focal", [])) > 0.5)
     if face.sum() < 300:
-        face = skin
+        face = skin7
     if face.sum() >= 300 and engine not in NO_SKIN_CHECK:
         # read wider still: a pop-art screen's dots are 9 u apart, and a face's tone is what they average to
         # (within the skin: dark hair round a small face must not darken it)
@@ -420,6 +481,222 @@ def look_checks(subject, img, alpha, parts, out, U, engine=None):
                           "what": f"'{p['name']}' is broken into patches: its broad lightness spread grew by "
                                   f"{spread:.0f} over the source's (a texture or a wash's drift on a dark part)"})
     return found
+
+
+def _hue_deg(f):
+    return np.degrees(np.arctan2(f[..., 2], f[..., 1])) % 360
+
+
+def recolour_checks(subject, img, alpha, parts, out, U, mended=None):
+    """A colour card's parts on the result. RC1: the part's base colour, as the centre of its lit tone (the cluster of
+    its interior colours nearest the card's base), against the card's base, by CIEDE2000. RC2: the old colour left, in
+    patches: pixels still near the part's own old hue (within 30 degrees) and far (45) from every colour the card gives
+    it; for a part that was near-neutral (a white shirt made pink), pixels still near-neutral and light. A line in a
+    neighbour's new colour along a small part's edge is neither. RC3: the irises against the card's iris hue, and the
+    two eyes against each other. RC4: a left-alone part's patches inside a recoloured one (_strays_inside). RC5: a
+    recoloured part's far pieces inside another, kept as drawn (_recolour.mend_parts)."""
+    import _colour as C
+    rec = (subject.get("recolour") or {}).get("parts", {})
+    if not rec:
+        return []
+    graded = subject["recolour"].get("grade", "card") == "style"
+    found = []
+    within = alpha > 0.5
+    f = lab(out)
+    fs = lab(img)
+    chroma = np.hypot(f[..., 1], f[..., 2])
+    hue = _hue_deg(f)
+    k = 2 * max(1, int(round(U.len(1.0)))) + 1
+    iris = []
+    import _recolour as rc_
+    kinds = [None] + [kind_of(q) for q in subject["parts"]]
+    # the part map as the finish mended it for the card: the hair an iris part took given back, the pieces joined to a
+    # recoloured part by colour alone kept as drawn (RC5 names them)
+    parts, kept, pieces = mended or rc_.mend_parts(subject, img, alpha, parts, U, kinds)
+    skin = within & np.isin(parts, [j for j, kk in enumerate(kinds) if j > 0 and kk == "skin"])
+    lost = [list(b) for b in rc_.mislabelled_irises(subject, fs, within, parts, kinds, skin)]
+    # (an eye part's pixels that can be the iris's: not the skin or the white of the eye it was drawn wide over; and
+    # what a touch gave an iris)
+    names = [q["name"] for q in subject["parts"]]
+    touched_eyes = np.zeros(alpha.shape, bool)
+    for m_, t in rc_.touch_masks(subject, img, alpha, U):
+        if t.get("as") in names and kinds[names.index(t["as"]) + 1] == "eyes":
+            touched_eyes |= m_
+    iris_src = rc_.iris_like(fs, np.median(fs[skin], axis=0) if skin.sum() > 50 else None) | touched_eyes
+    in_box = rc_.box_fade(subject, *alpha.shape) > 0
+    # the source's lines, where the finish lays its own ink (a brown ink over hair made black is the style's, not the
+    # part's colour): the checks measure the fills
+    from _guard import dark_lines
+    ink = cv2.dilate(dark_lines(img, within, U).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    lost_box = np.zeros(alpha.shape, bool)
+    for x0, y0, x1, y1 in lost:
+        lost_box[max(0, y0):max(0, y1), max(0, x0):max(0, x1)] = True
+    for j, p in enumerate(subject["parts"], start=1):
+        r = rec.get(p["name"])
+        if r is None:
+            continue
+        m = (parts == j) & within & ~kept
+        inner = cv2.erode(m.astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+        if kind_of(p) != "eyes":
+            inner &= ~ink
+        if inner.sum() < 60:
+            continue
+        card = {s: lab(C.parse_hex(r[s]).astype(np.float32).reshape(1, 1, 3))[0, 0]
+                for s in ("base", "shadow", "deep", "highlight") if s in r}
+        px = f[inner]
+        # RC1: the lit tone's centre (a few k-means steps started at the card's own colours, a cluster per tone)
+        cents = np.array(list(card.values()), np.float32)
+        for _ in range(6):
+            lab_ = np.argmin(np.linalg.norm(px[:, None, :] - cents[None], axis=2), axis=1)
+            cents = np.array([px[lab_ == i].mean(0) if (lab_ == i).any() else cents[i] for i in range(len(cents))])
+        bi = list(card).index("base")
+        ys, xs = np.nonzero(inner)
+        box = [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1]
+        if kind_of(p) != "eyes" and float((lab_ == bi).mean()) > 0.03:
+            cb = card["base"]
+            if graded:
+                # under `grade: style` the style sets the lightness and the chroma: the hue is the card's (a
+                # style that takes nearly all the chroma leaves no hue to read)
+                off = abs((_hue_deg(cents[bi][None])[0] - _hue_deg(cb[None])[0] + 180) % 360 - 180)
+                if np.hypot(cb[1], cb[2]) >= 8 and np.hypot(cents[bi][1], cents[bi][2]) >= 8 and off > 15:
+                    found.append({"id": "RC1", "level": "FAIL" if off > 30 else "WARN", "part": p["name"],
+                                  "box": box, "area": int(inner.sum()),
+                                  "what": f"'{p['name']}' is painted {off:.0f} degrees of hue off the card's base "
+                                          f"{r['base']} (grade: style)"})
+            else:
+                de = float(C.ciede2000(cents[bi], cb))
+                if de > 3.0:
+                    found.append({"id": "RC1", "level": "FAIL" if de > 6.0 else "WARN", "part": p["name"],
+                                  "box": box, "area": int(inner.sum()),
+                                  "what": f"'{p['name']}' is painted {de:.1f} (CIEDE2000) off the card's base "
+                                          f"{r['base']}"})
+        # RC2: the old colour, wherever it lies in the part's fills outside the protected boxes (inside them the
+        # features are kept as drawn, and what the part map gave this part only there with them; RC3 measures the
+        # irises). The darkest pixels, below L* 25, are ink: their colour is the style's (a brown ink over brown hair
+        # made violet)
+        # (an eyes part: its iris alone, as the finish recolours it, _recolour.iris_core; an iris a segmenter split,
+        # whole)
+        core = None
+        if kind_of(p) == "eyes":
+            core = m if p.get("exact") else rc_.iris_core(subject, m & iris_src) | (m & touched_eyes)
+        m2 = (m & ~in_box & ~ink if core is None else core & ~lost_box) & (f[..., 0] >= 25)
+        old = np.median(fs[inner], axis=0)
+        old_c = float(np.hypot(old[1], old[2]))
+        if old_c >= 8:
+            far = np.ones(m2.shape, bool)
+            for c in card.values():
+                cc = float(np.hypot(c[1], c[2]))
+                far &= (chroma > cc + 14) if cc < 8 else (np.abs((hue - _hue_deg(c[None])[0] + 180) % 360 - 180) > 45)
+            near_old = np.abs((hue - _hue_deg(old[None])[0] + 180) % 360 - 180) < 30
+            resid = m2 & far & near_old & (chroma > 8)
+        # (under `grade: style` a grey can be the style's own grade: only under `grade: card` is it a white left)
+        elif not graded and float(np.hypot(card["base"][1], card["base"][2])) >= 12:
+            resid = m2 & (chroma < 4) & (f[..., 0] > 45)      # a white made coloured: white left where colour belongs
+        else:
+            resid = np.zeros(m2.shape, bool)
+        patches = _patches(resid, U.area(4.0), max(1, int(round(U.len(0.4)))))
+        share = resid.sum() / max(1, m2.sum())
+        if patches and share > 0.005:
+            box2, _ = max(patches, key=lambda t: t[1])
+            found.append({"id": "RC2", "level": "FAIL", "part": p["name"], "box": box2, "area": int(resid.sum()),
+                          "what": f"{100 * share:.1f}% of '{p['name']}' keeps a colour the card does not give it "
+                                  "(the old colour: a line, a box, a fleck)"})
+        if core is not None:
+            sel = core & (chroma > 8)
+            for b in subject.get("protect", []):
+                if "eye" not in b.get("name", ""):
+                    continue
+                x0, y0, x1, y1 = (int(v) for v in b["box"])
+                s_ = np.zeros_like(sel)
+                s_[y0:y1, x0:x1] = sel[y0:y1, x0:x1]
+                if s_.sum() > 20:
+                    iris.append((np.median(f[s_], axis=0), [x0, y0, x1, y1], p["name"], card["base"]))
+    # an eye whose iris the part map gave to the hair or the clothes is left as drawn by the finish: say why
+    why = (" (its iris is labelled hair or cloth, so the eye was left as drawn: give the iris a part of kind eyes, "
+           "as P2 says)")
+    for med, box, name, cb in iris:
+        off = abs((_hue_deg(med[None])[0] - _hue_deg(cb[None])[0] + 180) % 360 - 180)
+        if np.hypot(cb[1], cb[2]) >= 8 and off > 25:
+            found.append({"id": "RC3", "level": "FAIL", "part": name, "box": box, "area": 0,
+                          "what": f"the iris in this eye is {off:.0f} degrees of hue off the card's"
+                                  + (why if box in lost else "")})
+    # the two eyes against each other when the card gives them one colour (eyes of two colours match their own)
+    if len(iris) >= 2 and float(C.ciede2000(iris[0][3], iris[1][3])) < 3.0:
+        d = float(C.ciede2000(iris[0][0], iris[1][0]))
+        if d > 10:
+            odd = next((t for t in iris if t[1] in lost), iris[1])
+            found.append({"id": "RC3", "level": "FAIL", "part": odd[2], "box": odd[1], "area": 0,
+                          "what": f"the two eyes differ by {d:.1f} (CIEDE2000): one iris is not recoloured like the "
+                                  "other" + (why if odd[1] in lost else " (part of it labelled skin or eye-white?)")})
+    found += _strays_inside(subject, fs, f, within, parts, U, rec, ink, in_box)
+    # RC5: the pieces kept as drawn (mend_parts), by the part they were joined to and the part they lie in
+    seen = {}
+    for a, b, box, n in pieces:
+        if n < U.area(4.0):
+            continue
+        v = seen.setdefault((a, b), box + [0])
+        v[:4] = [min(v[0], box[0]), min(v[1], box[1]), max(v[2], box[2]), max(v[3], box[3])]
+        v[4] += n
+    for (a, b), v in seen.items():
+        found.append({"id": "RC5", "level": "WARN", "part": a, "box": v[:4], "area": v[4],
+                      "what": f"pieces of '{a}' far from it inside '{b}' were kept as drawn (joined to '{a}' by "
+                              f"colour alone, as a gold ornament to blonde hair): if they are '{a}' (a strap cut off by "
+                              f"an arm), give '{a}' \"pieces\": \"paint\" on the card"})
+    return found
+
+
+def _strays_inside(subject, fs, f, within, parts, U, rec, ink, in_box):
+    """RC4: a patch of a part the card left alone, lying inside a part it recoloured and drawn like that part in the
+    source: most likely that part's own, which the part map gave to its neighbour (a cream tee's light folds read as
+    the pale skin beside it). In the source's colours it never showed; now it keeps the old look while all round it
+    changed. A patch of the left-alone part's own colour (skin seen between strands of dark hair) is not one."""
+    rec_idx = [j for j, p in enumerate(subject["parts"], start=1) if p["name"] in rec]
+    if not rec_idx:
+        return []
+    h, w = within.shape
+    fill = within & ~ink & ~in_box
+    med_src, med_out = {}, {}
+
+    def medians(k):
+        if k not in med_src:
+            m = (parts == k) & fill
+            med_src[k] = np.median(fs[m], axis=0) if m.sum() > 50 else None
+            med_out[k] = np.median(f[m], axis=0) if m.sum() > 50 else None
+        return med_src[k], med_out[k]
+
+    hits = {}
+    for j, p in enumerate(subject["parts"], start=1):
+        if p["name"] in rec or kind_of(p) == "eyes":
+            continue
+        n, lbl, st, _ = cv2.connectedComponentsWithStats(((parts == j) & fill).astype(np.uint8), connectivity=8)
+        if n <= 2:
+            continue
+        main = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+        for i in range(1, n):
+            x, y, bw, bh, area = (int(v) for v in st[i])
+            if i == main or area < U.area(4.0):
+                continue
+            y0, y1, x0, x1 = max(0, y - 3), min(h, y + bh + 3), max(0, x - 3), min(w, x + bw + 3)
+            c = lbl[y0:y1, x0:x1] == i
+            ring = ((cv2.dilate(c.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0) & ~c & within[y0:y1, x0:x1]
+                    & ~ink[y0:y1, x0:x1])
+            around = parts[y0:y1, x0:x1][ring]
+            in_rec = np.isin(around, rec_idx)
+            if len(around) < 10 or in_rec.mean() < 0.6:
+                continue
+            k = int(np.bincount(around[in_rec]).argmax())
+            ks, ko = medians(k)
+            if ks is None:
+                continue
+            if (np.linalg.norm(np.median(fs[y0:y1, x0:x1][c], axis=0) - ks) <= 15
+                    and np.linalg.norm(np.median(f[y0:y1, x0:x1][c], axis=0) - ko) > 15):
+                hb = hits.setdefault((p["name"], subject["parts"][k - 1]["name"]), [x, y, x + bw, y + bh, 0])
+                hb[:4] = [min(hb[0], x), min(hb[1], y), max(hb[2], x + bw), max(hb[3], y + bh)]
+                hb[4] += area
+    return [{"id": "RC4", "level": "WARN", "part": a, "box": v[:4], "area": v[4],
+             "what": f"patches labelled '{a}' inside '{b}' keep the old look while '{b}' changed, and were drawn like "
+                     f"'{b}': if they are {b}, give them to it (a hint point); if not, name '{a}' on the card"}
+            for (a, b), v in hits.items()]
 
 
 def verdict(found):
