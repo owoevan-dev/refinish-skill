@@ -385,7 +385,7 @@ NO_SKIN_CHECK = ("neon", "pencil")          # the look sinks or empties every fi
 NO_MOTTLE_CHECK = ("neon", "pixel", "tone")  # dark ground, flat pixel blocks, solid black with white lights: by design
 
 
-def look_checks(subject, img, alpha, parts, out, U, engine=None):
+def look_checks(subject, img, alpha, parts, out, U, engine=None, mended=None):
     """O7 to O9, on the result itself, for every engine (the prints, washes and drawings too, whose other checks read
     their cel base): what a style's own look did to the figure.
 
@@ -408,9 +408,12 @@ def look_checks(subject, img, alpha, parts, out, U, engine=None):
     # O7: a darker skin printed far lighter (every skin painted the period's pale), or a light one far darker than the
     # rest of the figure went
     from _core import ellipse_mask
-    # (a skin a colour card recoloured was asked to change: RC1 measures it against the card)
+    # (a skin a colour card recoloured was asked to change: RC1 measures it against the card; so was what a touch
+    # gave a colour of its own or kept as drawn, read on the map the finish painted from)
     carded = (subject.get("recolour") or {}).get("parts", {})
-    skin7 = skin & ~np.isin(parts, [j for j, p in enumerate(plist, start=1) if p["name"] in carded])
+    p7, kept7 = (mended[0], mended[1]) if mended else (parts, np.zeros(parts.shape, bool))
+    skin7 = within & (kinds[p7] == "skin") & ~kept7 & ~np.isin(p7, [j for j, p in enumerate(plist, start=1)
+                                                                      if p["name"] in carded])
     face = skin7 & (ellipse_mask(h, w, subject.get("focal", [])) > 0.5)
     if face.sum() < 300:
         face = skin7
@@ -530,7 +533,7 @@ def recolour_checks(subject, img, alpha, parts, out, U, mended=None):
         lost_box[max(0, y0):max(0, y1), max(0, x0):max(0, x1)] = True
     for j, p in enumerate(subject["parts"], start=1):
         r = rec.get(p["name"])
-        if r is None or "gradient" in r:
+        if r is None:
             continue
         m = (parts == j) & within & ~kept
         inner = cv2.erode(m.astype(np.uint8), np.ones((k, k), np.uint8)) > 0

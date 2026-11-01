@@ -114,7 +114,7 @@ All in `../refinish/scripts/palette.py`; each prints JSON, and stops with exit c
 
 | command | does |
 |---|---|
-| `apply SUBJECT.json CARD.json OUT.json [--touch TOUCH.json]` | writes the subject with the card in its colour models; reports each recoloured part's four colours and where they came from, and the parts kept as drawn; with touches, each touch's reach and a preview (above) |
+| `apply SUBJECT.json CARD.json OUT.json [--touch TOUCH.json]` | writes the subject with the card in its colour models (over a subject a card was applied to, that card's colours come off first); reports each recoloured part's four colours and where they came from, and the parts kept as drawn; with touches, each touch's reach and a preview (above) |
 | `zoom PICTURE.png x0,y0,x1,y1 [--out zoom.jpg]` | a box of a picture enlarged with a grid of its coordinates, to read a touch's points off a result |
 | `derive "#c8442f" [--kind skin]` | the shadow, second shadow and highlight a base gets |
 | `board CARD.json OUT.png [--subject SUBJECT.json]` | the card as swatches, one row an entry: base, shadow, second shadow, highlight, a derived one marked `*`; with the subject, each row derived for its part's kind |

@@ -302,22 +302,47 @@ def match(subject, card, stats):
 
 def full_entry(entry, kind, rule):
     """An entry with every slot filled: the card's colours where it gives them, derived ones elsewhere."""
-    base = entry.get("base")
-    if base is None:                                   # (a gradient alone: its middle stands for the part)
-        stops = entry["gradient"]["stops"]
-        base = C.parse_hex(stops[len(stops) // 2][1])
+    base = entry["base"]
     d = derive(base, kind, rule)
     out = {"base": base}
     for k in ("shadow", "deep", "highlight"):
         out[k] = entry.get(k, d[k])
-    for k in ("gradient", "pattern", "pieces"):
-        if k in entry:
-            out[k] = entry[k]
+    if "pieces" in entry:
+        out["pieces"] = entry["pieces"]
     return out
 
 
 def cielab(rgb):
     return [round(float(v), 2) for v in lab(np.asarray(rgb, np.float32).reshape(1, 1, 3))[0, 0]]
+
+
+CARD_KEYS = ("base_lab", "shadow_lab", "deep_lab")         # (and the highlight's colour_lab): what a card writes
+
+
+def _uncard_rule(r):
+    """A part's rule with the colour model a card wrote into it taken off, its other settings kept."""
+    r = {k: v for k, v in r.items() if k not in CARD_KEYS}
+    hl = {k: v for k, v in (r.get("highlight") or {}).items() if k != "colour_lab"}
+    if hl:
+        r["highlight"] = hl
+    else:
+        r.pop("highlight", None)
+    return r
+
+
+def without_card(subject):
+    """The subject as before a card was applied: no `recolour` record, and the colour models the card wrote into its
+    parts' rules taken off. For an engine that applies no card (paint, de-AI, duotone): it paints the picture's own
+    colours."""
+    if not subject.get("recolour"):
+        return subject
+    sj = {k: v for k, v in subject.items() if k != "recolour"}
+    rules = dict(sj.get("rules", {}))
+    for n in subject["recolour"].get("parts", {}):
+        if n in rules:
+            rules[n] = _uncard_rule(rules[n])
+    sj["rules"] = rules
+    return sj
 
 
 def apply(subject, card, stats, touches=None):
@@ -326,6 +351,11 @@ def apply(subject, card, stats, touches=None):
     with touches (load_touch), those too, their part names as the subject spells them and their own colours filled."""
     sj = {k: v for k, v in subject.items() if not k.startswith("_")}
     rules = dict(sj.get("rules", {}))
+    # a subject a card was applied to already: that card's colours come off its parts first, or a part the new card
+    # leaves alone would keep them (painted in the old card's colours, yet no longer a card's part)
+    for n in (subject.get("recolour") or {}).get("parts", {}):
+        if n in rules:
+            rules[n] = _uncard_rule(rules[n])
     rec = {"card": card["name"], "grade": card["grade"], "lines": card["lines"], "parts": {}}
     if card.get("light"):
         rec["light"] = card["light"]
@@ -337,8 +367,7 @@ def apply(subject, card, stats, touches=None):
         r["highlight"] = {**r.get("highlight", {}), "colour_lab": cielab(e["highlight"])}
         rules[n] = r
         rec["parts"][n] = {**{k: C.to_hex(e[k]) for k in SLOTS}, "kind": kind, "from": where,
-                           "pieces": e.get("pieces", card["pieces"]),
-                           **{k: e[k] for k in ("gradient", "pattern") if k in e}}
+                           "pieces": e.get("pieces", card["pieces"])}
     if touches:
         names = {p["name"].lower(): p["name"] for p in subject["parts"]}
         rec["touch"] = []

@@ -39,10 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _eyes  # noqa: E402
 from _core import die, emit, load_rgba, write_image  # noqa: E402
 
-PARSE_PARTS = ['hair', 'headwear', 'face', 'eyes', 'eyewear', 'ears', 'earwear', 'nose', 'mouth', 'neck', 'neckwear',
-               'topwear', 'handwear', 'bottomwear', 'legwear', 'footwear', 'tail', 'wings', 'objects']
-EYE_PARTS = ['iris', 'eye-white', 'lashes', 'eye-kept']             # 20, 21, 22, 23
-EYE0 = 20
+from _parse_labels import EYE0, EYE_PARTS, PARSE_PARTS  # noqa: E402
 HEAD_PARTS = ('hair', 'headwear', 'face', 'eyes', 'eyewear', 'ears', 'earwear', 'nose', 'mouth')
 FACE_PARTS = ('face', 'eyes', 'eyewear', 'ears', 'earwear', 'nose', 'mouth')
 WEIGHTS = ("24yearsold/l2d_sam_iter2", "checkpoint-18000.pt")
@@ -254,6 +251,8 @@ def main():
     ap.add_argument("--no-eyes", action="store_true", help="the parts only: the eyes left to auto_parts.py's colours")
     ap.add_argument("--device", default=None, help="cuda or cpu (default: cuda when there is one)")
     a = ap.parse_args()
+    if Path(a.out).suffix.lower() != ".png":
+        die(f"{a.out}: the parse is a map of labels; save it as a .png (a lossy format changes the labels)")
     if not a.seethrough:
         die("give the folder of See-Through's code with --seethrough or SEETHROUGH_DIR")
     img, alpha = load_rgba(a.image)

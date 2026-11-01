@@ -65,33 +65,35 @@ def main():
     from refinish import CHECKED, run_finish_checks
     U = Units(alpha, sj.get("head_px"))
     engine = st["engine"] if st is not None else None
+    if sj.get("recolour") and engine in ("paint", "deai", "duotone"):
+        from _palette import without_card
+        sj = without_card(sj)                       # (these engines apply no card: checked without it)
     if st is not None and engine not in ("deai", "duotone"):
         # the part map refinish.py painted from: the same guard over it (de-AI and duotone read their own areas)
         from _guard import guard_parts
         from _style import rule
         sj, parts, _ = guard_parts(sj, st, img, alpha, parts, U, rule)
-    if sj.get("recolour") and engine in ("paint", "deai", "duotone"):
-        sj = {k: v for k, v in sj.items() if k != "recolour"}    # (these engines apply no card: checked without it)
+    mended = finish_map(sj, img, alpha, parts, U) if sj.get("recolour") else None
     line = (find_lines(img, sj.get("upscaled", 1)) > 0.3) & (alpha > 0.5)
     layers = [p.get("op") for p in (st or {}).get("post", [])] + ([f"relight {a.hour}"] if a.hour else [])
     note = None
     if layers:
         # the result's checks read a finish before its layers, which this file no longer shows
-        found = part_map_checks(sj, img, alpha, parts, U, line)
+        found = part_map_checks(sj, img, alpha, parts, U, line, mended)
         note = (f"layers over the finish ({', '.join(layers)}): only the part map was checked; refinish.py checks the "
                 "finish before its layers when it makes the picture")
     elif engine is None or engine in CHECKED:
-        mended = finish_map(sj, img, alpha, parts, U)
         found = (part_map_checks(sj, img, alpha, parts, U, line, mended)
                  + result_checks(sj, img, alpha, parts, out, out_alpha, U, line, mended)
-                 + look_checks(sj, img, alpha, parts, out, U, engine))
+                 + look_checks(sj, img, alpha, parts, out, U, engine, mended))
         if sj.get("recolour") and engine in (None, "cel"):   # a card's parts against the card, as refinish.py does
             from _check import recolour_checks
             found += recolour_checks(sj, img, alpha, parts, out, U, mended)
     elif engine in ("deai", "duotone"):
         found, _, _ = run_finish_checks(sj, st, img, alpha, parts, U, out, out_alpha, None)
     else:
-        found = part_map_checks(sj, img, alpha, parts, U, line) + look_checks(sj, img, alpha, parts, out, U, engine)
+        found = (part_map_checks(sj, img, alpha, parts, U, line, mended)
+                 + look_checks(sj, img, alpha, parts, out, U, engine, mended))
         note = ("built on a cel finish: the part map and the look checks; refinish.py checks the cel base's paint when "
                 "it makes the picture")
     rv = Path(a.review) if a.review else Path(a.out).with_suffix(".check.jpg")

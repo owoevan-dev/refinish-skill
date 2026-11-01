@@ -231,16 +231,6 @@ def cmd_board(a):
             ink = (255, 255, 255) if lab(np.asarray(c, np.float32).reshape(1, 1, 3))[0, 0, 0] < 55 else (30, 30, 30)
             cv2.putText(vis, C.to_hex(c) + ("" if given else " *"), (x + 4, y + rh - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
                         ink, 1)
-        if "gradient" in e:
-            stops = e["gradient"]["stops"]
-            x = lab_w
-            bar = np.zeros((10, 4 * (sw + gap) - gap, 3), np.float64)
-            ts = np.linspace(0, 1, bar.shape[1])
-            ok = np.array([C.srgb_to_oklab(C.parse_hex(s[1])) for s in stops])
-            pos = np.array([float(s[0]) for s in stops])
-            cols = np.stack([np.interp(ts, pos, ok[:, k]) for k in range(3)], -1)
-            bar[:] = C.oklab_to_srgb(cols)[None]
-            vis[y - 12:y - 2, x:x + bar.shape[1]] = (bar[..., ::-1] * 255).astype(np.uint8)
     cv2.putText(vis, "* derived from the base", (16, H - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (90, 86, 82), 1)
     write_image(a.out, vis, [cv2.IMWRITE_PNG_COMPRESSION, 6] if a.out.lower().endswith(".png") else ())
     emit({"board": a.out, "rows": len(rows)})

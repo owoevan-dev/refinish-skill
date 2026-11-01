@@ -55,9 +55,12 @@ def render(ref, sj, img, alpha, parts, U, check):
         die(f"'{ref}' gives a picture of another size (a pixel sprite, a sticker's border, a neon glow): it cannot "
             "be mixed")
     sj_g, parts_g, guard = sj, parts, {}
+    if st["engine"] in ("paint", "deai", "duotone"):
+        from _palette import without_card
+        sj_g = without_card(sj)                     # (these engines apply no card)
     if st["engine"] not in ("deai", "duotone"):
         from _guard import guard_parts
-        sj_g, parts_g, guard = guard_parts(sj, st, img, alpha, parts, U, rule)
+        sj_g, parts_g, guard = guard_parts(sj_g, st, img, alpha, parts, U, rule)
     from refinish import card_map
     sj_e, parts_e = (sj_g, parts_g) if st["engine"] in ("paint", "deai", "duotone") else card_map(sj_g, img, alpha,
                                                                                                    parts_g, U)
@@ -211,7 +214,10 @@ def main():
     sj = load_subject(sp if sp.is_absolute() else rp.parent / sp)
     img, alpha, parts = load_or_build(sj)
     U = Units(alpha, sj.get("head_px"))
-    sel = Selector(sj, img, alpha, parts, U)
+    # with a card, the layers select its parts as its cel finish paints them: the touches and the mends applied
+    from refinish import card_map
+    sj_m, parts_m = card_map(sj, img, alpha, parts, U)
+    sel = Selector(sj_m, img, alpha, parts_m, U)
     for lay in rc.get("layers", []):
         if lay.get("blend", "normal") not in BLENDS:
             die(f"no blend mode '{lay['blend']}': {', '.join(BLENDS)}")
@@ -247,7 +253,7 @@ def main():
     post = list(rc.get("post", [])) + ([{"op": "relight", "hour": rc["hour"]}] if rc.get("hour") else [])
     if post:
         import _post
-        mix = _post.apply(post, np.clip(mix, 0, 1), mix_alpha, parts, sj, U, seed=rc.get("seed", 7))
+        mix = _post.apply(post, np.clip(mix, 0, 1), mix_alpha, parts_m, sj_m, U, seed=rc.get("seed", 7))
     save_rgba(a.out, np.clip(mix, 0, 1), mix_alpha)
     emit({"out": a.out, "finishes": records, "layers": covered, "seconds": round(time.time() - t0, 1)})
     sys.exit(1 if any(r.get("check", {}).get("verdict") == "fail" for r in records) else 0)

@@ -140,6 +140,8 @@ def _auto(subject, img, alpha, U, base_name):
 
 
 def run(subject, style, img, alpha, parts, U, seed=7):
+    from _palette import without_card
+    subject = without_card(subject)                    # (a duotone applies no colour card, its cel base none either)
     d = style.get("duotone", {})
     h, w = alpha.shape
     within = alpha > 0.5

@@ -45,7 +45,7 @@ CHECKED = ("cel", "paint")                         # the engines whose results t
 RESIZING = ("pixel", "sticker", "neon")            # the engines whose result is not the picture's size
 
 
-def card_map(sj, img, alpha, parts, U):
+def card_map(sj, img, alpha, parts, U, mended=None):
     """With a colour card, the part map its cel finish painted from, for what reads that finish by part afterwards
     (an engine built on it, the post layers): the touches and the mends applied, and the pixels kept as drawn a part
     of their own, as the same-material guard keeps its own. Without a card, the subject and the map as they are."""
@@ -53,7 +53,7 @@ def card_map(sj, img, alpha, parts, U):
         return sj, parts
     from _check import finish_map
     from _guard import KEPT
-    mended, kept, _ = finish_map(sj, img, alpha, parts, U)
+    mended, kept, _ = mended or finish_map(sj, img, alpha, parts, U)
     if not kept.any():
         return sj, mended
     names = [p["name"] for p in sj["parts"]]
@@ -66,13 +66,14 @@ def card_map(sj, img, alpha, parts, U):
     return sj, mended
 
 
-def finish(sj, st, img, alpha, parts, U, a, engine_parts=None):
+def finish(sj, st, img, alpha, parts, U, a, engine_parts=None, mended=None):
     """The engine's result: (RGB, alpha, report). engine_parts: the subject and part map an engine built on a cel
-    finish reads that finish by (card_map), when they are not the ones the cel finish starts from."""
+    finish reads that finish by (card_map), when they are not the ones the cel finish starts from; mended: the card's
+    mended part map (_check.finish_map), when it is at hand."""
     engine = st["engine"]
     if engine == "cel":
         import _cel
-        out, info = _cel.run(sj, st, img, alpha, parts, U)
+        out, info = _cel.run(sj, st, img, alpha, parts, U, mended)
         return out, alpha, {"colour_model": info}
     if engine == "paint":
         import _paint
@@ -89,7 +90,7 @@ def finish(sj, st, img, alpha, parts, U, a, engine_parts=None):
     # the engines that start from a cel finish of the figure
     import _cel
     base = load_style(resolve_style(st.get("base", "tv-cel")))
-    cel, _ = _cel.run(sj, base, img, alpha, parts, U)
+    cel, _ = _cel.run(sj, base, img, alpha, parts, U, mended)
     sj, parts = engine_parts or (sj, parts)
     if engine == "pixel":
         import _pixel
@@ -111,7 +112,7 @@ def finish(sj, st, img, alpha, parts, U, a, engine_parts=None):
     return out, info.pop("alpha", alpha), {**info, "_cel": cel}
 
 
-def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base):
+def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base, mended=None):
     """The checks on one finish, the same for refinish.py and recipe.py: (findings, what they read, the picture and
     alpha to box them on).
     - cel and paint: the result against the source;
@@ -120,11 +121,12 @@ def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_b
     - de-AI: its own colour-shift check (H1);
     and on every engine's own result, the duotones too, the look checks O7 to O9."""
     from _check import finish_map, look_checks
+    from _palette import without_card
     from check_output import run_checks
     engine = st["engine"]
     if sj.get("recolour") and engine != "cel" and cel_base is None:
-        sj = {k: v for k, v in sj.items() if k != "recolour"}    # (this engine applies no card: checked without it)
-    mended = finish_map(sj, img, alpha, parts, U) if sj.get("recolour") else None
+        sj, mended = without_card(sj), None                        # (this engine applies no card: checked without it)
+    mended = (mended or finish_map(sj, img, alpha, parts, U)) if sj.get("recolour") else None
     if engine == "deai":
         import _deai
         found = _deai.check(img, alpha, engine_out, U, sj.get("upscaled", 1), st.get("deai", {}).get("chroma", 1.0))
@@ -139,7 +141,7 @@ def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_b
         found, on = [], "the result: O7 to O9 only"
         shown = (engine_out if engine_out.shape[:2] == alpha.shape else np.zeros(alpha.shape + (3,), np.float32), alpha)
     # the engine's own look on its own result: the skin, boxes round the features, mottled darks (O7 to O9)
-    found += look_checks(sj, img, alpha, parts, engine_out, U, engine)
+    found += look_checks(sj, img, alpha, parts, engine_out, U, engine, mended)
     if sj.get("recolour") and shown[0].shape[:2] == alpha.shape:
         # a colour card's parts against the card (RC1 to RC5), on what the finish painted
         from _check import recolour_checks
@@ -168,19 +170,26 @@ def main():
             "relight a style that keeps the size, or leave --hour out")
     img, alpha, parts = load_or_build(sj)
     U = Units(alpha, sj.get("head_px"))
+    from _check import finish_map
+    from _palette import without_card
+    card_ignored = bool(sj.get("recolour")) and st["engine"] in ("paint", "deai", "duotone")
+    if card_ignored:
+        sj = without_card(sj)                       # (these engines apply no card: they paint the picture's colours)
     guard = {}
     if st["engine"] not in ("deai", "duotone"):     # (these read their own areas and need no parts)
         from _guard import guard_parts
         from _style import rule
         sj, parts, guard = guard_parts(sj, st, img, alpha, parts, U, rule)
-    # with a card, what reads the cel finish by part afterwards (an engine built on it, the post layers) reads the
-    # map that finish painted from
-    sj_e, parts_e = (sj, parts) if st["engine"] in ("paint", "deai", "duotone") else card_map(sj, img, alpha, parts, U)
-    out, out_alpha, info = finish(sj, st, img, alpha, parts, U, a, (sj_e, parts_e))
+    post = list(st.get("post", [])) + ([{"op": "relight", "hour": a.hour}] if a.hour else [])
+    # with a card, the part map its cel finish paints from, mended once: for the finish, for the checks, and for what
+    # reads the cel finish by part afterwards (an engine built on it, the post layers)
+    mended = finish_map(sj, img, alpha, parts, U) if sj.get("recolour") else None
+    sj_e, parts_e = (card_map(sj, img, alpha, parts, U, mended) if mended and (st["engine"] != "cel" or post)
+                     else (sj, parts))
+    out, out_alpha, info = finish(sj, st, img, alpha, parts, U, a, (sj_e, parts_e), mended)
     info.update(guard)
     cel_base = info.pop("_cel", None)               # the cel finish under a print, wash, pixel or pencil engine
     engine_out = out                                # what the checks look at: the finish before the layers over it
-    post = list(st.get("post", [])) + ([{"op": "relight", "hour": a.hour}] if a.hour else [])
     if post:
         if out_alpha.shape != alpha.shape:
             die(f"the {st['engine']} finish changed the picture's size: its post layers cannot be laid over it")
@@ -196,7 +205,7 @@ def main():
     check = {}
     if not a.no_check:
         from _check import review, verdict
-        found, on, shown = run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base)
+        found, on, shown = run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_base, mended)
         rv = Path(a.out).with_suffix(".check.jpg")
         review(*shown, found, rv)
         check = {"check": {"verdict": verdict(found), **({"on": on} if on else {}),
@@ -206,7 +215,7 @@ def main():
                                         for f in found]}}
         if cel_base is not None:
             check["check"]["note"] = "beyond O7 to O9 the engine's own look is not measured: look at the result too"
-        if sj.get("recolour") and st["engine"] != "cel" and cel_base is None:
+        if card_ignored:
             check["check"]["card"] = (f"not applied: the {st['engine']} engine paints the picture's own colours; a "
                                       "colour card needs a cel style or a style built on one")
     emit({"out": a.out, "engine": st["engine"], "style": st.get("id", Path(a.style).stem),

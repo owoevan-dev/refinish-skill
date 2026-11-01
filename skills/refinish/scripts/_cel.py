@@ -23,7 +23,7 @@ from _core import clean_shape, cut_raggedness, ellipse_mask, lab, lab_px, protec
 from _style import follow, kind_of, rule
 
 
-def run(subject, style, img, alpha, parts, U):
+def run(subject, style, img, alpha, parts, U, mended=None):
     h, w = alpha.shape
     within = alpha > 0.5
     plist = subject["parts"]
@@ -40,7 +40,7 @@ def run(subject, style, img, alpha, parts, U):
     touches = []
     touched_eyes = touched_rec = None                    # (what the touches gave an iris; a part the card recoloured)
     if rec or card.get("touch"):
-        parts, kept_drawn, _ = rc_.mend_parts(subject, img, alpha, parts, U, kinds)
+        parts, kept_drawn, _ = mended or rc_.mend_parts(subject, img, alpha, parts, U, kinds)
         touches = rc_.touch_masks(subject, img, alpha, U)
         names = [p["name"] for p in plist]
         to_kind = [kinds[names.index(t["as"]) + 1] if t.get("as") in names else None for _, t in touches]
@@ -138,6 +138,11 @@ def run(subject, style, img, alpha, parts, U):
         if core.sum() < 50 or r.get("model", "part") == "keep" or (src_ is not img and kinds[j] == "eyes"):
             if src_ is not img:
                 out[m] = src_[m]
+            elif p["name"] in rec and kinds[j] != "eyes" and m.any():
+                # a card's part too small for a colour model (a stud, a thin ribbon): its drawing carried onto the
+                # card's colours all the same
+                out[m] = rc_.transfer(img, m, rc_.knots(rec[p["name"]]), keep=0.0)
+                paint_rec |= m
             continue                                   # (keep: a small accessory already drawn in flat cel)
         if r.get("model") == "regions":
             out = _regions(out, src_, m, is_line)
@@ -289,7 +294,8 @@ def run(subject, style, img, alpha, parts, U):
                 # only where the light lies in a broad patch: a few bright strands make no band
                 a_hl = np.clip((sm_ - 0.25) * 2.5, 0, 1) * m * band.get("alpha", 0.5)
                 b = lab_px(base)
-                hl_col = rgb_px([b[0] + band.get("lift", 8.0), b[1], b[2] - 2.0])
+                hl_col = (rgb_px(hl["colour_lab"]) if p["name"] in rec and "colour_lab" in hl
+                          else rgb_px([b[0] + band.get("lift", 8.0), b[1], b[2] - 2.0]))
             layer = layer * (1 - a_hl[..., None]) + hl_col * a_hl[..., None]
         if drawn:
             # most of the way to the flat tones, the lines left as drawn: the source's fine marks (strands, the
@@ -524,13 +530,15 @@ def run(subject, style, img, alpha, parts, U):
         # any other recoloured part reaching into a box (hair over an eye, a clip by it) is painted with its part
         other = rc_.reaching_in(subject, parts, [j for j in rc_.part_index(subject, rec) if kinds[j] != "eyes"],
                                 within & ~is_line, Lv0) | touched_rec
-        # and a feature the card names (a mouth, brows), which lies inside a box by nature: painted with its part, or
-        # the box would put the drawn feature back over it
+        # and a feature the card names (a mouth, brows), which lies inside a box by nature: the box puts it back as
+        # drawn, in the card's colours (its drawing carried onto them, as an iris's)
         in_box_ = rc_.box_fade(subject, h, w) > 0
         for j in rc_.part_index(subject, rec):
             m_ = (parts == j) & within
             if kinds[j] != "eyes" and m_.any() and (m_ & in_box_).sum() > 0.5 * m_.sum():
-                other |= m_
+                src_feat = src_feat.copy() if src_feat is img else src_feat
+                src_feat[m_] = rc_.transfer(img if card.get("grade", "card") == "card" else src_feat, m_,
+                                            rc_.knots(rec[plist[j - 1]["name"]]), keep=0.0)
         if other.any():
             prot = prot * (1 - cv2.GaussianBlur(other.astype(np.float32), (0, 0), 1.0))
     if kept_drawn is not None and kept_drawn.any():

@@ -45,12 +45,8 @@ from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E
 from _lines import find_lines  # noqa: E402
 
 REGIONS_FORMAT = 1
-# a part segmentation's labels (seethrough_parse.py writes 0, then these from 1): --parse
-PARSE_PARTS = ('hair', 'headwear', 'face', 'eyes', 'eyewear', 'ears', 'earwear', 'nose', 'mouth', 'neck', 'neckwear',
-               'topwear', 'handwear', 'bottomwear', 'legwear', 'footwear', 'tail', 'wings', 'objects')
-# and, from 20, an eye split by a promptable segmenter: its iris, its white, its lashes, or the whole eye kept as drawn
-EYE_PARTS = ('iris', 'eye-white', 'lashes', 'eye-kept')
-PARSE = {p: k + 1 for k, p in enumerate(PARSE_PARTS + EYE_PARTS)}
+# a part segmentation's labels (--parse), as seethrough_parse.py writes them
+from _parse_labels import EYE_PARTS, PARSE, PARSE_PARTS  # noqa: E402
 # the review's part colours: Kelly's colours of maximum contrast (Kelly 1965), as RGB, white and black left out
 KELLY = [(242, 243, 244), (243, 195, 0), (135, 86, 146), (243, 132, 0), (161, 202, 241), (190, 0, 50), (194, 178, 128),
          (132, 132, 130), (0, 136, 86), (230, 143, 172), (0, 103, 165), (249, 147, 121), (96, 78, 151), (246, 166, 0),
@@ -798,7 +794,7 @@ def tolerant(px, c):
     return np.sqrt((wl * (px[..., 0] - c[0])) ** 2 + (px[..., 1] - c[1]) ** 2 + (px[..., 2] - c[2]) ** 2)
 
 
-def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None):
+def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None, keep=()):
     """A region that holds points of two or more parts (the line finder missed the outline between them: a print on
     a shirt, a hair clip, a coat and trousers of one navy in a painting with few lines) is split among them by a
     watershed from markers (Beucher and Meyer 1993; computed as an image foresting transform, Falcao et al. 2004):
@@ -806,8 +802,9 @@ def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None)
     parts meet, the boundary falls on the strongest colour edge between them, however soft the shading on either side.
     What is far in colour from every point of the part that flooded it (a material nobody pointed at) is set apart as a
     region of its own for the parts' growth to settle; so is what is far from the points of the only part pointed at
-    in a region (a white collar flap in one region with the navy stripe pointed at on it). Returns the region map and
-    the regions it made (bounded by the watershed and the colour test, not by drawn lines)."""
+    in a region (a white collar flap in one region with the navy stripe pointed at on it). The regions in `keep`, carved
+    before the points (an iris a segmenter split, the mouth), stay whole. Returns the region map and the regions it
+    made (bounded by the watershed and the colour test, not by drawn lines)."""
     pts = {}
     for k, hp in enumerate(hint_parts):
         for x, y in hp.get("at", []):
@@ -820,7 +817,10 @@ def split_by_hints(reg, hint_parts, L, s, far=22.0, inner_margin=8.0, line=None)
     r = max(1, int(round(2 * s)))
     min_area = max(40.0, 60.0 * s * s)
     made = set()
+    keep = set(keep)
     for j, found in pts.items():
+        if j in keep:
+            continue
         ks = sorted({k for k, _, _ in found})
         sl = boxes[j - 1]
         m = reg[sl] == j
@@ -1626,6 +1626,8 @@ def like_parts(parts, ref_path, st, fig):
             p = dict(p, name=best[0], kind=best[1])
         if p["name"] in out:
             out[p["name"]]["regions"] += p["regions"]
+            if not p.get("exact"):
+                out[p["name"]].pop("exact", None)      # (taken whole only while every piece of it was split whole)
         else:
             out[p["name"]] = p
     return list(out.values())
@@ -1677,6 +1679,9 @@ def main():
         if parse is None or parse.shape != within.shape:
             die(f"{a.parse}: not a part map of this picture ({w}x{h}); make it from this picture with "
                 "scripts/seethrough_parse.py")
+        if int(parse.max()) > len(PARSE):
+            die(f"{a.parse}: label {int(parse.max())} is not one a parse writes (0 to {len(PARSE)}): a part map saved "
+                "as a lossy picture (JPEG), or another picture; make it with scripts/seethrough_parse.py, as a PNG")
     face = find_face(L, within, reg, line, fig, s, hints)
     brows = None
     if parse is not None:
@@ -1819,7 +1824,8 @@ def main():
         # see it: found once more over a white ground, near the figure's edge
         edge_d = cv2.distanceTransform(within.astype(np.uint8), cv2.DIST_L2, 3)
         rim = find_lines(img * alpha[..., None] + (1 - alpha[..., None]), a.upscaled) > 0.3
-        reg, soft = split_by_hints(reg, hints["parts"], L, s, line=line | (rim & within & (edge_d < 10 * s)))
+        reg, soft = split_by_hints(reg, hints["parts"], L, s, line=line | (rim & within & (edge_d < 10 * s)),
+                                   keep={i for v in carved.values() for i in v})
         reg, lut = relabel(reg, with_lut=True)
         carved = {k: [int(lut[i]) for i in v if i < len(lut) and lut[i] > 0] for k, v in carved.items()}
         soft = {int(lut[i]) for i in soft if i < len(lut) and lut[i] > 0}
@@ -2025,6 +2031,8 @@ def main():
                         doubts.append(f"region {i} reads as {kind} but was named '{hints['parts'][k]['name']}': "
                                       f"check at [{sl[1].start}, {sl[0].start}, {sl[1].stop}, {sl[0].stop}]")
             parts = [p for p in parts if p["name"] in keep]
+        split_whole = {p["name"]: set(p["regions"]) for p in parts if p.get("exact")}   # (as the parse split them)
+        draft_owner = {i: p for p in parts for i in p["regions"]}
         for p in parts:
             p["regions"] = [i for i in p["regions"] if i not in owner]
         by_name = {p["name"]: p for p in parts}
@@ -2032,6 +2040,17 @@ def main():
             mine = sorted((i for i, o in owner.items() if o == k), key=lambda i: -st["area"][i])
             if hp["name"] in by_name:
                 q = by_name[hp["name"]]
+                stray = [i for i in mine if i not in split_whole.get(q["name"], set(mine))]
+                if q.get("exact") and stray:
+                    # an iris a segmenter split takes no region read by its colours (a lash line under a point at its
+                    # rim would be painted the iris's colour): those go back where the draft had them, or stay in no
+                    # part, as drawn
+                    for i in stray:
+                        if i in draft_owner and draft_owner[i] is not q:
+                            draft_owner[i]["regions"].append(i)
+                    mine = [i for i in mine if i not in stray]
+                    doubts.append(f"a point for '{hp['name']}' lies off the iris the parse split: that eye stays as "
+                                  "split (click it on the parse's sheet to change it)")
                 q["regions"] = mine + q["regions"]
                 q["kind"] = hp.get("kind", q["kind"])
             else:

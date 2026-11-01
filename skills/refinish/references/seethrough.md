@@ -68,13 +68,13 @@ Exit code 0: done. 1: done, with doubtful eyes. 2: a bad input, or a model not f
 
 What `auto_parts.py --parse` takes from it:
 - **The hair and the skin** of the head (the face, the ears and the nose), held: a hint part's growth stops at them, and it takes one of their regions only where one of its points lies (inside its boxes), or with its `within` box. A hint part named `hair` or `skin` adds what its points reach elsewhere.
-- **Each split eye**: its iris becomes the part `irises` (kind `eyes`), taken whole by a colour card, with no colour test to thin it; its white `eye-whites` and its lashes `lashes`, both kept as drawn. An eye kept as drawn becomes `eyes-kept`.
+- **Each split eye**: its iris becomes the part `irises` (kind `eyes`), taken whole by a colour card, with no colour test to thin it (a hint point off the split iris does not add to it: click the eye instead); its white `eye-whites` and its lashes `lashes`, both kept as drawn. An eye kept as drawn becomes `eyes-kept`.
 - **The brows** (what lies above an eye) go with the hair.
 - **Glasses, headwear and earrings** become `eyewear` (kind `metal`), `headwear` and `earwear` (kind `metal`). A hint part of the same name adds to them, its kind replacing theirs.
 - **The mouth**, when the parse has one; otherwise the face finder's.
 - **The eyes' boxes** for the protected face come from the parse; the hints' eye boxes are used when the parse holds no face, and for an eye it missed (read as glasses, or as a brow).
 
-A parse of another picture, or of the picture at another size, is refused.
+A parse of another picture, or of the picture at another size, is refused, and so is one with labels a parse never writes: keep the parse a PNG, since a lossy format such as JPEG changes its labels.
 
 ## Checking the eyes
 
