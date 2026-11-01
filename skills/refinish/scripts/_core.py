@@ -286,15 +286,20 @@ def protect_mask(subject, h, w, img, skin_mask, feather=1.5, parts=None):
         k_box = cv2.dilate(keep[lab_].astype(np.uint8), np.ones((5, 5), np.uint8)).astype(np.float32)
         # faded out toward the box's own edges, so no box shows as a rectangle where what it keeps meets the
         # repainted skin (the lines over the features are laid again by every engine, so their ends are not lost)
-        bh, bw = y1 - y0, x1 - x0
-        mx, my = max(3.0, 0.12 * bw), max(3.0, 0.12 * bh)
-        xs = np.arange(bw, dtype=np.float32)
-        ys = np.arange(bh, dtype=np.float32)
-        rx = np.clip(np.minimum(xs + 0.5, bw - xs - 0.5) / mx, 0, 1)
-        ry = np.clip(np.minimum(ys + 0.5, bh - ys - 0.5) / my, 0, 1)
-        k_box *= np.minimum(ry[:, None], rx[None, :])
+        k_box *= box_ramp(x1 - x0, y1 - y0)
         m[y0:y1, x0:x1] = np.maximum(m[y0:y1, x0:x1], k_box)
     return cv2.GaussianBlur(m, (0, 0), feather) if feather else m
+
+
+def box_ramp(bw, bh):
+    """A protected box's weight, 1 inside and fading to 0 over its outer eighth, so what it keeps meets the repainted
+    picture round it without the box showing as a rectangle."""
+    mx, my = max(3.0, 0.12 * bw), max(3.0, 0.12 * bh)
+    xs = np.arange(bw, dtype=np.float32)
+    ys = np.arange(bh, dtype=np.float32)
+    rx = np.clip(np.minimum(xs + 0.5, bw - xs - 0.5) / mx, 0, 1)
+    ry = np.clip(np.minimum(ys + 0.5, bh - ys - 0.5) / my, 0, 1)
+    return np.minimum(ry[:, None], rx[None, :])
 
 
 def spots(h, w, items, soft=0.7):

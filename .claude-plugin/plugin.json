@@ -26,6 +26,7 @@
     "visual-novel"
   ],
   "skills": [
-    "./skills/refinish"
+    "./skills/refinish",
+    "./skills/recolor"
   ]
 }

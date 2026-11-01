@@ -114,6 +114,10 @@ def run_finish_checks(sj, st, img, alpha, parts, U, engine_out, out_alpha, cel_b
         shown = (engine_out if engine_out.shape[:2] == alpha.shape else np.zeros(alpha.shape + (3,), np.float32), alpha)
     # the engine's own look on its own result: the skin, boxes round the features, mottled darks (O7 to O9)
     found += look_checks(sj, img, alpha, parts, engine_out, U, engine)
+    if sj.get("recolour") and shown[0].shape[:2] == alpha.shape:
+        # a colour card's parts against the card (RC1 to RC3), on what the finish painted
+        from _check import recolour_checks
+        found += recolour_checks(sj, img, alpha, parts, shown[0], U)
     return found, on, shown
 
 

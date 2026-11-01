@@ -86,6 +86,7 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 - **改变时段。** 夜晚和黄昏由白天的颜色在线性光下推算，或者套用电影感的夜景调色。
 - **混合完稿。** `recipe.py` 按部位叠加完稿：衣服用水彩、脸用赛璐璐，或在水彩上以正片叠底叠一层网点。
 - **修复原图。** `repair.py` 修正抠图留下的白边、杂点、线稿断口、越过材质边界的渗色，而且不改画风。
+- **重新配色。** 第二个技能 [Recolor](skills/recolor/SKILL.md) 按色卡给角色换上别的颜色，以赛璐璐完稿呈现：可按部位、按种类或按角色（主色、副色、点缀色）指定，每个颜色的阴影、第二层阴影与高光，都照色彩设计师的做法推导。线条会跟着新颜色走，虹膜也在受保护的脸部范围内换色。部件图分错的地方，在上面点一个点就能修正。
 
 ## 实际表现
 
@@ -124,7 +125,7 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 npx skills add owoevan-dev/refinish-skill
 ```
 
-脚本需要 Python 3.10 及以上版本，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可选）。不需要 GPU、网络，也不用下载模型。
+脚本需要 Python 3.10 及以上版本，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可选）。不需要 GPU、网络，也不用下载模型。只有一个步骤可选：两个分割模型 See-Through 与 SAM 2（均为 Apache-2.0，另行安装，最好有 NVIDIA 显卡）能读出角色的头部，并把眼睛分成虹膜、眼白和睫毛（[seethrough.md](skills/refinish/references/seethrough.md)）。它们只标记像素，不画任何东西。
 
 ## 使用方法
 
@@ -137,6 +138,8 @@ npx skills add owoevan-dev/refinish-skill
 > 把 `street.png` 里的女孩抠出来，改成 90 年代赛璐璐，再放回原位。
 
 > 照 `refs/` 里那几张截图的完稿，套到我的角色上：线条、配色、阴影都要像。也告诉我哪些带不过来。
+
+> 帮她换成银发、红眼、黑外套，做成电视动画赛璐璐风格。
 
 agent 会按 [SKILL.md](skills/refinish/SKILL.md) 的流程：先检查原图、建立主体文件、执行完稿，自己看过结果再交给你。脚本也可以单独使用：
 
@@ -167,6 +170,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 背景、景深和光线包裹 |
 | [style-format.md](skills/refinish/references/style-format.md) | 编写或修改风格文件 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 画风与著作权，以及 Steam 和 pixiv 的要求 |
+| [Recolor 的 SKILL.md](skills/recolor/SKILL.md) | 按色卡给角色换色 |
+| [palette-format.md](skills/recolor/references/palette-format.md) | 色卡格式：条目、匹配方式、推导出的阴影 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | 怎么挑色卡的颜色，以及这些规则的出处 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 用两个分割模型读出头部与眼睛（可选） |
 
 文档正文以英文撰写。
 

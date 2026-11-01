@@ -86,6 +86,7 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 - **시간대 바꾸기.** 밤과 노을은 낮의 색에서 선형 광으로 계산하거나, 영화 같은 야간 색 보정을 적용합니다.
 - **마감 섞기.** `recipe.py`는 부위별로 마감을 겹칩니다. 옷은 수채화, 얼굴은 셀로 하거나, 수채화 위에 스크린톤을 곱하기로 겹치는 식입니다.
 - **원본 고치기.** `repair.py`는 오려 낸 이미지의 테두리 잔상, 잡티, 끊긴 선화, 재료 경계를 넘어 번진 색을 화풍은 그대로 둔 채 고칩니다.
+- **색 바꾸기.** 두 번째 스킬 [Recolor](skills/recolor/SKILL.md)는 컬러 카드에 맞춰 캐릭터의 색을 바꾸고 셀 마감으로 그립니다. 부위별, 종류별, 역할별(메인, 서브, 포인트)로 지정할 수 있고, 각 색의 그림자, 두 번째 그림자, 하이라이트는 색채 설계자의 방식대로 이끌어 냅니다. 선은 새 색을 따라가고, 눈동자는 보호된 얼굴 안에서 색이 바뀝니다. 파트 맵이 잘못 나눈 곳은 그 위의 한 점을 짚어 고칠 수 있습니다.
 
 ## 실제 성능
 
@@ -124,7 +125,7 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 npx skills add owoevan-dev/refinish-skill
 ```
 
-스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). GPU, 네트워크, 모델 다운로드는 필요 없습니다.
+스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). GPU, 네트워크, 모델 다운로드는 필요 없습니다. 선택 단계가 하나 있습니다. 두 분할 모델 See-Through와 SAM 2(둘 다 Apache-2.0, 따로 설치, NVIDIA GPU 권장)가 캐릭터의 머리를 읽고 눈을 홍채, 흰자, 속눈썹으로 나눕니다([seethrough.md](skills/refinish/references/seethrough.md)). 모델은 픽셀에 표시만 할 뿐 아무것도 그리지 않습니다.
 
 ## 사용법
 
@@ -137,6 +138,8 @@ npx skills add owoevan-dev/refinish-skill
 > `street.png`에서 여자아이를 오려 내서 90년대 셀로 바꾸고 원래 자리에 다시 넣어 줘.
 
 > `refs/`에 있는 프레임들의 마감을 내 캐릭터에 맞춰 줘. 선, 색, 그림자까지. 옮겨지지 않는 부분도 알려 줘.
+
+> 은발, 빨간 눈, 검은 코트로 색을 바꿔 줘. TV 애니메이션 셀 마감으로.
 
 에이전트는 [SKILL.md](skills/refinish/SKILL.md)의 절차를 따릅니다. 그림을 검사하고, 서브젝트 파일을 만들고, 마감을 적용한 뒤 결과를 직접 확인하고 나서 보여 줍니다. 스크립트만 따로 써도 됩니다.
 
@@ -167,6 +170,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 배경, 피사계 심도, 라이트 랩 |
 | [style-format.md](skills/refinish/references/style-format.md) | 스타일 파일 작성과 수정 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 화풍과 저작권, Steam과 pixiv의 요구 사항 |
+| [Recolor의 SKILL.md](skills/recolor/SKILL.md) | 컬러 카드로 캐릭터의 색 바꾸기 |
+| [palette-format.md](skills/recolor/references/palette-format.md) | 컬러 카드 형식: 항목, 맞추는 방식, 이끌어 낸 그림자 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | 카드의 색을 고르는 법과 그 규칙의 출처 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 두 분할 모델로 머리와 눈 읽기(선택) |
 
 문서 본문은 영어로 작성되어 있습니다.
 

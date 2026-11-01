@@ -86,6 +86,7 @@ A character drawn into a scene can be cut out first with `cutout.py`. You draw a
 - **Relight.** Night and sunset are worked out from the day colours in linear light, or come from a cinematic night grade.
 - **Mix finishes.** `recipe.py` layers finishes part by part: the clothes in watercolour and the face in cel, or a screentone multiplied over a wash.
 - **Repair the source.** `repair.py` fixes a cut-out's fringe, stray specks, gaps in the line art and colour that ran across a material's edge, without restyling anything.
+- **Recolour.** A second skill, [Recolor](skills/recolor/SKILL.md), gives a character other colours from a colour card, in a cel finish: by part, by kind or by role (main, sub, accent), with each colour's shadow, second shadow and highlight derived the way colour designers turn them. The lines follow the new colours, and the irises are recoloured inside the protected face. A patch the part map got wrong is fixed from a point on it.
 
 ## How well it works
 
@@ -124,7 +125,7 @@ Copy or link `skills/refinish` into your agent's skills folder, or use [skills.s
 npx skills add owoevan-dev/refinish-skill
 ```
 
-The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). No GPU, no network, no model downloads.
+The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). No GPU, no network, no model downloads. One step is optional: two segmentation models, See-Through and SAM 2 (both Apache-2.0, installed apart, best on an NVIDIA GPU), can read a figure's head and split its eyes into iris, white and lashes ([seethrough.md](skills/refinish/references/seethrough.md)). They label pixels and draw nothing.
 
 ## Using it
 
@@ -137,6 +138,8 @@ With the skill installed, ask your agent in plain words:
 > Cut the girl out of `street.png`, give her a 90s cel finish and put her back.
 
 > Match the finish of the frames in `refs/` on my character: the lines, the colours, the shading. Tell me what does not carry over.
+
+> Recolour her with silver hair, red eyes and a black coat, as a TV anime cel.
 
 The agent follows [SKILL.md](skills/refinish/SKILL.md). It checks the picture, makes the subject file, runs the finish, and looks at the result before showing it to you. The scripts also work on their own:
 
@@ -167,6 +170,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | Backgrounds, depth of field and light wrap |
 | [style-format.md](skills/refinish/references/style-format.md) | Writing or changing a style file |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | Style and copyright, and what Steam and pixiv ask for |
+| [Recolor's SKILL.md](skills/recolor/SKILL.md) | Recolouring a character to a colour card |
+| [palette-format.md](skills/recolor/references/palette-format.md) | The colour card: entries, matching, derived shadows |
+| [palette-design.md](skills/recolor/references/palette-design.md) | Choosing a card's colours, and the sources behind the rules |
+| [seethrough.md](skills/refinish/references/seethrough.md) | Reading the head and the eyes with two segmentation models (optional) |
 
 ## Contributing
 

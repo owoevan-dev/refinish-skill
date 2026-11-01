@@ -81,6 +81,9 @@ def main():
         found = (part_map_checks(sj, img, alpha, parts, U, line)
                  + result_checks(sj, img, alpha, parts, out, out_alpha, U, line)
                  + look_checks(sj, img, alpha, parts, out, U, engine))
+        if sj.get("recolour"):                      # a colour card's parts against the card, as refinish.py checks them
+            from _check import recolour_checks
+            found += recolour_checks(sj, img, alpha, parts, out, U)
     elif engine in ("deai", "duotone"):
         found, _, _ = run_finish_checks(sj, st, img, alpha, parts, U, out, out_alpha, None)
     else:

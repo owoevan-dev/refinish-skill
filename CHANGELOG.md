@@ -9,10 +9,27 @@ All notable changes to this project are documented here. The format follows [Kee
 - A Codex listing: the plugin's own manifest (`.codex-plugin/plugin.json`) and marketplace (`.agents/plugins/marketplace.json`) give the plugin page a name, icon, description, website, screenshots, starter prompts and the Creativity category; the skill carries its own name and icons (`agents/openai.yaml`).
 - A display name, Refinish, in Claude's plugin manifest, for the plugin directory and `/plugin`.
 - A privacy statement (`PRIVACY.md`), linked from both plugin manifests: the skill collects, sends and keeps nothing.
+- **A second skill, Recolor** (`skills/recolor`): recolours a character to a colour card in a cel finish, keeping the drawing.
+  - Colour cards (`refinish-palette/1`): colours by part name, for the irises, by kind and by role (main, sub, accent by area); the shadow, second shadow and highlight a card leaves out derived in OkLCh the way colour designers turn shadows (cooler for most materials, warmer for skin, a tint for near-whites); `palette.py apply | derive | board | read` (a card's swatches drawn for approval, a colour card picture's swatches read).
+  - Colour science (`_colour.py`): Oklab and OkLCh, CSS Color 4's gamut mapping (chroma alone, lightness and hue kept), CIEDE2000 checked against Sharma, Wu and Dalal's 34 test pairs.
+  - The cel finish paints a card's parts in its colours exactly: the drawn marks under the flat colour carried onto the card by the part's own lightness; parts kept as drawn (accessories, a patterned garment) carried the same way; the lines round them, and the hair's line over the face, in a dark shade of the new colour; each line and soft edge keeping the ink it held in the source, so a dark outline survives a light new colour (and the styles that draw the source's own lines outline a dark part made light); a strip of a part the part map drew beyond its line painted as the area on its side; the card's highlight on a tenth of the part at most; the irises recoloured inside and outside the protected boxes alike, their catchlights white and an eye part drawn wide over the white or the skin colouring only its iris, of a dark iris part joined to the lash line and the strands round it only its thick round mass in the eye's box (a strip narrower than the iris's own radius stays as drawn), while lashes and whites the part map gave to a recoloured part stay as drawn, as does an eye whose iris it labelled hair.
+  - The part map mended for a card before painting: an iris part's pixels that are the hair over the eye go back to the hair; a recoloured part's small pieces far from its body and inside another part (another thing joined to it by colour alone: gold ornaments to blonde hair) are kept as drawn, unless the card says `"pieces": "paint"`.
+  - Touches after a look (`palette.py apply --touch`, `refinish-touch/1`): a point on a patch in the wrong colour gives the patch to a part, keeps it as drawn or gives it a colour of its own, over every other rule; the report and a preview give each touch's reach. `palette.py zoom` enlarges a box of a result with a grid of its coordinates, to read the points off.
+  - Checks for a card (RC1 a part off its card colour, RC2 a part's old colour left, RC3 the irises, RC4 patches of a left-alone part inside a recoloured one that were drawn like it, RC5 the pieces kept as drawn); the pure-black check O6 and the frame-edge check O3 know a part the card made dark.
+  - Without a card, every cel style's output is unchanged, byte for byte.
+- **A head read by models** (optional; `seethrough_parse.py`, `references/seethrough.md`):
+  - See-Through's part segmentation reads a figure's hair, face, eyes, mouth, glasses, headwear and earrings, the head read a second time cut out and enlarged;
+  - SAM 2 splits each eye into its iris, its white and its lashes, clicked where the eye's own tones put the iris (the click goes to the middle of what is like neither the white nor the lashes, as Iris-SAM prompts a segmenter for the iris); an 'eye' the model reads below the nose (a laughing mouth) is given to the mouth; an eye whose split looks wrong by its proportions is reported and left to the colours; a review sheet shows every eye beside its split; clicks fix an eye or keep it as drawn (`refinish-eyes/1`);
+  - `auto_parts.py --parse` takes the head's hair and skin, the brows, glasses, headwear and earrings from the parse, the whites and lashes as drawn, and each iris as the part `irises`, taken whole by a card and the checks (`exact`), with no colour test to thin it;
+  - neither model ships with the skill: both are Apache-2.0, installed apart from official sources, best on an NVIDIA GPU; without them, the colours read the head as before.
 
 ### Changed
 
 - Step 0 of SKILL.md installs `opencv-python-headless` on a server or in a sandbox, where `opencv-python` can fail to import for want of graphics libraries.
+
+### Fixed
+
+- Hints that name every part (`complete`) and give one the name of a part the draft carved before the points (`irises`, `eye-whites`, `mouth`, `black-masses`) add to that part; they used to drop it, leaving its regions in no part.
 
 ## [0.1.0] - 2026-10-30
 

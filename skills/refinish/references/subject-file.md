@@ -26,7 +26,7 @@ A subject file describes one picture: where its parts are and which features are
 | `upscaled` | how many times the picture was enlarged: the line finder looks that many times wider |
 | `head_px` | the head's height (crown to chin) in pixels, for a figure the frame cuts off (a bust, a reference still): the unit is then taken as seven heads, not the visible height, so a close-up and a full figure are measured alike |
 | `families` | colour families: a few sample points each, covering its lit and its shaded tones |
-| `parts` | `name`, `family`, `kind` (references/style-format.md), and where the part may be: `poly` or `polys`; `only_placed` keeps a family's pixels outside the polygon from going to that part; `exclusive` gives the part every pixel inside its polygons whatever their colour (a dark iris the colour of the dark hair round it: draw the polygon tightly round the iris) |
+| `parts` | `name`, `family`, `kind` (references/style-format.md), and where the part may be: `poly` or `polys`; `only_placed` keeps a family's pixels outside the polygon from going to that part; `exclusive` gives the part every pixel inside its polygons whatever their colour (a dark iris the colour of the dark hair round it: draw the polygon tightly round the iris); `exact`, on an iris part a segmenter split (`auto_parts.py --parse`), takes the part whole, with no test of its colour to thin it |
 | `protect` | boxes round the eyes and the mouth: inside, everything not skin is kept as drawn; `de` lowers the colour step for faint features (a closed smile: 6) |
 | `focal` | ellipses where detail matters most (the face, a raised hand): more lines kept, finer paint |
 | `blush` | [x, y, rx, ry] spots for the style's blush |
@@ -44,6 +44,7 @@ Most pictures need no hand-placed samples. The reviewer (the agent running the s
      - `<subject>.auto.jpg`: every part in false colour, every region numbered;
      - `<subject>.face.jpg`: the face enlarged;
      - `<subject>.sheet.jpg`: every part on its own, in its own colours.
+   - With `--parse parse.png`, a head read by two segmentation models ([seethrough.md](seethrough.md)), the head's hair and skin, the eyes split into iris, white and lashes, the brows, glasses, headwear and earrings come from the parse instead of the colours. The body's parts are found as before.
 2. Look at the picture itself (`scripts/zoom.py image.png 0,0,W,H all.jpg --step 100`) and list its materials: every material that should take its own colours is a part. Watch for the easy ones to miss:
    - the white frills of a petticoat under a coloured skirt;
    - a lining, and the inside of an open jacket in shadow: it belongs to the jacket, not to what is under it;
@@ -138,7 +139,7 @@ Two rounds of hints settle most clean cel pictures. When a third round would onl
 1. **Ask for one sentence.** Show the person the parts sheet and ask what is wrong, in their words (step 4 above). A sentence about the picture is surer than another round of points read off a grid.
 2. **Name fewer, larger parts.** Black on black, white on white and two materials of one colour are told apart only by the lines between them. Where those lines are faint, one part painted from one colour model looks better than two that trade pixels along a guessed border.
 3. **One part for a dense pattern.** A garment of many small motifs is one part with the rule `"model": "regions"`, so each region its lines enclose keeps its own flat colour.
-4. **Eyes the face reading missed.** When the draft reads no eyes (glasses, closed eyes, a stylised eye), the eye boxes given are used as they are, so draw them tightly round each eye. An iris that still lands in the skin or the hair moves with their colours; check P2 says so. Give it a part of its own, of kind `eyes`, with a point on the iris and a tight box.
+4. **Eyes the face reading missed.** When the draft reads no eyes (glasses, closed eyes, a stylised eye), the eye boxes given are used as they are, so draw them tightly round each eye. An iris that still lands in the skin or the hair moves with their colours; check P2 says so. Give it a part of its own, of kind `eyes`, with a point on the iris and a tight box. Where See-Through and SAM 2 are installed, read the head with them instead ([seethrough.md](seethrough.md)): they find the eyes behind glasses and split a pale iris from its white.
 5. **Finish only the parts that are right.** A recipe with `"base": "source"` re-finishes the parts its layers name and leaves the rest of the picture as drawn ([recipes.md](recipes.md)).
 6. **Use a finish that needs no parts.** The de-AI and duotone styles run on the draft as it is.
 7. **Start from a source that can be split.** Soft airbrushed shading and an outline missing on the lit side are made at generation, and no hint repairs them. `scripts/check_input.py` grades both. Where the picture can be generated again, [source-spec.md](source-spec.md) says what to ask for.

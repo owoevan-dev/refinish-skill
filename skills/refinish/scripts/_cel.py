@@ -18,6 +18,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 import _lines as ln_
+import _recolour as rc_
 from _core import clean_shape, cut_raggedness, ellipse_mask, lab, lab_px, protect_mask, rgb, rgb_px, spots, tone_cuts
 from _style import follow, kind_of, rule
 
@@ -31,10 +32,31 @@ def run(subject, style, img, alpha, parts, U):
     def of_kind(k):
         return np.isin(parts, [j for j, kk in enumerate(kinds) if j > 0 and kk == k])
 
+    # a colour card (palette.py apply): its parts' colour models are in the rules already; here, what else it asks.
+    # First the part map's mistakes a recolour would paint, mended for it (_recolour.mend_parts)
+    card = subject.get("recolour") or {}
+    rec = rc_.recoloured(subject)
+    kept_drawn = None
+    touches = []
+    touched_eyes = touched_rec = None                    # (what the touches gave an iris; a part the card recoloured)
+    if rec:
+        parts, kept_drawn, _ = rc_.mend_parts(subject, img, alpha, parts, U, kinds)
+        touches = rc_.touch_masks(subject, img, alpha, U)
+        names = [p["name"] for p in plist]
+        to_kind = [kinds[names.index(t["as"]) + 1] if "as" in t else None for _, t in touches]
+        touched_eyes = np.zeros((h, w), bool)
+        touched_rec = np.zeros((h, w), bool)
+        for (m_, t), k in zip(touches, to_kind):
+            if k == "eyes":
+                touched_eyes |= m_
+            elif k is not None and t["as"] in rec:
+                touched_rec |= m_
     skin = of_kind("skin")
     prot = protect_mask(subject, h, w, img, skin, parts=parts)
     face = ellipse_mask(h, w, subject.get("focal", [])) > 0.5
     drawn_default = follow(style, subject) == "drawn"
+    rec_mask = np.isin(parts, rc_.part_index(subject, rec)) & within if rec else None
+    follow_lines = bool(rec) and card.get("lines", "follow") == "follow"
 
     # ---- the line art worth keeping ---------------------------------------------------------------------------------
     lines = style.get("lines", {})
@@ -52,20 +74,73 @@ def run(subject, style, img, alpha, parts, U):
         by_part = [(of_kind(k), U.area(a)) for k, a in keep.get("kinds", {}).items()]
     L_keep = ln_.keep_lines(L_line, min_area, reach, by_part, always=face & skin)
     is_line = L_line > 0.3
+    rec_in = [j for j in rc_.part_index(subject, rec) if kinds[j] != "eyes"] if rec else []
+    # an eye whose iris the part map gave to the hair or the clothes (P2) is left as drawn: its iris cannot be told
+    # from the lashes and the hair round it, and half an iris recoloured is worse than none (RC3 reports it)
+    eye_ok = np.ones((h, w), bool)
+    Lv0 = eyes_new = None
+    if rec:
+        Lab0 = lab(img)
+        Lv0 = Lab0[..., 0]
+        for x0, y0, x1, y1 in rc_.mislabelled_irises(subject, Lab0, within, parts, kinds, skin & within):
+            eye_ok[max(0, y0):max(0, y1), max(0, x0):max(0, x1)] = False
+        # the irises the card recolours, once for inside the protected boxes and out: their drawing carried onto the
+        # card's colours (a gradient map from the iris's own lightness to the card's knots), a catchlight left white.
+        # The iris alone (_recolour.iris_core): a lash's tail or a strand the part map joined to it stays as drawn;
+        # what a touch gave the iris is the iris's (a pale reflection in it the part map gave to the skin)
+        eyes_new = img.copy()
+        sk = skin & within
+        iris_px = (eye_ok & rc_.iris_like(Lab0, np.median(Lab0[sk], axis=0) if sk.sum() > 50 else None)) | touched_eyes
+        iris_m = {}
+        for j, p in enumerate(plist, start=1):
+            if p["name"] in rec and kinds[j] == "eyes":
+                if p.get("exact"):
+                    # an iris a segmenter split (auto_parts.py --parse): taken whole, its pale patches the iris's
+                    m_ = (parts == j) & within & ~kept_drawn
+                else:
+                    m_ = ((rc_.iris_core(subject, (parts == j) & within & iris_px) | ((parts == j) & touched_eyes))
+                          & ~kept_drawn)
+                if m_.sum() > 10:
+                    iris_m[j] = m_
+                    eyes_new[m_] = rc_.transfer(img, m_, rc_.knots(rec[p["name"]]), white_keep=True)
+    if rec_in:
+        # the boxes give up hair and cloth reaching in across their edges; with a card, only what truly reaches in (a
+        # part's fill joined to its fill outside, not across a line). A lash, a white of the eye, an iris the part map
+        # gave to a recoloured part only inside a box is the feature's own drawing, kept as drawn: painted with that
+        # part's new colours it would turn pink lashes or yellow eye whites
+        fade = rc_.box_fade(subject, h, w)
+        stray = (np.isin(parts, rec_in) & within & (fade > 0) & ~touched_rec
+                 & ~rc_.reaching_in(subject, parts, rec_in, within & ~is_line, Lv0))
+        if stray.any():
+            prot = np.maximum(prot, cv2.GaussianBlur(stray.astype(np.float32), (0, 0), 1.0) * fade)
 
     # ---- each part painted from its colour model ----------------------------------------------------------------------
     Lv = lab(img)[..., 0] / 100.0
     out = img.copy()
     model = {}
     smoothed = {}
+    paint_rec = np.zeros((h, w), bool)                 # (a card's parts painted from their colour models)
+    sl_all = np.zeros((h, w), bool)                    # (and the strips of them beyond their lines, given away)
     for j, p in enumerate(plist, start=1):
         r = rule(style, subject, p)
         m = (parts == j) & within
         core = m & ~is_line
-        if core.sum() < 50 or r.get("model", "part") == "keep":
+        src_ = img
+        if p["name"] in rec and r.get("model", "part") in ("keep", "regions"):
+            # a card's part the finish keeps as drawn: its own drawing carried onto the card's colours (a pattern's
+            # tones onto the card's tones). An iris goes as the protected boxes paste it, not painted flat region by
+            # region: the two would meet at the box's edge as a square patch
+            if kinds[j] == "eyes":
+                src_ = eyes_new
+            else:
+                src_ = img.copy()
+                src_[m] = rc_.transfer(img, m, rc_.knots(rec[p["name"]]), keep=0.0)
+        if core.sum() < 50 or r.get("model", "part") == "keep" or (src_ is not img and kinds[j] == "eyes"):
+            if src_ is not img:
+                out[m] = src_[m]
             continue                                   # (keep: a small accessory already drawn in flat cel)
         if r.get("model") == "regions":
-            out = _regions(out, img, m, is_line)
+            out = _regions(out, src_, m, is_line)
             continue
         drawn = r.get("follow", "drawn") == "drawn"
         minor = None                                   # (the few light patches of a dark part, when they are wear)
@@ -160,6 +235,11 @@ def run(subject, style, img, alpha, parts, U):
                     if tones >= 3 else -1.0)
             t_hl = np.percentile(Lv[core], 100 * (1 - hl.get("share", 0.06))) if hl_mode != "none" else 2.0
             Lh = Lv
+        if p["name"] in rec and hl_mode != "none":
+            # a card's highlight is the light on the material (the ring of light on hair), a small part of it: a source
+            # drawn light (white hair) has a lit side as wide as its lightest tone, which in the card's colours would
+            # read as a second material
+            t_hl = max(t_hl, float(np.percentile(Lh[core], 100 * (1 - rc_.HIGHLIGHT_SHARE))))
         mid = core & (Lf >= t_sh) & (Lh <= t_hl)
         if minor is not None:
             mid &= ~minor
@@ -216,13 +296,44 @@ def run(subject, style, img, alpha, parts, U):
             # bangs' tips) stay under the flat colour instead of being painted out
             hd = r.get("harden", 0.85)
             sel = m & ~is_line
-            out[sel] = img[sel] + hd * (layer[sel] - img[sel])
+            under = img
+            if p["name"] in rec:
+                # a card's part: the marks left under the flat colour are its own drawing carried onto the card (their
+                # lightness kept, the old hue gone), or the old colour would show through in every one of them
+                under = img.copy()
+                under[m] = rc_.transfer(img, m, rc_.knots(rec[p["name"]], ("deep", "shadow", "base") + (
+                    ("highlight",) if hl_mode != "none" else ())), keep=0.0)
+            out[sel] = under[sel] + hd * (layer[sel] - under[sel])
         else:
             out[m] = layer[m]
+        if p["name"] in rec:
+            paint_rec |= m
         model[p["name"]] = {"kind": kinds[j], "base": [round(float(v) * 255) for v in base],
                             "shadow": [round(float(v) * 255) for v in shade]}
         if tones >= 3:
             model[p["name"]]["deep"] = [round(float(v) * 255) for v in deep]
+
+    if rec:
+        # under the lines of a card's painted parts, and on the cut-out's soft edge beside them: the ink each pixel held
+        # in the source over the part's new fill. A line is laid again over what is beneath it with soft edges (and
+        # where the source's own line was too faint to find, at a boundary between a dark part and a light one, what
+        # is beneath it is all of the line); the old fill there would show as a rim, a strand of hair drawn all in
+        # line out on the cheek in the skin's colour, and a dark outline lost under a light new fill
+        ink_L = rc_.ink_lightness(img, L_line, within)
+        fill_src = rc_.fill_round(img, L_line, within, U.len(1.5))
+        # a strip of a part beyond the line that bounds it belongs to the area on its side
+        sl = rc_.slivers(parts, rc_.part_index(subject, rec), within, is_line, U)
+        for m_ in sl.values():
+            sl_all |= m_
+        for j, m_ in sl.items():
+            out[m_] = rc_.nearest_colour(out, within & ~is_line & ~sl_all & (parts != j))[m_]
+        for j in rc_.part_index(subject, rec):
+            ln_m = paint_rec & is_line & (parts == j)
+            own = (parts == j) & within & ~is_line & ~sl_all
+            if ln_m.any():
+                fill_new = rc_.nearest_colour(out, own if own.any() else within & ~is_line)
+                out[ln_m] = rc_.ink_over(img, fill_src, fill_new, ln_m, ink_L)
+        out = rc_.fringe(out, img, alpha, within, rec_mask, is_line, fill_src, ink_L)
 
     # ---- cast shadows: one part's shadow on another (the fringe's on the brow, a side lock's on the cheek) -------------
     for c in style.get("touches", {}).get("cast", []):
@@ -269,6 +380,11 @@ def run(subject, style, img, alpha, parts, U):
             L0, keep = ease
             t = np.clip((f[..., 0] - L0) / max(1.0, 100.0 - L0), 0, 1)
             maps["chroma"] = 1.0 + (maps["chroma"] - 1.0) * (1.0 - t * (1.0 - keep))
+        if rec and card.get("grade", "card") == "card":
+            # a card's colours are the colour designer's: the style's grade passes them by (eased at their borders)
+            mb = cv2.GaussianBlur(rec_mask.astype(np.float32), (0, 0), U.len(0.5))
+            for key, neutral in (("contrast", 1.0), ("lift", 0.0), ("chroma", 1.0)):
+                maps[key] = maps[key] * (1 - mb) + neutral * mb
         pv = pal.get("pivot", 50)
         f[..., 0] = pv + (f[..., 0] - pv) * maps["contrast"] + maps["lift"]
         f = _boost_chroma(f, maps["chroma"], within)
@@ -307,9 +423,18 @@ def run(subject, style, img, alpha, parts, U):
     strength = lines.get("strength", 1.0)
     outer = lines.get("outer", {})
     thicken, band = U.len(outer.get("thicken", 0.0)), U.len(outer.get("band", 1.67))
+    painted = out
+    line_src = img
+    if follow_lines:
+        # a recoloured part's lines are a dark shade of its new colour (色トレス), not of the one it was drawn in
+        k_ = 2 * max(1, int(round(U.len(1.5)))) + 1
+        sm_ = cv2.GaussianBlur(cv2.dilate(rec_mask.astype(np.uint8), np.ones((k_, k_), np.uint8)).astype(np.float32),
+                               (0, 0), U.len(0.5))[..., None]
+        # (the lines' own pixels still hold the old drawing: the colour round each line, its new fill, stands in)
+        line_src = img * (1 - sm_) + ln_.fill_under(out, L_line) * sm_
     if mode == "own":
         own = lines.get("own", {})
-        out = ln_.lay_own(out, img, L_new, within, strength, own.get("L", 16.0), own.get("chroma", 0.9),
+        out = ln_.lay_own(out, line_src, L_new, within, strength, own.get("L", 16.0), own.get("chroma", 0.9),
                           own.get("gap", 9.0))
     elif mode == "ink":
         ink = lines.get("ink", {})
@@ -330,6 +455,13 @@ def run(subject, style, img, alpha, parts, U):
         if ol:                                         # the closed outline, in the same ink
             a_ol = np.clip(ln_.closed_outline(alpha, U.len(ol.get("width", 1.0)), ol.get("smooth", 3)), 0, 1)
             out = out * (1 - a_ol[..., None]) + col * a_ol[..., None]
+        elif follow_lines:
+            # a dark part's edge needs no line: its own dark fill is the edge. Recoloured light, it does, or it melts
+            # into what lies behind it: the outline its dark fill made unneeded, in the same ink, along its silhouette
+            dark = rec_mask & (lab(img)[..., 0] < 40)
+            a_ol = np.clip(ln_.closed_outline(alpha, U.len(1.0), 3), 0, 1) * cv2.GaussianBlur(
+                cv2.dilate(dark.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(np.float32), (0, 0), 1.0)
+            out = out * (1 - a_ol[..., None]) + col * a_ol[..., None]
     elif mode == "trace":
         tr = lines.get("trace", {})
         base_kw = {k: tr[k] for k in ("dark", "cap", "chroma", "neutral_bias") if k in tr}
@@ -341,6 +473,27 @@ def run(subject, style, img, alpha, parts, U):
         out = out_t
     else:
         raise ValueError(f"lines.colour must be own, ink, trace or drawn, not {mode!r}")
+    if follow_lines and mode in ("own", "trace"):
+        # recoloured hair takes its lines along: the line between hair and skin is the hair's (the hair lies over
+        # the face), and so is a strand drawn as a line across the face
+        hair_rec = of_kind("hair") & rec_mask
+        mine = rc_.hair_lines(L_new, hair_rec, prot, U) if hair_rec.any() else None
+        if mine is not None and mine.any():
+            fill_h = hair_rec & ~is_line & ~sl_all      # (the hair's own fill: not its lines, nor strips given away)
+            near = rc_.nearest_colour(painted, fill_h if fill_h.any() else hair_rec)
+            if mode == "own":
+                own = lines.get("own", {})
+                f_ = lab(near)
+                f_[..., 0] = own.get("L", 16.0)
+                f_[..., 1:] *= own.get("chroma", 0.9)
+                col_h = rgb(f_)
+            else:
+                tr = lines.get("trace", {})
+                kw = {**{k: tr[k] for k in ("dark", "cap", "chroma", "neutral_bias") if k in tr},
+                      **tr.get("kinds", {}).get("hair", {})}
+                col_h = ln_.trace_colour(ln_.fill_under(near, L_new), **kw)
+            a_h = (ln_.alpha_of(L_new, strength) * cv2.GaussianBlur(mine.astype(np.float32), (0, 0), 0.6))[..., None]
+            out = out * (1 - a_h) + col_h * a_h
 
     # the face's own features as drawn, in the style's colours for them if it has any (a colour model moved from
     # night to day takes the eyes along); a fine grain if the style has one (a film's, a print's)
@@ -361,7 +514,27 @@ def run(subject, style, img, alpha, parts, U):
         hair_m = of_kind("hair").astype(np.float32)
         if hair_m.any():
             prot = prot * (1 - cv2.GaussianBlur(hair_m, (0, 0), 1.0))
+    if rec:
+        # the irises a card recoloured, as painted outside the boxes (the card's colours exactly); under the style's
+        # grade (`grade: style`) carried from the features as the style colours them
+        for j, m_ in iris_m.items():
+            src_feat = src_feat.copy() if src_feat is img else src_feat
+            src_feat[m_] = (eyes_new[m_] if card.get("grade", "card") == "card" else
+                            rc_.transfer(src_feat, m_, rc_.knots(rec[plist[j - 1]["name"]]), white_keep=True))
+        # any other recoloured part reaching into a box (hair over an eye, a clip by it) is painted with its part
+        other = rc_.reaching_in(subject, parts, [j for j in rc_.part_index(subject, rec) if kinds[j] != "eyes"],
+                                within & ~is_line, Lv0) | touched_rec
+        if other.any():
+            prot = prot * (1 - cv2.GaussianBlur(other.astype(np.float32), (0, 0), 1.0))
+        if kept_drawn.any():
+            # the pieces the part map joined to a recoloured part by colour alone, and what a touch keeps or paints
+            # in its own colour, as drawn (mend_parts)
+            out[kept_drawn] = img[kept_drawn]
     out = out * (1 - prot[..., None]) + src_feat * prot[..., None]
+    for m_, t in touches:
+        if "to" in t and m_.any():
+            # a touch's own colour (`to`): its drawing carried onto the colour, as an iris is, inside a box too
+            out[m_] = rc_.transfer(img, m_, rc_.knots(t["to"]), white_keep=True)
     gr = style.get("texture", {}).get("grain", 0.0)
     if gr > 0:
         rng = np.random.default_rng(style.get("seed", 7))

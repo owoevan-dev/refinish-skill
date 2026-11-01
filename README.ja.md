@@ -86,6 +86,7 @@ Refinish は、手元にあるイラストを仕上げ直すための [Agent Ski
 - **時間帯を変える。** 夜と夕方は、昼の色からリニアな光で求めるか、映画的な夜のグレーディングを使います。
 - **仕上げを混ぜる。** `recipe.py` はパーツごとに仕上げを重ねます。服は水彩で顔はセル、あるいは水彩の上にスクリーントーンを乗算で重ねる、といった具合です。
 - **元の絵を直す。** `repair.py` は、切り抜きのフチ、細かなゴミ、線画の途切れ、素材の境界を越えてにじんだ色を、画風を変えずに直します。
+- **色替え。** もう一つのスキル [Recolor](skills/recolor/SKILL.md) は、カラーカードに沿ってキャラクターの色を替え、セル仕上げで描きます。部位ごと、種類ごと、役割（メイン、サブ、アクセント）ごとに指定でき、各色の影・2号影・ハイライトは色彩設計の考え方で導きます。線は新しい色に合わせ、瞳は守られた顔の中で色を替えます。部位分けを誤った箇所は、その上の一点を指して直せます。
 
 ## どこまでできるか
 
@@ -124,7 +125,7 @@ Refinish は、手元にあるイラストを仕上げ直すための [Agent Ski
 npx skills add owoevan-dev/refinish-skill
 ```
 
-スクリプトには Python 3.10 以降と `numpy`、`opencv-python`、`scipy` が必要です（`Pillow` は任意）。GPU もネットワークも、モデルのダウンロードも要りません。
+スクリプトには Python 3.10 以降と `numpy`、`opencv-python`、`scipy` が必要です（`Pillow` は任意）。GPU もネットワークも、モデルのダウンロードも要りません。任意の手順が一つだけあります。二つのセグメンテーションモデル、See-Through と SAM 2（どちらも Apache-2.0、別途インストール、NVIDIA の GPU 推奨）が、キャラクターの頭部を読み取り、目を虹彩・白目・まつ毛に分けます（[seethrough.md](skills/refinish/references/seethrough.md)）。モデルは画素に印を付けるだけで、何も描きません。
 
 ## 使い方
 
@@ -137,6 +138,8 @@ npx skills add owoevan-dev/refinish-skill
 > `street.png` の女の子を切り抜いて、90 年代のセルにして、元の場所に戻して。
 
 > `refs/` のフレームの仕上げを、私のキャラクターに合わせて。線、色、影まで。移せないところも教えて。
+
+> 銀髪、赤い瞳、黒いコートに色替えして。TVアニメのセル仕上げで。
 
 エージェントは [SKILL.md](skills/refinish/SKILL.md) の手順に沿って、画像をチェックし、サブジェクトファイルを作り、仕上げを実行し、結果を自分で確認してからお見せします。スクリプトは単体でも使えます。
 
@@ -167,6 +170,10 @@ python skills/refinish/scripts/refinish.py subject.json tv-cel out.png
 | [compositing.md](skills/refinish/references/compositing.md) | 背景、被写界深度、ライトラップ |
 | [style-format.md](skills/refinish/references/style-format.md) | スタイルファイルの書き方と変え方 |
 | [legal-and-disclosure.md](skills/refinish/references/legal-and-disclosure.md) | 画風と著作権、Steam と pixiv で求められること |
+| [Recolor の SKILL.md](skills/recolor/SKILL.md) | カラーカードでキャラクターの色を替える |
+| [palette-format.md](skills/recolor/references/palette-format.md) | カラーカードの形式：項目、当てはめ方、導かれる影 |
+| [palette-design.md](skills/recolor/references/palette-design.md) | カードの色の選び方と、その規則の出典 |
+| [seethrough.md](skills/refinish/references/seethrough.md) | 二つのセグメンテーションモデルで頭部と目を読み取る（任意） |
 
 ドキュメント本体は英語で書かれています。
 

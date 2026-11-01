@@ -2,7 +2,7 @@
 name: refinish
 description: "Re-finishes an existing character picture or background in another style by code, never by regenerating it: the drawing stays, only the finish changes. 37 styles: TV anime cel and its heavy, bold-ink, film, night, sunset, pastel, 90s variants; a cleaner de-AI finish; duotone, sepia, cyanotype, risograph; watercolour, gouache, thick paint; manga screentone, key drawing, screen print; ink wash, woodblock, pop art, neon, stained glass, paper cut, charcoal, pastel, stickers; pixel sprites; landscapes. Also matches the finish of reference pictures by measurement, tweaks a style from words ('softer shadows'), relights for night or sunset, mixes finishes by part, cuts out figures and composites them into scenes. Use it whenever the user wants a picture in a technique's style, an anime look, a less AI-looking finish, a manga, watercolour, woodblock, pixel or retro version, a night version, consistent sprites or a figure in a scene, even if they only say 'make this look hand-drawn' or 'it looks too AI'."
 license: MIT
-compatibility: Python 3.10+ with numpy, opencv-python and scipy (Pillow optional, for reading PNG notes). No image model, no network, no GPU.
+compatibility: Python 3.10+ with numpy, opencv-python and scipy (Pillow optional, for reading PNG notes). No image model, no network, no GPU. Two optional segmentation models (See-Through, SAM 2), installed apart and best on an NVIDIA GPU, can read a figure's head and eyes (references/seethrough.md).
 metadata:
   author: "owoevan-dev"
   version: "0.1.0"
@@ -56,6 +56,7 @@ A subject file says what each part of the picture is (skin, hair, each garment) 
   - boxes round the eyes and the mouth.
 
   Then run `auto_parts.py --hints` again. Two rounds settle most pictures. When they do not, change the approach rather than the points: [subject-file.md](references/subject-file.md), "When the parts will not come right", lists what to try.
+- **A head the colours misread** (an iris taken for the white or the hair, glasses, hair across the face), or any recolour: when See-Through and SAM 2 are installed, `scripts/seethrough_parse.py IMAGE.png parse.png` reads the head's parts and splits each eye into iris, white and lashes. Look at every eye on its sheet (`parse.eyes.jpg`), click the wrong ones, then give `--parse parse.png` to `auto_parts.py` beside the hints. Install, licences, the click file and the limits: [references/seethrough.md](references/seethrough.md). Without the models, the colours read the head as before.
 - **Backgrounds**: `python scripts/scene_subject.py IMAGE.png subject.json` finds the scene's areas by colour and guesses their kinds (sky, far hills, foliage, ground, ...). A painted background takes `deai-light` or a scene style, not a cel style: flat tones break its gradients into blotches (presets.md, Scenes).
 - **No parts needed**: the de-AI and duotone styles run on the draft as it is.
 
@@ -182,7 +183,8 @@ All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check
 | `cutout.py PICTURE.png OUTLINE.json OUT_DIR [--trimap T.png]` | cut a figure out of a picture with a background |
 | `prep.py SRC.png OUT.png [--scale 2]` | crop to the figure and enlarge; `--restore SRC.png --box B` puts a finish back on the source's canvas |
 | `check_input.py PICTURE.png \| SUBJECT.json` | grade a source |
-| `auto_parts.py IMAGE.png SUBJECT.json [--hints H.json]` | the subject file for a figure, with its parts sheet |
+| `auto_parts.py IMAGE.png SUBJECT.json [--hints H.json] [--parse P.png]` | the subject file for a figure, with its parts sheet |
+| `seethrough_parse.py IMAGE.png PARSE.png [--eyes E.json]` | optional: the head's parts and each eye's iris, white and lashes, read by two segmentation models (run with their environment's Python; references/seethrough.md) |
 | `hints.py check \| points \| pick` | check hint points, turn region numbers into points, pick a point in a colour |
 | `scene_subject.py IMAGE.png SUBJECT.json` | the subject file for a background |
 | `parts.py SUBJECT.json` | rebuild and check a part map |

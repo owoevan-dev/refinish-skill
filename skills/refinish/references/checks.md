@@ -9,7 +9,7 @@
 | check | level | what it finds | usual cause | fix |
 |---|---|---|---|---|
 | P1 | WARN | a thick blob much darker or lighter than the rest of its part | a misfit in the part map (a dark lock labelled skin) | a hint point, or a sample |
-| P2 | WARN | the middle of an eye's box labelled hair or cloth | an iris as dark as the hair, read as hair | give the irises a part of kind `eyes` |
+| P2 | WARN | the middle of an eye's box labelled hair or cloth (with a colour card, on the part map as the finish mended it, touches included) | an iris as dark as the hair, read as hair | give the irises a part of kind `eyes` |
 | M1 | FAIL (WARN when near-white or near-black) | a patch inside a part with the colour of a part beside it and none of its own | a piece of one part labelled as another (a neck read as the gold collar beside it, a waistband read as the jacket) | move its region, or add a hint point |
 | O1 | FAIL | a patch kept as drawn while the rest of its part changed | a protected box keeping hair or cloth, or a region left out of its part | tighten the box, or give the region its part |
 | O2 | FAIL | the white of an eye painted as skin | eye whites a few steps from the skin's colour | give the whites a part of kind `eyes` |
@@ -20,10 +20,16 @@
 | O7 | FAIL (WARN for a light skin) | a darker skin printed far lighter, or a light one far darker than the rest of the figure | a style's skin convention applied to every skin | adjusting.md, "Skin painted another colour" |
 | O8 | FAIL | the face's tone stepping along a protected box's straight edge | a feature kept or inked by a fixed level against a skin repainted round it | a tighter box, or the box's `de` (adjusting.md) |
 | O9 | WARN | a dark part broken into patches far more than in the source | a texture or a wash's drift on a dark area | the engine's texture settings (adjusting.md) |
+| RC1 | FAIL over 6 (WARN over 3) | a colour card's part painted far from its card colour (CIEDE2000, the part's lit tone) | the part holds another material, its tones split between two | fix the part map |
+| RC2 | FAIL | a patch of a card's part still in its old colour | a line or fleck the part map gave to another part, a box keeping it | fix the part map; look at the boxed place |
+| RC3 | FAIL | an iris off the card's iris hue by over 25 degrees, or the two eyes over 10 apart | the iris labelled hair or cloth (that eye is left as drawn), or part of it labelled skin | give the irises a part of kind `eyes` |
+| RC4 | WARN | patches of a part the card left alone, lying inside a part it recoloured, drawn like it (within 15 of its colour in the source) and now standing out from it | a piece of the recoloured part given to its neighbour (a cream shirt's light folds read as pale skin) | give the patches to the recoloured part (a hint point), or name their part on the card |
+| RC5 | WARN | small pieces of a recoloured part far from its body, lying inside one other part, kept as drawn by the finish | another thing joined to the part by colour alone (gold ornaments to blonde hair, silver buckles to silver hair) | nothing when they are another thing; when they are the part's own (a strap cut off by an arm), `"pieces": "paint"` in its card entry |
 
 **Where the checks run:**
 - P1 to O6 run on the cel or paint finish. For an engine built on a cel finish (print, woodblock, wash, pencil, pixel, tone, pop, glass, paper cut, drawing, sticker, neon), they run on that cel base.
 - O7 to O9 run on every engine's own result, the duotones included.
+- RC1 to RC5 run when the subject carries a colour card (the Recolor skill), on what the cel finish painted, with the part map as the finish mended it for the card. They measure the fills: inside the protected boxes RC2 does not look (the features there are kept as drawn by design), none of them counts the source's lines, where the style lays its own ink, and RC1 and RC2 leave out the pieces kept as drawn. On an eyes part, RC2 and RC3 measure its iris alone, as the finish recolours it (its thick round mass in each eye's box, not the lash line or strands joined to it).
 
 **How the O7 to O9 thresholds were set:** on 740 results, 37 styles on 20 generated figures, before and after the fixes they point at.
 - **Before the fixes**, they found:
