@@ -83,12 +83,19 @@ def derive(base_rgb, kind="cloth", rule=None):
     return out
 
 
+def _number(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
 def _entry(v, where):
-    """A card entry: a base hex, or {base, shadow?, deep?, highlight?, gradient?}; colours as sRGB 0..1."""
+    """A card entry: a base hex, or {base, shadow?, deep?, highlight?, pieces?}; colours as sRGB 0..1."""
     if isinstance(v, str):
         v = {"base": v}
-    if not isinstance(v, dict) or "base" not in v and "gradient" not in v:
+    if not isinstance(v, dict) or "base" not in v:
         die(f"{where}: an entry is a hex colour or an object with 'base' (and optionally shadow, deep, highlight)")
+    for k in ("gradient", "pattern"):
+        if k in v:
+            die(f"{where}.{k}: not painted yet; give the part one base colour")
     e = {}
     for k in SLOTS:
         if k in v:
@@ -96,9 +103,6 @@ def _entry(v, where):
             if c is None:
                 die(f"{where}.{k}: '{v[k]}' is not a hex colour such as #c8442f")
             e[k] = c
-    for k in ("gradient", "pattern"):
-        if k in v:
-            e[k] = v[k]
     if "pieces" in v:
         if v["pieces"] not in ("keep", "paint"):
             die(f"{where}.pieces: 'keep' (the part's far pieces inside another part kept as drawn) or 'paint'")
@@ -122,6 +126,13 @@ def load_palette(path):
     unknown = [k for k in d.get("shadow_rule", {}) if k not in RULE]
     if unknown:
         die(f"shadow_rule: no such setting {', '.join(unknown)} (the settings: {', '.join(RULE)})")
+    for k, v in d.get("shadow_rule", {}).items():
+        want = RULE[k]
+        if isinstance(want, list):
+            if not (isinstance(v, list) and len(v) == len(want) and all(_number(x) for x in v)):
+                die(f"shadow_rule.{k}: a list of {len(want)} numbers, such as {want}")
+        elif not _number(v):
+            die(f"shadow_rule.{k}: a number, such as {want}")
     card = {"name": d.get("name", p.stem), "rule": d.get("shadow_rule", {}), "grade": d.get("grade", "card"),
             "lines": d.get("lines", "follow"), "pieces": d.get("pieces", "keep"), "parts": {}, "kinds": {},
             "roles": {}, "iris": None,

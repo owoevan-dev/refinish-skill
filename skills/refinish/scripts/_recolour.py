@@ -146,14 +146,18 @@ def touch_masks(subject, img, alpha, U, line=None, Lab=None):
                 r = 10 ** 6 if not line[y, x] else int(round(U.len(TOUCH_REACH)))
                 x0, y0, x1, y1 = x - r, y - r, x + r + 1, y + r + 1
             x0, y0, x1, y1 = max(0, x0), max(0, y0), min(w, x1), min(h, y1)
-            free = np.zeros((h, w), bool)
-            free[y0:y1, x0:x1] = within[y0:y1, x0:x1] & (True if line[y, x] else ~line[y0:y1, x0:x1])
-            win = (slice(max(0, y - 2), y + 3), slice(max(0, x - 2), x + 3))
-            ref = np.median(Lab[win][free[win]], axis=0) if free[win].any() else Lab[y, x]
-            cand = free & (np.linalg.norm(Lab - ref, axis=-1) < t.get("tol", TOUCH_TOL))
-            cand[y, x] = True
+            if not (x0 <= x < x1 and y0 <= y < y1):
+                m[y, x] = True                         # (a point outside its own box reaches itself alone)
+                continue
+            # the work inside the box or the reach alone, not over the whole picture
+            free = within[y0:y1, x0:x1] & (True if line[y, x] else ~line[y0:y1, x0:x1])
+            Lw, yy, xx = Lab[y0:y1, x0:x1], y - y0, x - x0
+            win = (slice(max(0, yy - 2), yy + 3), slice(max(0, xx - 2), xx + 3))
+            ref = np.median(Lw[win][free[win]], axis=0) if free[win].any() else Lab[y, x]
+            cand = free & (np.linalg.norm(Lw - ref, axis=-1) < t.get("tol", TOUCH_TOL))
+            cand[yy, xx] = True
             _, lbl = cv2.connectedComponents(cand.astype(np.uint8), connectivity=4)
-            m |= lbl == lbl[y, x]
+            m[y0:y1, x0:x1] |= lbl == lbl[yy, xx]
         out.append((m, t))
     return out
 

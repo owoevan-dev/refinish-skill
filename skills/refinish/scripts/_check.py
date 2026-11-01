@@ -79,12 +79,11 @@ def _clusters(px, k=4, seed=0):
 def finish_map(subject, img, alpha, parts, U):
     """The part map a finish painted from, and the pixels it kept as drawn by rule: with a colour card, the map as
     _recolour.mend_parts mended it (an iris part's hair given back, a part's far pieces kept as drawn, the touches);
-    without one, the map as it is."""
+    without one, the map as it is. (parts, kept, the pieces kept: mend_parts's.)"""
     if not subject.get("recolour"):
-        return parts, np.zeros(parts.shape, bool)
+        return parts, np.zeros(parts.shape, bool), []
     import _recolour as rc_
-    mended, kept, _ = rc_.mend_parts(subject, img, alpha, parts, U, [None] + [kind_of(p) for p in subject["parts"]])
-    return mended, kept
+    return rc_.mend_parts(subject, img, alpha, parts, U, [None] + [kind_of(p) for p in subject["parts"]])
 
 
 def part_map_checks(subject, img, alpha, parts, U, line, mended=None):
@@ -182,7 +181,7 @@ def _middle(b, frac=0.4):
 def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None, mended=None):
     """O1 to O6: what went wrong in the finished picture, on the map the finish painted from (finish_map)."""
     found = []
-    parts, kept_by_rule = mended or finish_map(subject, img, alpha, parts, U)
+    parts, kept_by_rule = (mended or finish_map(subject, img, alpha, parts, U))[:2]
     Ls, Lo = lab(img), lab(out)
     within = (alpha > 0.5) & (out_alpha > 0.5)
     plist = subject["parts"]
@@ -485,7 +484,7 @@ def _hue_deg(f):
     return np.degrees(np.arctan2(f[..., 2], f[..., 1])) % 360
 
 
-def recolour_checks(subject, img, alpha, parts, out, U):
+def recolour_checks(subject, img, alpha, parts, out, U, mended=None):
     """A colour card's parts on the result. RC1: the part's base colour, as the centre of its lit tone (the cluster of
     its interior colours nearest the card's base), against the card's base, by CIEDE2000. RC2: the old colour left, in
     patches: pixels still near the part's own old hue (within 30 degrees) and far (45) from every colour the card gives
@@ -510,7 +509,7 @@ def recolour_checks(subject, img, alpha, parts, out, U):
     kinds = [None] + [kind_of(q) for q in subject["parts"]]
     # the part map as the finish mended it for the card: the hair an iris part took given back, the pieces joined to a
     # recoloured part by colour alone kept as drawn (RC5 names them)
-    parts, kept, pieces = rc_.mend_parts(subject, img, alpha, parts, U, kinds)
+    parts, kept, pieces = mended or rc_.mend_parts(subject, img, alpha, parts, U, kinds)
     skin = within & np.isin(parts, [j for j, kk in enumerate(kinds) if j > 0 and kk == "skin"])
     lost = [list(b) for b in rc_.mislabelled_irises(subject, fs, within, parts, kinds, skin)]
     # (an eye part's pixels that can be the iris's: not the skin or the white of the eye it was drawn wide over; and
@@ -518,7 +517,7 @@ def recolour_checks(subject, img, alpha, parts, out, U):
     names = [q["name"] for q in subject["parts"]]
     touched_eyes = np.zeros(alpha.shape, bool)
     for m_, t in rc_.touch_masks(subject, img, alpha, U):
-        if "as" in t and kinds[names.index(t["as"]) + 1] == "eyes":
+        if t.get("as") in names and kinds[names.index(t["as"]) + 1] == "eyes":
             touched_eyes |= m_
     iris_src = rc_.iris_like(fs, np.median(fs[skin], axis=0) if skin.sum() > 50 else None) | touched_eyes
     in_box = rc_.box_fade(subject, *alpha.shape) > 0
@@ -553,9 +552,10 @@ def recolour_checks(subject, img, alpha, parts, out, U):
         if kind_of(p) != "eyes" and float((lab_ == bi).mean()) > 0.03:
             cb = card["base"]
             if graded:
-                # under `grade: style` the style sets the lightness and the chroma: the hue is the card's
+                # under `grade: style` the style sets the lightness and the chroma: the hue is the card's (a
+                # style that takes nearly all the chroma leaves no hue to read)
                 off = abs((_hue_deg(cents[bi][None])[0] - _hue_deg(cb[None])[0] + 180) % 360 - 180)
-                if np.hypot(cb[1], cb[2]) >= 8 and off > 15:
+                if np.hypot(cb[1], cb[2]) >= 8 and np.hypot(cents[bi][1], cents[bi][2]) >= 8 and off > 15:
                     found.append({"id": "RC1", "level": "FAIL" if off > 30 else "WARN", "part": p["name"],
                                   "box": box, "area": int(inner.sum()),
                                   "what": f"'{p['name']}' is painted {off:.0f} degrees of hue off the card's base "
@@ -586,7 +586,8 @@ def recolour_checks(subject, img, alpha, parts, out, U):
                 far &= (chroma > cc + 14) if cc < 8 else (np.abs((hue - _hue_deg(c[None])[0] + 180) % 360 - 180) > 45)
             near_old = np.abs((hue - _hue_deg(old[None])[0] + 180) % 360 - 180) < 30
             resid = m2 & far & near_old & (chroma > 8)
-        elif float(np.hypot(card["base"][1], card["base"][2])) >= 12:
+        # (under `grade: style` a grey can be the style's own grade: only under `grade: card` is it a white left)
+        elif not graded and float(np.hypot(card["base"][1], card["base"][2])) >= 12:
             resid = m2 & (chroma < 4) & (f[..., 0] > 45)      # a white made coloured: white left where colour belongs
         else:
             resid = np.zeros(m2.shape, bool)

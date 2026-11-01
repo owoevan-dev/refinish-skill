@@ -655,7 +655,9 @@ def face_from_parse(parse, L, within, s):
         if any(v.any() for v in split.values()):
             e["exact"] = split                          # (as split: a pale iris is no skin to leave out)
         elif (region & (parse == PARSE["eye-kept"])).any():
-            e["kept"] = True
+            e["kept"] = True                            # (kept whole: a pale white is no skin to leave out either)
+            e["mask"] = region & within
+            e["area"] = int(e["mask"].sum())
         else:
             e["closed"] = bool(bh_ < 0.35 * bw_ and (m & white).sum() < 0.05 * max(1, m.sum()))
     mouth = None
@@ -1683,8 +1685,26 @@ def main():
             doubts.append("the parse holds no face: the face was found in the pixels")
         else:
             if face is not None and got[0]["mouth"] is None:
-                got[0]["mouth"] = face["mouth"]
+                # the mouth the colours found, cut as they cut it: out of their skin (the parse's face holds it)
+                got[0]["mouth"], got[0]["mouth_skin"] = face["mouth"], face["head"]
             face, brows = got
+            given = (hints or {}).get("eyes") or []
+            if len(face["eyes"]) < len(given):
+                # an eye the parse missed (read as glasses, or as a brow) that the hints give: its box stands for it,
+                # what in it is not skin its mask, as the colours' face finder does
+                sk_ = skin_of(L, face["colour"]) & within
+                for b in given:
+                    x0, y0, x1, y1 = (int(v) for v in b)
+                    if any(e["box"][0] < x1 and x0 < e["box"][2] and e["box"][1] < y1 and y0 < e["box"][3]
+                           for e in face["eyes"]):
+                        continue
+                    m = np.zeros(within.shape, bool)
+                    m[max(0, y0):max(0, y1), max(0, x0):max(0, x1)] = True
+                    px = L[m & within] if (m & within).any() else L[m]
+                    face["eyes"].append({"box": [x0, y0, x1, y1], "centre": [(x0 + x1) / 2.0, (y0 + y1) / 2.0],
+                                         "area": int((m & ~sk_).sum()), "score": 1.0, "mask": m & ~sk_,
+                                         "look": np.median(px.reshape(-1, 3), axis=0), "shine": False, "given": True})
+                face["eyes"].sort(key=lambda e: e["centre"][0])
     carved = {"white": [], "iris": [], "mouth": [], "black": [], "closed": [], "brow": [], "eyewear": [],
               "headwear": [], "earwear": [], "iris_x": [], "lash": [], "kept": []}
     # pure-black masses on light ground (a chin's cast shadow drawn in black, a black print on a white shirt) are carved
@@ -1760,7 +1780,7 @@ def main():
                     reg[mm] = nid
                     carved[key].append(nid)
         if face["mouth"] is not None:
-            mm = face["mouth"][1] & within & ~face["head"]
+            mm = face["mouth"][1] & within & ~face.get("mouth_skin", face["head"])
             if mm.sum() >= 30 * s * s:
                 nid += 1
                 reg[mm] = nid

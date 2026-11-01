@@ -72,7 +72,7 @@ What `auto_parts.py --parse` takes from it:
 - **The brows** (what lies above an eye) go with the hair.
 - **Glasses, headwear and earrings** become `eyewear` (kind `metal`), `headwear` and `earwear` (kind `metal`). A hint part of the same name adds to them, its kind replacing theirs.
 - **The mouth**, when the parse has one; otherwise the face finder's.
-- **The eyes' boxes** for the protected face come from the parse; the hints' eye boxes are used only when the parse holds no face.
+- **The eyes' boxes** for the protected face come from the parse; the hints' eye boxes are used when the parse holds no face, and for an eye it missed (read as glasses, or as a brow).
 
 A parse of another picture, or of the picture at another size, is refused.
 

@@ -524,6 +524,13 @@ def run(subject, style, img, alpha, parts, U):
         # any other recoloured part reaching into a box (hair over an eye, a clip by it) is painted with its part
         other = rc_.reaching_in(subject, parts, [j for j in rc_.part_index(subject, rec) if kinds[j] != "eyes"],
                                 within & ~is_line, Lv0) | touched_rec
+        # and a feature the card names (a mouth, brows), which lies inside a box by nature: painted with its part, or
+        # the box would put the drawn feature back over it
+        in_box_ = rc_.box_fade(subject, h, w) > 0
+        for j in rc_.part_index(subject, rec):
+            m_ = (parts == j) & within
+            if kinds[j] != "eyes" and m_.any() and (m_ & in_box_).sum() > 0.5 * m_.sum():
+                other |= m_
         if other.any():
             prot = prot * (1 - cv2.GaussianBlur(other.astype(np.float32), (0, 0), 1.0))
     if kept_drawn is not None and kept_drawn.any():

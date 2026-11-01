@@ -58,12 +58,16 @@ def render(ref, sj, img, alpha, parts, U, check):
     if st["engine"] not in ("deai", "duotone"):
         from _guard import guard_parts
         sj_g, parts_g, guard = guard_parts(sj, st, img, alpha, parts, U, rule)
-    out, out_alpha, info = finish(sj_g, st, img, alpha, parts_g, U, SimpleNamespace(seed=None, palette_from=None))
+    from refinish import card_map
+    sj_e, parts_e = (sj_g, parts_g) if st["engine"] in ("paint", "deai", "duotone") else card_map(sj_g, img, alpha,
+                                                                                                   parts_g, U)
+    out, out_alpha, info = finish(sj_g, st, img, alpha, parts_g, U, SimpleNamespace(seed=None, palette_from=None),
+                                  (sj_e, parts_e))
     cel = info.pop("_cel", None)
     engine_out = out
     if st.get("post"):
         import _post
-        out = _post.apply(st["post"], out, out_alpha, parts_g, sj_g, U, seed=st.get("seed", 7))
+        out = _post.apply(st["post"], out, out_alpha, parts_e, sj_e, U, seed=st.get("seed", 7))
     rec = {"style": st.get("id", str(ref)), "engine": st["engine"]}
     if check:
         from _check import verdict

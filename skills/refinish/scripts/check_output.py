@@ -38,10 +38,10 @@ from _style import load_style, load_subject, resolve_style  # noqa: E402
 from parts import load_or_build  # noqa: E402
 
 
-def run_checks(sj, img, alpha, parts, out, out_alpha):
+def run_checks(sj, img, alpha, parts, out, out_alpha, mended=None):
     U = Units(alpha, sj.get("head_px"))
     line = (find_lines(img, sj.get("upscaled", 1)) > 0.3) & (alpha > 0.5)
-    mended = finish_map(sj, img, alpha, parts, U)
+    mended = mended or finish_map(sj, img, alpha, parts, U)
     return (part_map_checks(sj, img, alpha, parts, U, line, mended)
             + result_checks(sj, img, alpha, parts, out, out_alpha, U, line, mended))
 
@@ -70,6 +70,8 @@ def main():
         from _guard import guard_parts
         from _style import rule
         sj, parts, _ = guard_parts(sj, st, img, alpha, parts, U, rule)
+    if sj.get("recolour") and engine in ("paint", "deai", "duotone"):
+        sj = {k: v for k, v in sj.items() if k != "recolour"}    # (these engines apply no card: checked without it)
     line = (find_lines(img, sj.get("upscaled", 1)) > 0.3) & (alpha > 0.5)
     layers = [p.get("op") for p in (st or {}).get("post", [])] + ([f"relight {a.hour}"] if a.hour else [])
     note = None
@@ -85,7 +87,7 @@ def main():
                  + look_checks(sj, img, alpha, parts, out, U, engine))
         if sj.get("recolour") and engine in (None, "cel"):   # a card's parts against the card, as refinish.py does
             from _check import recolour_checks
-            found += recolour_checks(sj, img, alpha, parts, out, U)
+            found += recolour_checks(sj, img, alpha, parts, out, U, mended)
     elif engine in ("deai", "duotone"):
         found, _, _ = run_finish_checks(sj, st, img, alpha, parts, U, out, out_alpha, None)
     else:

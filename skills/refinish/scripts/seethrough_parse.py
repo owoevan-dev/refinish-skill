@@ -293,8 +293,8 @@ def main():
     if not a.no_eyes:
         segmenter = load_segmenter(a.sam2, device)
         if segmenter is None:
-            if fixes:
-                die("SAM 2 is not installed in this environment: the eyes' clicks need it (references/seethrough.md)")
+            die("SAM 2 is not installed in this environment: install it (references/seethrough.md), or run with "
+                "--no-eyes to leave the eyes to auto_parts.py's colours")
         else:
             report, rows = split_eyes(segmenter, rgb, lab_map, fixes, device)
     write_image(a.out, lab_map)
