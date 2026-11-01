@@ -287,15 +287,18 @@ def test_workflow(figure, tmp_path):
     assert r.returncode in (0, 1), r.stderr[-400:]
     assert {"skin", "hair", "eyes"} <= {p["kind"] for p in d["parts"]}
 
-    # the hints part them, each material whole: its lit and shaded tones together, whichever side was pointed at
+    # the hints part them, each material whole: its lit and shaded tones together, whichever side was pointed at (and
+    # a part's prop flag reaches the subject; the shoes stand in for a held thing here)
     hints = {"eyes": [at(*b[:2]) + at(*b[2:]) for b in HINTS["eyes"]],
              "mouth": at(*HINTS["mouth"][:2]) + at(*HINTS["mouth"][2:]),
-             "parts": [{**p, "at": [at(*q) for q in p["at"]]} for p in HINTS["parts"]]}
+             "parts": [{**p, "at": [at(*q) for q in p["at"]], **({"prop": True} if p["name"] == "shoes" else {})}
+                       for p in HINTS["parts"]]}
     hp = tmp_path / "hints.json"
     hp.write_text(json.dumps(hints), encoding="utf-8")
     r, d = run("auto_parts.py", image, tmp_path / "subject.json", "--upscaled", "2", "--hints", hp)
     assert r.returncode in (0, 1), r.stderr[-400:]
     sj = load_subject(tmp_path / "subject.json")
+    assert [p["name"] for p in sj["parts"] if p.get("prop")] == ["shoes"]
     _, _, parts = load_or_build(sj)
     names = [""] + [p["name"] for p in sj["parts"]]
     wrong = []
@@ -1116,6 +1119,20 @@ def test_card_entries_match_by_name_then_iris_kind_and_role(tmp_path):
     got = {n: w for n, (_, w) in P.match(sj, card, stats).items()}
     assert got == {"boots": "parts", "iris": "iris", "hair": "kinds", "coat": "roles.main", "scarf": "roles.sub",
                    "clip": "roles.accent"}
+
+
+def test_a_prop_keeps_its_colours_unless_the_card_names_it(tmp_path):
+    """A thing the character holds (a painter's brush, a cup) is no part of the costume: the kinds and the roles pass
+    it by, and only a card that names it recolours it."""
+    import _palette as P
+    parts = (("coat", "cloth", 20000, (50, 5, -20)), ("brush", "cloth", 9000, (40, 10, 30)),
+             ("sword", "metal", 3000, (70, 0, 0)), ("cup", "cloth", 2000, (80, 5, 5)))
+    sj = {"parts": [{"name": n, "kind": k, **({} if n == "coat" else {"prop": True})} for n, k, _, _ in parts]}
+    stats = {n: {"area": a, "kind": k, "lab": np.array(c, float), "in_boxes": 0.0} for n, k, a, c in parts}
+    card = P.load_palette(card_file(tmp_path, {"parts": {"cup": "#f0d040"}, "kinds": {"metal": "#c0c0d0"},
+                                               "roles": {"main": "#2e7d5b", "sub": "#c03050"}}))
+    got = {n: w for n, (_, w) in P.match(sj, card, stats).items()}
+    assert got == {"coat": "roles.main", "cup": "parts"}
 
 
 def test_card_mistakes_stop_with_a_message(tmp_path):

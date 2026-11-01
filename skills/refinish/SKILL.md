@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.10+ with numpy, opencv-python and scipy (Pillow optional, for reading PNG notes). No image model, no network, no GPU. Two optional segmentation models (See-Through, SAM 2), installed apart and best on an NVIDIA GPU, can read a figure's head and eyes (references/seethrough.md).
 metadata:
   author: "owoevan-dev"
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Refinish

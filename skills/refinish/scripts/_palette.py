@@ -263,19 +263,23 @@ def is_iris(name, st):
 
 def match(subject, card, stats):
     """{part name: (entry, where it came from)} for every part the card covers; precedence parts > iris > kinds >
-    roles (the cloth-like parts ranked by area: main, sub, then accent)."""
+    roles (the cloth-like parts ranked by area: main, sub, then accent). A prop (a thing the character holds: a brush,
+    a cup) is no part of the costume, so only a card that names it recolours it."""
     got = {}
+    props = {p["name"] for p in subject["parts"] if p.get("prop")}
     for p in subject["parts"]:
         n, k = p["name"], p.get("kind", "cloth")
         if n.lower() in card["parts"]:
             got[n] = (card["parts"][n.lower()], "parts")
+        elif n in props:
+            continue
         elif card["iris"] is not None and is_iris(n, stats[n]):
             got[n] = (card["iris"], "iris")
         elif k in card["kinds"] and (is_iris(n, stats[n]) if k == "eyes" else not is_feature(n, stats[n])):
             got[n] = (card["kinds"][k], "kinds")
     if card["roles"]:
-        rest = sorted((n for n, st in stats.items() if n not in got and st["kind"] in CLOTHLIKE and st["area"] > 0
-                       and not is_feature(n, st) and not is_ink(st)), key=lambda n: -stats[n]["area"])
+        rest = sorted((n for n, st in stats.items() if n not in got and n not in props and st["kind"] in CLOTHLIKE
+                       and st["area"] > 0 and not is_feature(n, st) and not is_ink(st)), key=lambda n: -stats[n]["area"])
         for i, n in enumerate(rest):
             role = ROLES[min(i, 2)]
             if role in card["roles"]:

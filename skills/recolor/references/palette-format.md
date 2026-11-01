@@ -42,7 +42,8 @@ Each part of the subject takes the first entry that reaches it:
 3. **`kinds`**: every part of that kind: `skin`, `hair`, `eyes`, `cloth`, `cloth-white`, `cloth-dark`, `sheer`, `gloss`, `metal`, `accessory`. Of kind `eyes`, only the irises.
 4. **`roles`**: the clothes and accessories left over (kinds `cloth`, `cloth-white`, `cloth-dark`, `sheer`, `accessory`, `gloss`, `metal`), largest first: the largest takes `main`, the next `sub`, every other `accent`. A role the card leaves out is skipped, not passed down.
 
-Two things are never reached by `kinds` or `roles`, only by name:
+Three things are never reached by `kinds` or `roles`, only by name:
+- **a prop**: a part marked `"prop": true` in the subject file, something the character holds or carries (a brush, a cup, a sword, a bag). It isn't part of the costume, so a scheme leaves it alone;
 - **a feature of the face**: a part whose name has a word starting mouth, lip, teeth, tooth, tongue, blush, brow, lash, nose or eye (`lips`, `eyebrows`, but not `clip`), or an accessory lying mostly inside the protected boxes;
 - **solid black ink**: an accessory part darker than CIELAB L* 20 with less than 8 of chroma (the spot blacks of an inked style, which the checks ask to be a part of their own).
 

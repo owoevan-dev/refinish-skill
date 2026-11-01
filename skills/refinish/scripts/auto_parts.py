@@ -2015,6 +2015,8 @@ def main():
                 q = {"name": hp["name"], "kind": hp.get("kind", "cloth"), "regions": mine}
                 parts.append(q)
                 by_name[q["name"]] = q
+            if hp.get("prop"):
+                q["prop"] = True
             if not q["regions"]:
                 doubts.append(f"the points for '{hp['name']}' reached no region: check where they lie")
             for x, y in hp.get("at", []):
@@ -2083,7 +2085,8 @@ def main():
         image_rel = str(Path(a.image).resolve()).replace("\\", "/")
     fams = {p["name"]: samples(p["regions"], reg) for p in parts}
     out_parts = [{"name": p["name"], "family": p["name"], "kind": p["kind"], "regions": [int(i) for i in p["regions"]],
-                  **({"exact": True} if p.get("exact") else {})} for p in parts]
+                  **({"exact": True} if p.get("exact") else {}), **({"prop": True} if p.get("prop") else {})}
+                 for p in parts]
     sj = {"format": "refinish-subject/1", "image": image_rel, "upscaled": a.upscaled,
           **({"head_px": a.head_px} if a.head_px else {}),
           "regions": rp.name, "families": fams, "parts": out_parts, "protect": protect, "focal": focal,

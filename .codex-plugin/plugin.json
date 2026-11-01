@@ -1,7 +1,7 @@
 {
   "name": "refinish-skill",
-  "version": "0.1.0",
-  "description": "Re-finish character art and backgrounds in another style by code, never by regenerating them: 37 styles (anime cel and its film, night and 90s variants, a cleaner de-AI finish, duotone and risograph, watercolour, gouache, manga screentone, an animator's key drawing, screen print, ink wash, ukiyo-e woodblock, pop art, neon, stained glass, paper cut, pixel sprites), style matching by measurement, style tweaks from plain words, relighting, cutting a figure out of its scene, and a compositing camera.",
+  "version": "0.2.0",
+  "description": "Re-finish character art and backgrounds in another style by code, never by regenerating them: 37 styles (anime cel and its film, night and 90s variants, a cleaner de-AI finish, duotone and risograph, watercolour, gouache, manga screentone, an animator's key drawing, screen print, ink wash, ukiyo-e woodblock, pop art, neon, stained glass, paper cut, pixel sprites), style matching by measurement, style tweaks from plain words, relighting, cutting a figure out of its scene, a compositing camera, and recolouring a character to a colour card.",
   "author": {
     "name": "owoevan-dev",
     "url": "https://github.com/owoevan-dev"
@@ -26,7 +26,7 @@
   "interface": {
     "displayName": "Refinish",
     "shortDescription": "Re-finish art in 37 styles",
-    "longDescription": "Refinish repaints the finish of character art and backgrounds you already have, in 37 styles so far: TV anime cel and its film, night, sunset, pastel and 90s variants, a cleaner de-AI finish, duotone, risograph and cyanotype, watercolour and gouache, manga screentone, an animator's key drawing, screen print, ink wash, woodblock, pop art, neon, stained glass, paper cut and pixel sprites. The drawing stays as it is. No image model is involved, and every result is checked against the source.\n\nIt also fits a cel finish to reference frames by measurement, adjusts a style from plain words (\"softer shadows\"), relights a picture for night or sunset, mixes finishes part by part, and cuts a figure out of its scene to composite it into another.\n\nMade for game developers, visual novel makers and anyone who wants a set of pictures in one consistent look. It runs locally in Python with NumPy and OpenCV; no GPU or network is needed.\n\nLimitations: the skin, hair and clothing parts are drafted automatically and are sometimes wrong. When they are, tell the agent what is wrong in a sentence and it fixes them. Closed or winking eyes can be missed. Known issues are listed in the changelog.",
+    "longDescription": "Refinish repaints the finish of character art and backgrounds you already have, in 37 styles so far: TV anime cel and its film, night, sunset, pastel and 90s variants, a cleaner de-AI finish, duotone, risograph and cyanotype, watercolour and gouache, manga screentone, an animator's key drawing, screen print, ink wash, woodblock, pop art, neon, stained glass, paper cut and pixel sprites. The drawing stays as it is. No image model is involved, and every result is checked against the source.\n\nIt also fits a cel finish to reference frames by measurement, adjusts a style from plain words (\"softer shadows\"), relights a picture for night or sunset, mixes finishes part by part, and cuts a figure out of its scene to composite it into another.\n\nA second skill, Recolor, gives a character new colours from a colour card and keeps the drawing. Name the colours by part, by kind or as a main, sub and accent scheme; the shadows and highlights you leave out are worked out the way an anime colour designer turns them. Something the character holds can be marked as a prop, so a vivid scheme leaves it alone.\n\nMade for game developers, visual novel makers and anyone who wants a set of pictures in one consistent look. It runs locally in Python with NumPy and OpenCV; no GPU or network is needed.\n\nLimitations: the skin, hair and clothing parts are drafted automatically and are sometimes wrong. When they are, tell the agent what is wrong in a sentence and it fixes them. Closed or winking eyes can be missed. Known issues are listed in the changelog.",
     "developerName": "owoevan-dev",
     "category": "Creativity",
     "capabilities": [
@@ -38,7 +38,7 @@
     "privacyPolicyURL": "https://github.com/owoevan-dev/refinish-skill/blob/main/PRIVACY.md",
     "defaultPrompt": [
       "Re-finish this character as a film-style anime cel, keeping the drawing as it is.",
-      "Match the finish of the frames in refs/ on my character.",
+      "Recolour her with silver hair, red eyes and a black coat.",
       "Show this picture in three finishes: watercolour, paper cut and pixel art."
     ],
     "brandColor": "#C8442F",
@@ -46,7 +46,8 @@
     "logo": "./assets/brand/icon-512.png",
     "screenshots": [
       "./docs/images/hero.jpg",
-      "./docs/images/styles.jpg"
+      "./docs/images/styles.jpg",
+      "./docs/images/recolor.jpg"
     ]
   }
 }

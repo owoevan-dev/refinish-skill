@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.10+ with numpy, opencv-python and scipy. Runs the Refinish skill's scripts, which ship beside it in the same plugin. No image model, no network, no GPU. Two optional segmentation models (See-Through, SAM 2), installed apart and best on an NVIDIA GPU, can read the head and split the eyes (../refinish/references/seethrough.md).
 metadata:
   author: "owoevan-dev"
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Recolor
@@ -27,7 +27,7 @@ Copy this checklist and tick it off. Each step ends on its done-criterion.
 - [ ] **2. Card**: a colour card the user approved on its board.
 - [ ] **3. Apply**: `palette.py apply` wrote the carded subject; every part the user named is in its report.
 - [ ] **4. Finish**: `refinish.py` ran a cel style on the carded subject; no RC finding left unexplained.
-- [ ] **5. Look**: the result at full size beside the source, the face at 1:1.
+- [ ] **5. Look**: the result at full size beside the source, the face at 1:1, and every box RC5 names.
 - [ ] **6. Touch** (when the look finds a patch in the wrong colour): `touch.json` written, its preview looked at, the result finished and looked at again.
 
 ### 1. The subject
@@ -40,6 +40,7 @@ Recolouring shows every mistake of the part map that a finish in the same colour
 - **Each part the card changes holds one material.** A strip of collar inside the headphones' part turns the headphones' colour; a nail labelled as the cardigan turns the cardigan's.
 - **The irises are a part of kind `eyes`**, and the whites of the eyes are not part of a garment. An eye whose iris is labelled hair is left as drawn (check RC3 says so). Keep the brows out of the iris part: a thin lash line or strand joined to an iris stays as drawn, but a brow as thick as the iris takes the iris's new colour.
 - **Solid black (spot blacks, an inked style's masses) is a part of its own**, kind `accessory`: roles pass it by.
+- **Something the character holds is a prop.** Give a brush, a cup, a sword or a bag a part of its own with `"prop": true` in the hints. A scheme by kinds and roles then leaves it as drawn, and the card can still name it. Without the flag the roles treat it as clothing: under a vivid card, a painter's brush came out teal.
 
 ### 2. The card
 
@@ -86,7 +87,8 @@ All the checks: the Refinish skill's [checks.md](../refinish/references/checks.m
 Open the result at full size beside the source, and the face at 1:1:
 - the eyes: the lashes and the whites as drawn, the catchlights white, both irises alike;
 - the lines: round a light new colour, dark enough to hold the shape;
-- the edges between recoloured parts: no light seam, no rim of the old colour.
+- the edges between recoloured parts: no light seam, no rim of the old colour;
+- every piece RC5 kept as drawn. A piece of something else is right as it is. A piece of the part itself (a fold of a hood showing between strands of hair, a strap cut off by an arm) stays in its old colour until the card says `"pieces": "paint"` or a touch gives it to the part.
 
 A light colour on a part drawn dark (black hair made white) shows the drawing's strand marks more than the dark did: that is the drawing, not a fault. When the user wants it calmer, a darker or greyer shadow on the card softens it.
 
