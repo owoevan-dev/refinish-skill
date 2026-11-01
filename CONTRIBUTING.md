@@ -8,7 +8,7 @@ Thanks for wanting to help. Refinish is maintained by one person and has a fairl
 - **A finish you would like.** Name the technique (risograph, paper cutting, 1980s cel...) and describe what makes it that technique. Link reference pictures rather than uploading pictures you did not make.
 - **Docs that left you stuck.** Quote the sentence and say what you tried.
 
-Write in English, Chinese, Japanese or Korean, whichever is easiest for you.
+Write in whatever language is easiest for you.
 
 ## Pull requests
 

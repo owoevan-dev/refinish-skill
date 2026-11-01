@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for the report. Only attach pictures you have the right to share; a crop of the problem is often enough.
-        English, 中文, 日本語 and 한국어 are all fine.
+        Any language is fine.
   - type: dropdown
     id: area
     attributes:

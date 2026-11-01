@@ -6,6 +6,6 @@ body:
     id: question
     attributes:
       label: Your question or idea
-      description: Say what you are trying to make and what you have tried.
+      description: Say what you are trying to make and what you have tried. Any language is fine.
     validations:
       required: true

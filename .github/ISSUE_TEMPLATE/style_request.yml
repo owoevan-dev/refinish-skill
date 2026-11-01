@@ -7,6 +7,7 @@ body:
       value: |
         Styles are named after their technique, never after an artist, a studio or a title.
         Please link reference pictures instead of uploading pictures you did not make.
+        Any language is fine.
   - type: input
     id: technique
     attributes:
