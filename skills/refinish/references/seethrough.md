@@ -29,7 +29,7 @@ SAM2_BUILD_CUDA=0 python -m pip install --no-build-isolation -e sam2
 - **PyTorch**: `cu128` is the build for CUDA 12.8 drivers. For other drivers, or without an NVIDIA GPU, take the install command from pytorch.org. On a CPU the parse runs, far more slowly; it was not measured there.
 - **SAM 2**: `SAM2_BUILD_CUDA=0` skips an optional CUDA extension that often fails to build; SAM 2 works without it. In PowerShell, run `$env:SAM2_BUILD_CUDA="0"` first, then the same `pip` line. `--no-build-isolation` builds it against the PyTorch already installed. A build that stops with `invalid command 'bdist_wheel'` needs the `wheel` and `setuptools` from the line before.
 - **SAM 2's checkpoint**: download `sam2.1_hiera_large.pt` (0.9 GB) into `sam2/checkpoints/`, by `sam2/checkpoints/download_ckpts.sh` or from `https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt`.
-- **See-Through's weights** (`24yearsold/l2d_sam_iter2` on Hugging Face, 1.3 GB) download themselves on the first run, into the Hugging Face cache (`HF_HOME` moves it). That download sends nothing about the picture; after it, the parse makes no network request.
+- **See-Through's weights** (`24yearsold/l2d_sam_iter2` on Hugging Face, 1.3 GB) download themselves on the first run, into the Hugging Face cache (`HF_HOME` moves it). That download sends nothing about the picture, and the picture never leaves the computer. Later runs still ask Hugging Face whether the weights changed; set `HF_HUB_OFFLINE=1` to use the cached copy with no network request at all.
 
 ## Licences and credits
 

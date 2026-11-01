@@ -131,7 +131,7 @@ The figures below come from the project's own runs on pictures the code had neve
 
 **Other agents**
 
-Copy or link `skills/refinish` into your agent's skills folder, or use [skills.sh](https://skills.sh):
+Copy or link `skills/refinish` and `skills/recolor` into your agent's skills folder, side by side (Recolor runs the scripts in `../refinish/scripts`), or use [skills.sh](https://skills.sh):
 
 ```
 npx skills add owoevan-dev/refinish-skill

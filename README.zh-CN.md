@@ -131,7 +131,7 @@ Refinish 是一个 [Agent Skill](https://agentskills.io)，用来给手头已有
 
 **其他 agent**
 
-把 `skills/refinish` 复制或链接到 agent 的 skills 文件夹，或者使用 [skills.sh](https://skills.sh)：
+把 `skills/refinish` 和 `skills/recolor` 一起复制或链接到 agent 的 skills 文件夹，两个放在同一层（Recolor 会用 `../refinish/scripts` 里的脚本），或者使用 [skills.sh](https://skills.sh)：
 
 ```
 npx skills add owoevan-dev/refinish-skill

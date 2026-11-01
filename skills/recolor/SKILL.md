@@ -22,7 +22,7 @@ What it can and cannot do (tell the user before starting):
 
 Copy this checklist and tick it off. Each step ends on its done-criterion.
 
-- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not: `python -m pip install numpy scipy opencv-python`; on a server or in a sandbox, `opencv-python-headless` instead.
+- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not: `python -m pip install numpy scipy opencv-python`; on a server or in a sandbox, `opencv-python-headless` instead. `../refinish/scripts/palette.py` exists: Recolor runs the Refinish skill's scripts, so the two skills are installed side by side.
 - [ ] **1. Subject**: a subject file whose parts are right, every part the card will change holding only its own material.
 - [ ] **2. Card**: a colour card the user approved on its board.
 - [ ] **3. Apply**: `palette.py apply` wrote the carded subject; every part the user named is in its report.
@@ -68,13 +68,13 @@ python ../refinish/scripts/palette.py apply subject.json CARD.json carded.json
 python ../refinish/scripts/refinish.py carded.json tv-cel out.png
 ```
 
-Any cel style takes a card: `tv-cel`, `heavy-cel`, `bold-ink-cel`, `film-everyday-cel`, `pastel-film-cel`, `cel-90s`, and the night and sunset variants (the Refinish skill's [presets.md](../refinish/references/presets.md)). The card's parts are painted in its colours exactly; the rest of the figure in the style's own. Lines round a recoloured part take a dark shade of its new colour, and so does the line between hair and face.
+Any cel style takes a card: `tv-cel`, `heavy-cel`, `bold-ink-cel`, `film-everyday-cel`, `pastel-film-cel`, `cel-90s`, and the night and sunset variants (the Refinish skill's [presets.md](../refinish/references/presets.md)). The card's parts are painted in its colours exactly; the rest of the figure in the style's own. The other engines (paint, de-AI, duotone) ignore a card, and their report says so. Lines round a recoloured part take a dark shade of its new colour, and so does the line between hair and face.
 
 The check runs on every result. Besides the Refinish checks, five are the card's:
 
 | check | finds | usual cause | fix |
 |---|---|---|---|
-| RC1 | a part painted far from its card colour (CIEDE2000 over 3 WARN, over 6 FAIL) | the part holds another material, so its tones are split between two | fix the part map (step 1) |
+| RC1 | a part painted far from its card colour (CIEDE2000 over 3 WARN, over 6 FAIL; under `grade: style`, its hue over 15 degrees off WARN, over 30 FAIL) | the part holds another material, so its tones are split between two | fix the part map (step 1) |
 | RC2 | a patch of a part still in its old colour | a line or a fleck the part map gave to another part | fix the part map; look at the box on the review picture |
 | RC3 | an iris off the card's hue, or the two eyes recoloured unlike | the iris labelled hair or cloth, or part of it labelled skin | give the iris a part of kind `eyes` |
 | RC4 (WARN) | patches of a part the card left alone, inside one it recoloured, that were drawn like it | the part map gave a piece of the recoloured part to its neighbour (a cream shirt's light folds read as the pale skin beside them) | give the patches to the recoloured part (a hint point), or name their part on the card |

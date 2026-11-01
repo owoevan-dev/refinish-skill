@@ -669,8 +669,8 @@ def face_from_parse(parse, L, within, s):
 
 
 def parse_votes(reg, parse, n):
-    """Each region's pixels per parse label: (n + 1, len(PARSE_PARTS) + 1) counts."""
-    m = len(PARSE_PARTS) + 1
+    """Each region's pixels per parse label, the eye split's included: (n + 1, len(PARSE) + 1) counts."""
+    m = len(PARSE) + 1
     idx = reg.astype(np.int64) * m + parse.astype(np.int64)
     return np.bincount(idx.ravel(), minlength=(n + 1) * m)[:(n + 1) * m].reshape(n + 1, m)
 
@@ -1114,7 +1114,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held
     hint}."""
     locked, held, cut = set(locked), set(held), set(fixed or {})
     import heapq
-    owner, heap, colour = dict(fixed or {}), [], []
+    owner, heap, colour, seeded = dict(fixed or {}), [], [], []
     for k, hp in enumerate(hint_parts):
         # the region under each point is its seed, however small (a point on a line has the line's region, and a
         # line's pixels belong to the region beside them); a point outside the figure has none
@@ -1122,6 +1122,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held
                  if 0 <= int(y) < reg.shape[0] and 0 <= int(x) < reg.shape[1] and reg[int(y), int(x)] > 0]
         w_ = np.array([st["area"][j] for j in seeds] or [1.0], np.float64)
         colour.append((st["lab"][seeds] * w_[:, None]).sum(0) / w_.sum() if seeds else np.zeros(3))
+        seeded.append(bool(seeds))
         for j in seeds:
             if j not in owner:
                 heapq.heappush(heap, (0.0, j, k))
@@ -1159,7 +1160,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held
     # a row of buttons), the way an editor selects similar colours inside a selection; the held regions too, which
     # only a selection or a point takes, and what another part's box cut gave it when its colour is nearer the
     # selection's than that part's (a generous box round long hair takes a shirt's dark stripes by their grey; a
-    # selection of the shirt's white leaves the shirt's own cut alone)
+    # selection of the shirt's white leaves the shirt's own cut alone; a part with no points keeps its cut)
     for k, hp in enumerate(hint_parts):
         if "within" not in hp:
             continue
@@ -1167,7 +1168,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held
         for q in range(1, len(st["area"])):
             if q in locked or st["area"][q] == 0:
                 continue
-            if q in owner and (q not in cut or owner[q] == k or
+            if q in owner and (q not in cut or owner[q] == k or not seeded[owner[q]] or
                                cdist(st["lab"][q], colour[k]) >= cdist(st["lab"][q], colour[owner[q]])):
                 continue
             if x0 <= st["cx"][q] <= x1 and y0 <= st["cy"][q] <= y1 and cdist(st["lab"][q], colour[k]) <= budget:
@@ -1201,7 +1202,8 @@ def keep_to_boxes(reg, parts, hint_parts, L, within, pad, held=()):
     `pad` pixels) is that part's. Each piece of a part lying outside its boxes goes to the part whose points are
     nearest in colour among those that may be there (their boxes hold most of the piece, or they have none); a piece
     no other part may hold stays where it was. Regions are cut where their pixels change hands. The regions `held`
-    (the head as a part segmentation read it) stay where they are.
+    (the head's hair and skin as a part segmentation read it) stay with the hair and the skin; a part that took one
+    by a point or a selection keeps it inside its boxes only.
     Returns (region map, parts with their region lists renumbered, pixels moved)."""
     names = {p["name"]: i + 1 for i, p in enumerate(parts)}
     own = np.zeros(int(reg.max()) + 1, np.int32)
@@ -1211,9 +1213,10 @@ def keep_to_boxes(reg, parts, hint_parts, L, within, pad, held=()):
     allow = box_masks(hint_parts, names, reg.shape, pad)
     seeds = {names[hp["name"]]: point_colours(hp, L, within) for hp in hint_parts if hp["name"] in names}
     keep = np.isin(reg, np.asarray(list(held), dtype=np.int64)) if len(held) else np.zeros(reg.shape, bool)
+    holders = {names[n_] for n_ in ("hair", "skin") if n_ in names}
     moved = 0
     for k, m in allow.items():
-        bad = (label == k) & ~m & ~keep
+        bad = (label == k) & ~m & (~keep if k in holders else True)
         if not bad.any():
             continue
         n_, comp = cv2.connectedComponents(bad.astype(np.uint8), connectivity=8)
@@ -2017,7 +2020,11 @@ def main():
                 by_name[q["name"]] = q
             if hp.get("prop"):
                 q["prop"] = True
-            if not q["regions"]:
+            # (none of the regions under its points ended in the part: a draft part of the same name, merged in,
+            # would hide that behind its own regions)
+            at_regs = {int(reg[int(y), int(x)]) for x, y in hp.get("at", [])
+                       if 0 <= int(y) < h and 0 <= int(x) < w} - {0}
+            if not q["regions"] or (hp.get("at") and not at_regs & set(q["regions"])):
                 doubts.append(f"the points for '{hp['name']}' reached no region: check where they lie")
             for x, y in hp.get("at", []):
                 if not (0 <= int(y) < h and 0 <= int(x) < w and within[int(y), int(x)]):

@@ -15,7 +15,7 @@ import numpy as np
 
 import _colour as C
 from _core import die, lab
-from _style import KINDS
+from _style import KINDS, kind_of
 
 PALETTE_FORMAT = "refinish-palette/1"
 CLOTHLIKE = ("cloth", "cloth-white", "cloth-dark", "sheer", "accessory", "gloss", "metal")
@@ -211,7 +211,8 @@ def load_touch(path):
     return out
 
 
-FACE_WORDS = ("mouth", "lip", "teeth", "tooth", "tongue", "blush", "brow", "lash", "nose", "eye")
+FACE_WORDS = {"mouth", "lip", "lips", "teeth", "tooth", "tongue", "blush", "brow", "brows", "eyebrow", "eyebrows",
+              "lash", "lashes", "eyelash", "eyelashes", "nose", "eye", "eyes", "eyelid", "eyelids"}
 
 
 def part_stats(subject, img, alpha, parts):
@@ -227,17 +228,17 @@ def part_stats(subject, img, alpha, parts):
     for j, p in enumerate(subject["parts"], start=1):
         m = (parts == j) & (alpha > 0.5)
         n = int(m.sum())
-        out[p["name"]] = {"area": n, "kind": p.get("kind", "cloth"),
+        out[p["name"]] = {"area": n, "kind": kind_of(p),
                           "lab": np.median(f[m], axis=0) if n else np.array([50.0, 0.0, 0.0]),
                           "in_boxes": float((m & boxes).sum() / n) if n else 0.0}
     return out
 
 
 def is_feature(name, st):
-    """A feature of the face (a mouth, a brow, a blush): recoloured only when the card names it. By the words of its
-    name ('lips', 'upper_lip', 'eyebrows'; a hair 'clip' is no lip)."""
+    """A feature of the face (a mouth, a brow, a blush): recoloured only when the card names it. By the whole words of
+    its name ('lips', 'upper_lip', 'eyebrows'; a hair 'clip' is no lip, a 'brown-coat' no brow, 'eyewear' no eye)."""
     words = re.findall(r"[a-z]+", name.lower())
-    return st["kind"] != "eyes" and (any(w.startswith(fw) for w in words for fw in FACE_WORDS)
+    return st["kind"] != "eyes" and (any(w in FACE_WORDS for w in words)
                                      or st["kind"] == "accessory" and st["in_boxes"] > 0.5)
 
 
@@ -268,14 +269,15 @@ def match(subject, card, stats):
     got = {}
     props = {p["name"] for p in subject["parts"] if p.get("prop")}
     for p in subject["parts"]:
-        n, k = p["name"], p.get("kind", "cloth")
+        n, k = p["name"], kind_of(p)
         if n.lower() in card["parts"]:
             got[n] = (card["parts"][n.lower()], "parts")
         elif n in props:
             continue
         elif card["iris"] is not None and is_iris(n, stats[n]):
             got[n] = (card["iris"], "iris")
-        elif k in card["kinds"] and (is_iris(n, stats[n]) if k == "eyes" else not is_feature(n, stats[n])):
+        elif k in card["kinds"] and (is_iris(n, stats[n]) if k == "eyes" else
+                                     not is_feature(n, stats[n]) and not is_ink(stats[n])):
             got[n] = (card["kinds"][k], "kinds")
     if card["roles"]:
         rest = sorted((n for n, st in stats.items() if n not in got and n not in props and st["kind"] in CLOTHLIKE

@@ -50,7 +50,7 @@ def mend_parts(subject, img, alpha, parts, U, kinds):
     parts = parts.copy()
     kept = np.zeros((h, w), bool)
     pieces = []
-    if not rec:
+    if not rec and not (subject.get("recolour") or {}).get("touch"):
         return parts, kept, pieces
     names = [p["name"] for p in subject["parts"]]
     line = dark_lines(img, within, U)
@@ -101,6 +101,8 @@ def mend_parts(subject, img, alpha, parts, U, kinds):
     # the touches last (palette.py apply --touch): the agent's own word, over every rule above
     for m, t in touch_masks(subject, img, alpha, U, line, Lab):
         if "as" in t:
+            if t["as"] not in names:                   # (a subject rebuilt from this one may not have the part)
+                continue
             parts[m] = names.index(t["as"]) + 1
             kept &= ~m
             pieces = [pc for pc in pieces if not m[pc[2][1]:pc[2][3], pc[2][0]:pc[2][2]].any()]
@@ -159,6 +161,7 @@ def touch_masks(subject, img, alpha, U, line=None, Lab=None):
 # where each card colour sits among a part's own tones: a colour design's part is mostly lit, with a shadow over a
 # fifth of it, a second shadow in its deepest corners and a highlight on its brightest few
 ANCHOR = {"deep": 4.0, "shadow": 18.0, "base": 62.0, "highlight": 97.0}
+TIE = 0.01                                             # Oklab L: knots anchored closer than this on a part are one
 # the most of a card's part its highlight covers in a cel finish
 HIGHLIGHT_SHARE = 0.1
 
@@ -220,8 +223,10 @@ def transfer(src_rgb, mask, kn, keep=0.3, white_keep=False):
     the colour at the mapped lightness interpolated between the knots, `keep` of the part's own colour variation
     (its deviation from its median a, b) added back. Beyond the outer knots the lightness goes on toward black and
     white at the slope the room allows, between 1 and 4 (a pupil stays dark; a white turned black does not burst into
-    light flecks from its last few points of lightness). white_keep: a specular white (an eye's catchlight) stays
-    white. Returns the new sRGB values of the masked pixels, gamut-mapped."""
+    light flecks from its last few points of lightness). Knots anchored on one lightness (a flat fill, a source of a
+    few flat tones) count once: the one anchored nearest the middle of the pixels there, so a flat fill takes the
+    base. white_keep: a specular white (an eye's catchlight) stays white; True for every pixel, or a mask over the
+    masked pixels for those only. Returns the new sRGB values of the masked pixels, gamut-mapped."""
     ok = C.srgb_to_oklab(src_rgb[mask])
     if len(ok) == 0 or not kn:
         return src_rgb[mask]
@@ -229,16 +234,28 @@ def transfer(src_rgb, mask, kn, keep=0.3, white_keep=False):
     cols = np.array([k[1] for k in kn])
     kL = np.maximum.accumulate(np.clip(cols[:, 0], 0, 1))
     qs = np.percentile(Lsrc, [k[0] for k in kn])
+    srt, use, i = np.sort(Lsrc), [], 0
+    while i < len(kn):
+        j = i
+        while j + 1 < len(kn) and qs[j + 1] - qs[i] < TIE:
+            j += 1
+        if j > i:
+            mid = 50.0 * (np.searchsorted(srt, qs[i] - TIE) + np.searchsorted(srt, qs[j] + TIE, side="right")) / len(srt)
+            use.append(min(range(i, j + 1), key=lambda q: abs(kn[q][0] - mid)))
+        else:
+            use.append(i)
+        i = j + 1
+    qs, kU = qs[use], kL[use]
     qs = np.maximum.accumulate(qs + np.arange(len(qs)) * 1e-6)
-    if len(kn) > 1:
-        Lnew = np.interp(Lsrc, qs, kL)
+    if len(qs) > 1:
+        Lnew = np.interp(Lsrc, qs, kU)
     else:
-        Lnew = kL[0] + (Lsrc - qs[0])
+        Lnew = kU[0] + (Lsrc - qs[0])
     lo, hi = Lsrc < qs[0], Lsrc > qs[-1]
-    s_lo = np.clip(kL[0] / max(qs[0], 1e-3), 1.0, 4.0)
-    s_hi = np.clip((1 - kL[-1]) / max(1 - qs[-1], 1e-3), 1.0, 4.0)
-    Lnew[lo] = kL[0] - (qs[0] - Lsrc[lo]) * s_lo
-    Lnew[hi] = kL[-1] + (Lsrc[hi] - qs[-1]) * s_hi
+    s_lo = np.clip(kU[0] / max(qs[0], 1e-3), 1.0, 4.0)
+    s_hi = np.clip((1 - kU[-1]) / max(1 - qs[-1], 1e-3), 1.0, 4.0)
+    Lnew[lo] = kU[0] - (qs[0] - Lsrc[lo]) * s_lo
+    Lnew[hi] = kU[-1] + (Lsrc[hi] - qs[-1]) * s_hi
     Lnew = np.clip(Lnew, 0.0, 1.0)
     # the colour at that lightness: between the knots (the outer ones beyond them)
     n = len(kn)
@@ -249,8 +266,10 @@ def transfer(src_rgb, mask, kn, keep=0.3, white_keep=False):
     ab = cols[i0, 1:] * (1 - w) + cols[i1, 1:] * w
     ab = ab + keep * (ok[:, 1:] - np.median(ok[:, 1:], axis=0))
     res = C.oklab_to_srgb(np.concatenate([Lnew[:, None], ab], 1))
-    if white_keep:
+    if isinstance(white_keep, np.ndarray) or white_keep:
         spec = (Lsrc > 0.92) & (np.hypot(ok[:, 1], ok[:, 2]) < 0.04)
+        if isinstance(white_keep, np.ndarray):
+            spec &= white_keep
         res[spec] = src_rgb[mask][spec]
     return res.astype(np.float32)
 

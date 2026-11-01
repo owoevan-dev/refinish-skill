@@ -44,7 +44,7 @@ Each part of the subject takes the first entry that reaches it:
 
 Three things are never reached by `kinds` or `roles`, only by name:
 - **a prop**: a part marked `"prop": true` in the subject file, something the character holds or carries (a brush, a cup, a sword, a bag). It isn't part of the costume, so a scheme leaves it alone;
-- **a feature of the face**: a part whose name has a word starting mouth, lip, teeth, tooth, tongue, blush, brow, lash, nose or eye (`lips`, `eyebrows`, but not `clip`), or an accessory lying mostly inside the protected boxes;
+- **a feature of the face**: a part whose name holds one of the words mouth, lip, lips, teeth, tooth, tongue, blush, brow, brows, eyebrow, eyebrows, lash, lashes, eyelash, eyelashes, nose, eye, eyes, eyelid or eyelids (`upper_lip`, `eyebrows`; not `clip`, `brown-coat` or `eyewear`), or an accessory lying mostly inside the protected boxes;
 - **solid black ink**: an accessory part darker than CIELAB L* 20 with less than 8 of chroma (the spot blacks of an inked style, which the checks ask to be a part of their own).
 
 Every part no entry reaches keeps the style's own colours.
@@ -70,7 +70,7 @@ When a hue lies straight opposite its target, it turns the warm way (a yellow's 
 
 ## How the card is painted
 
-- **`grade`**: `"card"` (the default) paints the card's parts in its colours exactly: the style's own colour grade (its contrast, lift and chroma) is eased off over them. `"style"` lays the style's grade over the card's colours too, as over every other part (a film style's soft contrast, a night style's dark).
+- **`grade`**: `"card"` (the default) paints the card's parts in its colours exactly: the style's own colour grade (its contrast, lift and chroma) is eased off over them. `"style"` lays the style's grade over the card's colours too, as over every other part (a film style's soft contrast, a night style's dark); the check RC1 then compares the hue alone, since the style sets the lightness and the chroma.
 - **`lines`**: `"follow"` (the default): the lines round a card's part take a dark shade of its new colour (色トレス), and the line between hair and face, and a strand drawn as a line across the face, the hair's. `"keep"`: the lines as the style draws them.
 - **`pieces`**: `"keep"` (the default) or `"paint"`, for the whole card or in one part's entry (`{"base": "#c8442f", "pieces": "paint"}`). A part map joins some pieces to a part by colour alone: a book's gold ornaments to blonde hair, a jacket's silver buckles to silver hair, a shadow under the chin to dark hair. A small piece of a recoloured part (at most a twentieth of its body), far from it (40 u) and lying inside one other part (85% of the ring round it) is kept as drawn, so the new colour shows only where the part is; the check RC5 names each one. When such a piece is the part's own (a strap cut off by an arm), `"paint"` paints it with the part.
 
@@ -102,7 +102,7 @@ A result can show a patch the part map got wrong: a pale reflection in an iris g
 | `tol` | how far (CIELAB, default 12) a colour may be from the colour at the point and still be reached |
 | `box` | `[x0, y0, x1, y1]`: the patch stops at it |
 
-Each point reaches the colour round it: the pixels within `tol` of the colour at the point, joined to the point without crossing a line. A point on a line (a dark thing the line finder reads as ink, such as lashes) reaches over the lines as well, inside its box or close round the point (20 u), so give it a box. The touches are applied last, over every other rule for the part map and the protected boxes.
+Each point reaches the colour round it: the pixels within `tol` of the colour at the point, joined to the point without crossing a line. A point on a line (a dark thing the line finder reads as ink, such as lashes) reaches over the lines as well, inside its box or close round the point (20 u), so give it a box. The touches are applied last, over every other rule for the part map and the protected boxes. Where two touches reach the same pixels, the later one in the file wins. A `to` touch colours whites too (a white shirt), except a catchlight inside the protected boxes, which stays white.
 
 `palette.py apply SUBJECT.json CARD.json OUT.json --touch TOUCH.json` writes them into the carded subject. Its report gives each touch's reach: `px`, `box`, `share` of the figure, and a `note` when the reach goes well beyond its points or, given to an iris, out of the eyes' boxes. `OUT.touch.jpg` shows each touch's reach tinted and numbered on the picture. Look at it before finishing: a reach far larger than the patch has run into the part beside it (lower `tol`, or give a `box`); one smaller than the patch needs another point or a higher `tol`.
 

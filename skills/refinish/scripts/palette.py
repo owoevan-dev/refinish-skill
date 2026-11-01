@@ -166,7 +166,12 @@ def cmd_read(a):
             v = s.split(",")
             if len(v) < 2:
                 die(f"--at {s}: give x,y or x,y,name")
-            x, y = int(v[0]), int(v[1])
+            try:
+                x, y = int(v[0]), int(v[1])
+            except ValueError:
+                die(f"--at {s}: x and y are whole numbers of pixels")
+            if not (0 <= x < w and 0 <= y < h):
+                die(f"--at {s}: outside the picture (x 0 to {w - 1}, y 0 to {h - 1})")
             r = max(2, int(0.006 * max(h, w)))
             box = f[max(0, y - r):y + r + 1, max(0, x - r):x + r + 1].reshape(-1, 3)
             col = np.median(img[max(0, y - r):y + r + 1, max(0, x - r):x + r + 1].reshape(-1, 3), axis=0)
@@ -204,7 +209,7 @@ def cmd_board(a):
     rows += [(f"role: {k}", e, "cloth") for k, e in card["roles"].items()]
     if a.subject:
         sj = load_subject(a.subject)
-        kinds = {p["name"].lower(): p.get("kind", "cloth") for p in sj["parts"]}
+        kinds = {p["name"].lower(): kind_of(p) for p in sj["parts"]}
         rows = [(lb, e, kinds.get(lb.split(": ", 1)[-1], k)) for lb, e, k in rows]
     if not rows:
         die(f"{a.card} has no entries")

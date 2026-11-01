@@ -131,7 +131,7 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 
 **다른 에이전트**
 
-`skills/refinish`를 에이전트의 skills 폴더에 복사하거나 링크하세요. [skills.sh](https://skills.sh)를 써도 됩니다.
+`skills/refinish`와 `skills/recolor`를 나란히 에이전트의 skills 폴더에 복사하거나 링크하세요(Recolor는 `../refinish/scripts`의 스크립트를 씁니다). [skills.sh](https://skills.sh)를 써도 됩니다.
 
 ```
 npx skills add owoevan-dev/refinish-skill

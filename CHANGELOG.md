@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - With a colour card, every check reads the part map the finish actually painted from, touches included, so a patch a touch moved is checked as the part it was given.
+- O7 leaves out a skin that a colour card recoloured: the card asked for the change, and RC1 measures it.
 - Step 0 of SKILL.md suggests `opencv-python-headless` on servers and in sandboxes, where `opencv-python` can fail to load for lack of graphics libraries.
 - Given the same subject file and no colour card, every cel finish gives exactly the same output as 0.1.0, byte for byte.
 

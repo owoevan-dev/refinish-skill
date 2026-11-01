@@ -1549,6 +1549,9 @@ def test_a_point_or_within_takes_what_the_parse_holds():
     white = [{"name": "shirt", "kind": "cloth-white", "at": [[20, 30]]},
              {"name": "pick", "kind": "accessory", "at": [[20, 30]], "within": [0, 0, 40, 40]}]
     assert ap.claim(white, reg, st, nb, fig, fixed={4: 0}).get(4) == 0
+    # nor what a part with no points cut: it has no colour to compare
+    boxed_only = [{"name": "shirt", "kind": "cloth-white", "boxes": [[0, 0, 40, 40]]}, sel[0]]
+    assert ap.claim(boxed_only, reg, st, nb, fig, fixed={3: 0}).get(3) == 0
 
 
 def test_an_eye_below_the_nose_is_the_mouth():
@@ -1647,3 +1650,236 @@ def test_a_card_that_matches_nothing_changes_nothing(hinted, tmp_path):
     r, _ = run("refinish.py", tmp_path / "carded.json", "tv-cel", tmp_path / "out.png", "--no-check")
     assert r.returncode == 0, r.stderr[-400:]
     assert np.array_equal(load_rgba(tmp_path / "out.png")[0], load_rgba(plain_png)[0])
+
+
+def test_a_flat_fill_takes_the_cards_base():
+    """A part of one flat colour takes the card's base, not its darkest colour; of two flat tones the lower takes the
+    shadow and the upper the base (knots anchored on one lightness count once)."""
+    import _colour as C
+    import _recolour as rc
+    from _core import lab
+    rec = {"deep": "#4a0a1a", "shadow": "#8a1a30", "base": "#c8442f", "highlight": "#f0a080"}
+
+    def de(rgb_, hexc):
+        return C.ciede2000(lab(np.float32(rgb_).reshape(1, 1, 3))[0, 0],
+                           lab(C.parse_hex(hexc).astype(np.float32).reshape(1, 1, 3))[0, 0])
+
+    flat = np.full((20, 20, 3), 0.6, np.float32)
+    assert de(rc.transfer(flat, np.ones((20, 20), bool), rc.knots(rec)).mean(0), "#c8442f") < 2.0
+    two = np.full((20, 20, 3), 0.7, np.float32)
+    two[:10] = 0.35
+    got = rc.transfer(two, np.ones((20, 20), bool), rc.knots(rec)).reshape(20, 20, 3)
+    assert de(got[:10].mean((0, 1)), "#8a1a30") < 2.0 and de(got[10:].mean((0, 1)), "#c8442f") < 2.0
+
+
+def test_a_white_takes_a_touchs_colour_but_a_catchlight_stays_white():
+    """A `to` touch's colour reaches whites (a white shirt); only the whites inside a protected box (a catchlight)
+    keep their white."""
+    import _recolour as rc
+    rec = {"deep": "#4a0a1a", "shadow": "#8a1a30", "base": "#c8442f", "highlight": "#f0a080"}
+    img = np.full((10, 20, 3), 0.97, np.float32)
+    mask = np.ones((10, 20), bool)
+    inside = np.zeros(200, bool)
+    inside[:100] = True                                           # the first rows lie inside a protected box
+    got = rc.transfer(img, mask, rc.knots(rec), white_keep=inside)
+    assert np.allclose(got[:100], 0.97) and (np.abs(got[100:] - 0.97).max(1) > 0.2).all()
+    assert np.allclose(rc.transfer(img, mask, rc.knots(rec), white_keep=True), 0.97)
+
+
+def test_kinds_and_roles_pass_ink_and_read_face_words_whole(tmp_path):
+    """Solid black ink is passed by a card's kinds as by its roles; a face word counts only whole ('brown-coat' is no
+    brow, 'eyewear' no eye, 'upper_lip' a lip); a kind given the old way (`as`) is read as the finish reads it."""
+    import _palette as P
+    rows = (("ink", {"kind": "accessory"}, 6, (0.01, 0.01, 0.01)), ("bow", {"kind": "accessory"}, 6, (0.9, 0.5, 0.2)),
+            ("brown-coat", {"kind": "cloth"}, 24, (0.45, 0.3, 0.2)), ("eyewear", {"kind": "metal"}, 6, (0.2, 0.2, 0.2)),
+            ("upper_lip", {"kind": "accessory"}, 6, (0.8, 0.45, 0.45)), ("face", {"as": "skin"}, 12, (0.95, 0.8, 0.7)))
+    h, w = sum(r[2] for r in rows), 40
+    img = np.zeros((h, w, 3), np.float32)
+    parts = np.zeros((h, w), np.uint8)
+    y = 0
+    for j, (_, _, n, c) in enumerate(rows, start=1):
+        img[y:y + n], parts[y:y + n] = c, j
+        y += n
+    sj = {"parts": [{"name": nm, **kd} for nm, kd, _, _ in rows]}
+    stats = P.part_stats(sj, img, np.ones((h, w), np.float32), parts)
+    assert stats["face"]["kind"] == "skin"
+    card = P.load_palette(card_file(tmp_path, {"kinds": {"accessory": "#c8442f", "metal": "#c0c0d0"},
+                                               "roles": {"main": "#2e7d5b", "sub": "#3050c0", "accent": "#f0d040"}}))
+    got = {n: wh for n, (_, wh) in P.match(sj, card, stats).items()}
+    assert got == {"bow": "kinds", "brown-coat": "roles.main", "eyewear": "kinds"}
+
+
+def test_touches_run_without_a_matched_part_and_the_later_wins(hinted, tmp_path):
+    """A card that names no part still runs its touches; where touches overlap the later one wins (a colour, then a
+    keep: as drawn; a keep, then a colour: the colour; a colour, then a part: the part's colour)."""
+    import _colour as C
+    from _core import load_rgba
+    subject, _, at = hinted
+    src, _ = load_rgba(subject.parent / "image.png")
+    x, y = p = at(320, 450)
+
+    def finish(card, touches, name):
+        d = tmp_path / name
+        d.mkdir()
+        t = d / "touch.json"
+        t.write_text(json.dumps({"format": "refinish-touch/1", "touch": touches}), encoding="utf-8")
+        r, _ = run("palette.py", "apply", subject, card_file(d, card), d / "carded.json", "--touch", t)
+        assert r.returncode == 0, r.stderr[-400:]
+        r, _ = run("refinish.py", d / "carded.json", "tv-cel", d / "out.png", "--no-check")
+        assert r.returncode == 0, r.stderr[-400:]
+        return load_rgba(d / "out.png")[0]
+
+    def hue(ok):
+        return np.degrees(np.arctan2(ok[2], ok[1])) % 360
+
+    def near(res, hexc):
+        got = np.median(C.srgb_to_oklab(res[y - 3:y + 4, x - 3:x + 4].reshape(-1, 3)), 0)
+        return abs((hue(got) - hue(C.srgb_to_oklab(C.parse_hex(hexc))) + 180) % 360 - 180) < 30
+
+    def as_drawn(res):
+        return np.abs(res[y - 1:y + 2, x - 1:x + 2] - src[y - 1:y + 2, x - 1:x + 2]).max() < 0.02
+
+    red, green = "#c8442f", "#2e7d5b"
+    assert near(finish({}, [{"at": p, "to": red}], "a"), red)
+    assert as_drawn(finish({}, [{"at": p, "to": red}, {"at": p, "keep": True}], "b"))
+    assert near(finish({}, [{"at": p, "keep": True}, {"at": p, "to": red}], "c"), red)
+    assert near(finish({"parts": {"jacket": green}}, [{"at": p, "to": red}, {"at": p, "as": "jacket"}], "d"), green)
+
+
+def test_the_card_checks_run_only_where_a_card_is_applied(hinted, tmp_path):
+    """The paint engines do not apply a colour card: the card's checks are skipped and the report says so. The auto
+    duotone, which paints the figure as one part, finishes a carded subject that has touches."""
+    subject, _, at = hinted
+    touch = tmp_path / "touch.json"
+    touch.write_text(json.dumps({"format": "refinish-touch/1", "touch": [{"at": at(310, 760), "as": "jacket"}]}),
+                     encoding="utf-8")
+    r, _ = run("palette.py", "apply", subject, card_file(tmp_path, {"parts": {"jacket": "#2e7d5b"}}),
+               tmp_path / "carded.json", "--touch", touch)
+    assert r.returncode == 0, r.stderr[-400:]
+    r, d = run("refinish.py", tmp_path / "carded.json", "gouache", tmp_path / "paint.png")
+    assert r.returncode in (0, 1), r.stderr[-400:]
+    assert "not applied" in d["check"]["card"] and not any(f.startswith("RC") for f in d["check"]["findings"])
+    r, _ = run("refinish.py", tmp_path / "carded.json", "duotone-auto", tmp_path / "duo.png", "--no-check")
+    assert r.returncode == 0 and "Traceback" not in r.stderr, r.stderr[-400:]
+
+
+def test_o7_leaves_a_skin_the_card_recoloured_to_rc1():
+    """A darker skin printed far lighter fails O7, unless a colour card asked for that skin (RC1 measures it)."""
+    import _check as K
+    from _core import Units
+    h, w = 200, 200
+    img = np.full((h, w, 3), 0.9, np.float32)
+    alpha = np.zeros((h, w), np.float32)
+    alpha[20:180, 40:160] = 1
+    parts = np.zeros((h, w), np.uint8)
+    parts[20:180, 40:160] = 2
+    parts[30:110, 60:140] = 1
+    img[parts == 2] = (0.3, 0.3, 0.5)
+    img[parts == 1] = (0.435, 0.27, 0.184)                        # #6f452f
+    out = img.copy()
+    out[parts == 1] = (0.957, 0.812, 0.671)                       # #f4cfab
+    subject = {"parts": [{"name": "skin", "kind": "skin"}, {"name": "coat", "kind": "cloth"}],
+               "focal": [{"name": "face", "centre": [100, 70], "radii": [40, 40], "strength": 1.0}]}
+    U = Units(alpha)
+    assert any(f["id"] == "O7" for f in K.look_checks(subject, img, alpha, parts, out, U, "cel"))
+    subject["recolour"] = {"parts": {"skin": {"base": "#f4cfab"}}}
+    assert not any(f["id"] == "O7" for f in K.look_checks(subject, img, alpha, parts, out, U, "cel"))
+
+
+def test_rc1_reads_the_hue_under_a_style_grade_and_rc3_lets_eyes_differ():
+    """Under `grade: style` the style sets a card colour's lightness and chroma, so RC1 compares the hue: a coat in its
+    card colour desaturated passes there and fails under `grade: card`; a coat 40 degrees off fails both. RC3 compares
+    the two eyes only when the card gives them one colour: eyes of two colours, each its own, pass."""
+    import _check as K
+    import _colour as C
+    from _core import Units
+
+    def rgb(L, a, b):
+        return cv2.cvtColor(np.float32([[[L, a, b]]]), cv2.COLOR_Lab2RGB)[0, 0]
+
+    tones = {"base": (65, 40, 30), "shadow": (25, 30, 20), "deep": (12, 15, 10), "highlight": (95, 10, 8)}
+    entry = {s: C.to_hex(rgb(*v)) for s, v in tones.items()}
+    eyes = {"left-iris": {"base": "#d04040", "shadow": "#a03030", "deep": "#702020", "highlight": "#f08080"},
+            "right-iris": {"base": "#3a8fd0", "shadow": "#2a6fa0", "deep": "#1a4f70", "highlight": "#8ac0f0"}}
+    h, w = 220, 300
+    alpha = np.ones((h, w), np.float32)
+    parts = np.full((h, w), 4, np.uint8)                          # 4: the skin
+    parts[110:] = 1                                               # 1: the coat
+    parts[40:60, 60:80], parts[40:60, 200:220] = 2, 3             # 2, 3: the irises
+    img = np.zeros((h, w, 3), np.float32)
+    img[parts == 4], img[parts == 1] = (0.95, 0.8, 0.7), (0.3, 0.35, 0.6)
+    img[(parts == 2) | (parts == 3)] = (0.45, 0.3, 0.15)
+    subject = {"parts": [{"name": "coat", "kind": "cloth"}, {"name": "left-iris", "kind": "eyes"},
+                         {"name": "right-iris", "kind": "eyes"}, {"name": "skin", "kind": "skin"}],
+               "protect": [{"name": "left eye", "box": [50, 30, 90, 70]},
+                           {"name": "right eye", "box": [190, 30, 230, 70]}],
+               "recolour": {"parts": {"coat": entry, **eyes}}}
+
+    def paint(scale=1.0, rot=0.0, right="#3a8fd0"):
+        out = img.copy()
+        th = np.radians(rot)
+        for (lo, hi), s in (((110, 176), "base"), ((176, 206), "shadow"), ((206, 220), "deep")):
+            L, a, b = tones[s]
+            a, b = scale * a, scale * b
+            out[lo:hi] = rgb(L, a * np.cos(th) - b * np.sin(th), a * np.sin(th) + b * np.cos(th))
+        out[parts == 2], out[parts == 3] = C.parse_hex("#d04040"), C.parse_hex(right)
+        return out
+
+    U = Units(alpha)
+
+    def ids(out, grade):
+        subject["recolour"]["grade"] = grade
+        return [f["id"] for f in K.recolour_checks(subject, img, alpha, parts, out, U)]
+
+    assert "RC1" in ids(paint(0.5), "card") and "RC1" not in ids(paint(0.5), "style")
+    assert "RC1" in ids(paint(rot=40), "style") and "RC1" in ids(paint(rot=40), "card")
+    assert "RC3" not in ids(paint(), "card")                      # eyes of two colours, each its own
+    subject["recolour"]["parts"]["right-iris"] = dict(eyes["left-iris"])
+    assert "RC3" in ids(paint(right="#702020"), "card")           # one colour asked, one eye far darker
+
+
+def test_parse_votes_count_the_eye_labels_apart():
+    """The eye split's labels (iris 20 to eye-kept 23) have bins of their own, not the next region's hair."""
+    import auto_parts as ap
+    reg = np.array([[1, 1, 2, 2]], np.int32)
+    parse = np.array([[ap.PARSE["eye-white"], ap.PARSE["eye-white"], 0, 0]], np.uint8)
+    v = ap.parse_votes(reg, parse, 2)
+    assert v[2, ap.PARSE["hair"]] == 0 and v[1, ap.PARSE["eye-white"]] == 2
+
+
+def test_a_held_region_keeps_to_the_boxes_of_a_part_that_took_it():
+    """The regions a head parse holds stay with the hair and the skin whatever their boxes say; a part that took one
+    by a point keeps it only inside its own boxes (a lock of hair joined to a brush's handle goes back to the hair)."""
+    import auto_parts as ap
+    reg = np.zeros((40, 40), np.int32)
+    reg[:, :20], reg[:, 20:] = 1, 2
+    L = np.zeros((40, 40, 3), np.float32)
+    L[:, :20], L[:, 20:] = (40, 20, 20), (42, 18, 18)
+    within = np.ones((40, 40), bool)
+    parts = [{"name": "hair", "kind": "hair", "regions": [2]}, {"name": "brush", "kind": "accessory", "regions": [1]}]
+    hints = [{"name": "hair", "at": [[30, 20]]}, {"name": "brush", "at": [[10, 10]], "boxes": [[0, 0, 20, 20]]}]
+    reg2, parts2, moved = ap.keep_to_boxes(reg, parts, hints, L, within, 0, held=[1, 2])
+    name = {i: p["name"] for p in parts2 for i in p["regions"]}
+    assert moved > 0 and name[int(reg2[10, 10])] == "brush" and name[int(reg2[30, 10])] == "hair"
+
+
+def test_an_eyes_crop_holds_its_clicks_and_a_missing_iris_stays_doubtful():
+    """The crop an eye is split in widens to hold every click given for it, inside the picture. Clicks settle the
+    doubts about a split's proportions, but an eye whose iris did not come out stays doubtful."""
+    import seethrough_parse as sp
+    assert sp.eye_crop(100, 100, 40, 20, 500, 500) == (80, 88, 160, 132)
+    assert sp.eye_crop(100, 100, 40, 20, 500, 500, [(120, 60), (-5, 700)]) == (0, 58, 160, 500)
+    iris = np.ones((4, 4), bool)
+    assert sp.settle("fixed", None, ["no iris found"]) == "doubtful"
+    assert sp.settle("fixed", np.zeros((4, 4), bool), []) == "doubtful"
+    assert sp.settle("fixed", iris, ["the iris is small"]) == "fixed"
+    assert sp.settle("auto", iris, ["the iris is small"]) == "doubtful" and sp.settle("auto", iris, []) == "auto"
+
+
+def test_palette_read_stops_on_a_point_off_the_picture(tmp_path):
+    p = tmp_path / "card.png"
+    cv2.imwrite(str(p), np.full((40, 30, 3), 128, np.uint8))
+    r, _ = run("palette.py", "read", p, "--at", "9000,9000,coat")
+    assert r.returncode == 2 and "outside the picture" in r.stderr
+    r, d = run("palette.py", "read", p, "--at", "10,10,coat")
+    assert r.returncode == 0 and d["swatches"][0]["hex"] == "#808080"

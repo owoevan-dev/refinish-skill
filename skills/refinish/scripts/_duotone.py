@@ -133,6 +133,7 @@ def _auto(subject, img, alpha, U, base_name):
     from _style import load_style, resolve_style
     one = dict(subject)
     one.update({"parts": [{"name": "all", "kind": "cloth"}], "protect": [], "blush": [], "rules": {}})
+    one.pop("recolour", None)                          # (a colour card names parts this one-part subject has not)
     one_map = (alpha > 0.5).astype(np.uint8)
     out, model = _cel.run(one, load_style(resolve_style(base_name)), img, alpha, one_map, U)
     return out, model.get("all", {})

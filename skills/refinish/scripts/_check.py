@@ -409,9 +409,12 @@ def look_checks(subject, img, alpha, parts, out, U, engine=None):
     # O7: a darker skin printed far lighter (every skin painted the period's pale), or a light one far darker than the
     # rest of the figure went
     from _core import ellipse_mask
-    face = skin & (ellipse_mask(h, w, subject.get("focal", [])) > 0.5)
+    # (a skin a colour card recoloured was asked to change: RC1 measures it against the card)
+    carded = (subject.get("recolour") or {}).get("parts", {})
+    skin7 = skin & ~np.isin(parts, [j for j, p in enumerate(plist, start=1) if p["name"] in carded])
+    face = skin7 & (ellipse_mask(h, w, subject.get("focal", [])) > 0.5)
     if face.sum() < 300:
-        face = skin
+        face = skin7
     if face.sum() >= 300 and engine not in NO_SKIN_CHECK:
         # read wider still: a pop-art screen's dots are 9 u apart, and a face's tone is what they average to
         # (within the skin: dark hair round a small face must not darken it)
@@ -494,6 +497,7 @@ def recolour_checks(subject, img, alpha, parts, out, U):
     rec = (subject.get("recolour") or {}).get("parts", {})
     if not rec:
         return []
+    graded = subject["recolour"].get("grade", "card") == "style"
     found = []
     within = alpha > 0.5
     f = lab(out)
@@ -531,7 +535,7 @@ def recolour_checks(subject, img, alpha, parts, out, U):
             continue
         m = (parts == j) & within & ~kept
         inner = cv2.erode(m.astype(np.uint8), np.ones((k, k), np.uint8)) > 0
-        if p.get("kind") != "eyes":
+        if kind_of(p) != "eyes":
             inner &= ~ink
         if inner.sum() < 60:
             continue
@@ -546,12 +550,23 @@ def recolour_checks(subject, img, alpha, parts, out, U):
         bi = list(card).index("base")
         ys, xs = np.nonzero(inner)
         box = [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1]
-        if p.get("kind") != "eyes" and float((lab_ == bi).mean()) > 0.03:
-            de = float(C.ciede2000(cents[bi], card["base"]))
-            if de > 3.0:
-                found.append({"id": "RC1", "level": "FAIL" if de > 6.0 else "WARN", "part": p["name"], "box": box,
-                              "area": int(inner.sum()),
-                              "what": f"'{p['name']}' is painted {de:.1f} (CIEDE2000) off the card's base {r['base']}"})
+        if kind_of(p) != "eyes" and float((lab_ == bi).mean()) > 0.03:
+            cb = card["base"]
+            if graded:
+                # under `grade: style` the style sets the lightness and the chroma: the hue is the card's
+                off = abs((_hue_deg(cents[bi][None])[0] - _hue_deg(cb[None])[0] + 180) % 360 - 180)
+                if np.hypot(cb[1], cb[2]) >= 8 and off > 15:
+                    found.append({"id": "RC1", "level": "FAIL" if off > 30 else "WARN", "part": p["name"],
+                                  "box": box, "area": int(inner.sum()),
+                                  "what": f"'{p['name']}' is painted {off:.0f} degrees of hue off the card's base "
+                                          f"{r['base']} (grade: style)"})
+            else:
+                de = float(C.ciede2000(cents[bi], cb))
+                if de > 3.0:
+                    found.append({"id": "RC1", "level": "FAIL" if de > 6.0 else "WARN", "part": p["name"],
+                                  "box": box, "area": int(inner.sum()),
+                                  "what": f"'{p['name']}' is painted {de:.1f} (CIEDE2000) off the card's base "
+                                          f"{r['base']}"})
         # RC2: the old colour, wherever it lies in the part's fills outside the protected boxes (inside them the
         # features are kept as drawn, and what the part map gave this part only there with them; RC3 measures the
         # irises). The darkest pixels, below L* 25, are ink: their colour is the style's (a brown ink over brown hair
@@ -559,7 +574,7 @@ def recolour_checks(subject, img, alpha, parts, out, U):
         # (an eyes part: its iris alone, as the finish recolours it, _recolour.iris_core; an iris a segmenter split,
         # whole)
         core = None
-        if p.get("kind") == "eyes":
+        if kind_of(p) == "eyes":
             core = m if p.get("exact") else rc_.iris_core(subject, m & iris_src) | (m & touched_eyes)
         m2 = (m & ~in_box & ~ink if core is None else core & ~lost_box) & (f[..., 0] >= 25)
         old = np.median(fs[inner], axis=0)
@@ -601,7 +616,8 @@ def recolour_checks(subject, img, alpha, parts, out, U):
             found.append({"id": "RC3", "level": "FAIL", "part": name, "box": box, "area": 0,
                           "what": f"the iris in this eye is {off:.0f} degrees of hue off the card's"
                                   + (why if box in lost else "")})
-    if len(iris) >= 2:
+    # the two eyes against each other when the card gives them one colour (eyes of two colours match their own)
+    if len(iris) >= 2 and float(C.ciede2000(iris[0][3], iris[1][3])) < 3.0:
         d = float(C.ciede2000(iris[0][0], iris[1][0]))
         if d > 10:
             odd = next((t for t in iris if t[1] in lost), iris[1])

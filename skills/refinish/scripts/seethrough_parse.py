@@ -111,6 +111,29 @@ def load_fixes(path):
     return fixes
 
 
+def eye_crop(x, y, bw, bh, w, h, clicks=()):
+    """An eye's crop for the segmenter: its box widened by half its width on each side and 0.6 of its height above
+    and below, and further to hold every click given for it (a 'not' click on the brow above a small eye), inside
+    the picture. (x0, y0, x1, y1)."""
+    x0, y0 = x - bw // 2, y - int(0.6 * bh)
+    x1, y1 = x + bw + bw // 2, y + bh + int(0.6 * bh)
+    for cx, cy in clicks:
+        x0, y0 = min(x0, int(cx) - 2), min(y0, int(cy) - 2)
+        x1, y1 = max(x1, int(cx) + 3), max(y1, int(cy) + 3)
+    return max(0, x0), max(0, y0), min(w, x1), min(h, y1)
+
+
+def settle(status, iris, why):
+    """An eye's status once split. An automatic split with doubts is doubtful. Clicks settle the doubts about its
+    proportions, but not an iris that did not come out: that eye stays doubtful, keeps its parse label and is left to
+    the colours."""
+    if status == "fixed" and (iris is None or not iris.any()):
+        return "doubtful"
+    if status == "auto" and why:
+        return "doubtful"
+    return status
+
+
 def gridded(crop, x0, y0, s):
     """A crop enlarged s times with a grid of the picture's coordinates."""
     t = cv2.resize(crop, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
@@ -167,11 +190,11 @@ def split_eyes(segmenter, rgb, lab_map, fixes, device):
     report, rows = [], []
     for n, c in enumerate(sorted(comps, key=lambda c: cen[c][0])):
         x, y, bw, bh = (int(v) for v in st[c][:4])
-        x0, y0 = max(0, x - bw // 2), max(0, y - int(0.6 * bh))
-        x1, y1 = min(w, x + bw + bw // 2), min(h, y + bh + int(0.6 * bh))
+        fix = fixes.get(n)
+        x0, y0, x1, y1 = eye_crop(x, y, bw, bh, w, h, [] if not fix or fix.get("keep") else
+                                  [q for k_ in ("iris", "white", "not") for q in fix.get(k_, [])])
         crop = np.ascontiguousarray(rgb[y0:y1, x0:x1])
         eye = (cc == c)[y0:y1, x0:x1]
-        fix = fixes.get(n)
         status, iris, white, lash = "kept", None, np.zeros_like(eye), np.zeros_like(eye)
         if not (fix and fix.get("keep")):
             ctx = torch.autocast("cuda", dtype=torch.bfloat16) if device == "cuda" else torch.autocast("cpu",
@@ -183,8 +206,9 @@ def split_eyes(segmenter, rgb, lab_map, fixes, device):
                     masks, scores, _ = segmenter.predict(point_coords=pts, point_labels=labels, multimask_output=True)
                     return masks, scores
 
-                def to(q):
-                    return [(float(a) - x0, float(b) - y0) for a, b in q]
+                def to(q):                                 # (a click off the picture lands on its edge)
+                    return [(min(max(float(a) - x0, 0.0), x1 - x0 - 1.0), min(max(float(b) - y0, 0.0), y1 - y0 - 1.0))
+                            for a, b in q]
 
                 if fix:
                     iris, white, lash = _eyes.split(predict, crop, eye, to(fix["iris"]), to(fix.get("white", [])),
@@ -194,8 +218,7 @@ def split_eyes(segmenter, rgb, lab_map, fixes, device):
                     iris, white, lash = _eyes.split(predict, crop, eye)
                     status = "auto"
         why = _eyes.doubts(iris, white, lash, eye) if status != "kept" else []
-        if status == "auto" and why:
-            status = "doubtful"
+        status = settle(status, iris, why)
         blk = lab_map[y0:y1, x0:x1]
         if status == "kept":
             blk[eye] = EYE0 + 3

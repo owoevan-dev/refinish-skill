@@ -39,11 +39,11 @@ def run(subject, style, img, alpha, parts, U):
     kept_drawn = None
     touches = []
     touched_eyes = touched_rec = None                    # (what the touches gave an iris; a part the card recoloured)
-    if rec:
+    if rec or card.get("touch"):
         parts, kept_drawn, _ = rc_.mend_parts(subject, img, alpha, parts, U, kinds)
         touches = rc_.touch_masks(subject, img, alpha, U)
         names = [p["name"] for p in plist]
-        to_kind = [kinds[names.index(t["as"]) + 1] if "as" in t else None for _, t in touches]
+        to_kind = [kinds[names.index(t["as"]) + 1] if t.get("as") in names else None for _, t in touches]
         touched_eyes = np.zeros((h, w), bool)
         touched_rec = np.zeros((h, w), bool)
         for (m_, t), k in zip(touches, to_kind):
@@ -526,15 +526,22 @@ def run(subject, style, img, alpha, parts, U):
                                 within & ~is_line, Lv0) | touched_rec
         if other.any():
             prot = prot * (1 - cv2.GaussianBlur(other.astype(np.float32), (0, 0), 1.0))
-        if kept_drawn.any():
-            # the pieces the part map joined to a recoloured part by colour alone, and what a touch keeps or paints
-            # in its own colour, as drawn (mend_parts)
-            out[kept_drawn] = img[kept_drawn]
+    if kept_drawn is not None and kept_drawn.any():
+        # the pieces the part map joined to a recoloured part by colour alone, and what a touch keeps or paints in its
+        # own colour, as drawn (mend_parts)
+        out[kept_drawn] = img[kept_drawn]
     out = out * (1 - prot[..., None]) + src_feat * prot[..., None]
-    for m_, t in touches:
-        if "to" in t and m_.any():
-            # a touch's own colour (`to`): its drawing carried onto the colour, as an iris is, inside a box too
-            out[m_] = rc_.transfer(img, m_, rc_.knots(t["to"]), white_keep=True)
+    if touches:
+        # a touch's own colour (`to`): its drawing carried onto the colour, as an iris is. Where touches overlap, the
+        # later one wins, as in the part map; a white keeps its white only inside the protected boxes (a catchlight),
+        # so a white shirt takes the colour
+        in_box = rc_.box_fade(subject, h, w) > 0
+        later = np.zeros((h, w), bool)
+        for m_, t in reversed(touches):
+            mine = m_ & ~later
+            if "to" in t and mine.any():
+                out[mine] = rc_.transfer(img, mine, rc_.knots(t["to"]), white_keep=in_box[mine])
+            later |= m_
     gr = style.get("texture", {}).get("grain", 0.0)
     if gr > 0:
         rng = np.random.default_rng(style.get("seed", 7))

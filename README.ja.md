@@ -131,7 +131,7 @@ Refinish は、手元にあるイラストを仕上げ直すための [Agent Ski
 
 **その他のエージェント**
 
-`skills/refinish` をエージェントの skills フォルダにコピーかリンクするか、[skills.sh](https://skills.sh) を使います。
+`skills/refinish` と `skills/recolor` を同じ階層に並べてエージェントの skills フォルダにコピーかリンクするか（Recolor は `../refinish/scripts` のスクリプトを使います）、[skills.sh](https://skills.sh) を使います。
 
 ```
 npx skills add owoevan-dev/refinish-skill
