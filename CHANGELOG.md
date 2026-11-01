@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01
+
 ### Added
 
 - **Recolor**, a second skill in the plugin (`skills/recolor`). It gives a character new colours from a colour card and keeps the drawing as it is. A card can name colours by part ("silver hair"), by kind (all the hair, all the metal) or by role (a main, a sub and an accent colour for the costume). Any shadow, second shadow or highlight the card leaves out is worked out from the base, cooler for most materials and warmer for skin. The result comes out in one of the cel finishes.
@@ -131,5 +133,6 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.
 
-[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/owoevan-dev/refinish-skill/releases/tag/v0.1.0
