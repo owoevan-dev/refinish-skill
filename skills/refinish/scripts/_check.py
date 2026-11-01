@@ -76,9 +76,22 @@ def _clusters(px, k=4, seed=0):
     return [cen[i] / w for i in range(k) if share[i] >= 0.08]
 
 
-def part_map_checks(subject, img, alpha, parts, U, line):
-    """P1, P2, M1: the part map's likely mistakes."""
+def finish_map(subject, img, alpha, parts, U):
+    """The part map a finish painted from, and the pixels it kept as drawn by rule: with a colour card, the map as
+    _recolour.mend_parts mended it (an iris part's hair given back, a part's far pieces kept as drawn, the touches);
+    without one, the map as it is."""
+    if not subject.get("recolour"):
+        return parts, np.zeros(parts.shape, bool)
+    import _recolour as rc_
+    mended, kept, _ = rc_.mend_parts(subject, img, alpha, parts, U, [None] + [kind_of(p) for p in subject["parts"]])
+    return mended, kept
+
+
+def part_map_checks(subject, img, alpha, parts, U, line, mended=None):
+    """P1, P2, M1: the part map's likely mistakes, on the map the finish painted from (finish_map: with a card, a
+    touch's patch is checked as the part it was given)."""
     found = []
+    parts = (mended or finish_map(subject, img, alpha, parts, U))[0]
     for f in misfits(subject, img, alpha, parts, scale=U.s):
         found.append({"id": "P1", "level": "WARN", "part": f["part"], "box": f["box"], "area": f["area"],
                       "what": f"{f['what']} (a misfit: add a sample or a hint point)"})
@@ -89,12 +102,8 @@ def part_map_checks(subject, img, alpha, parts, U, line):
     skin = within & (kinds[parts] == "skin")
     skin_c = np.median(L[skin], axis=0) if skin.sum() > 50 else None
     # P2: the middle of an eye's box is its iris (the bangs and the lashes lie round it); labelled hair or cloth, it
-    # changes with them under a style that moves their colours. With a colour card, on the part map as the finish
-    # mended it for the card (a touch may have given the iris its part)
+    # changes with them under a style that moves their colours
     parts_p2 = parts
-    if subject.get("recolour"):
-        import _recolour as rc_
-        parts_p2 = rc_.mend_parts(subject, img, alpha, parts, U, [None] + [kind_of(p) for p in plist])[0]
     for p in subject.get("protect", []):
         if "eye" not in p["name"] or skin_c is None:
             continue
@@ -170,9 +179,10 @@ def _middle(b, frac=0.4):
     return (slice(xyxy[1], xyxy[3]), slice(xyxy[0], xyxy[2])), xyxy
 
 
-def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
-    """O1 to O6: what went wrong in the finished picture."""
+def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None, mended=None):
+    """O1 to O6: what went wrong in the finished picture, on the map the finish painted from (finish_map)."""
     found = []
+    parts, kept_by_rule = mended or finish_map(subject, img, alpha, parts, U)
     Ls, Lo = lab(img), lab(out)
     within = (alpha > 0.5) & (out_alpha > 0.5)
     plist = subject["parts"]
@@ -183,14 +193,15 @@ def result_checks(subject, img, alpha, parts, out, out_alpha, U, line=None):
     black = Ls[..., 0] < 15
     white = (Ls[..., 0] > 92) & (np.hypot(Ls[..., 1], Ls[..., 2]) < 6)
     # O1: a patch left as drawn inside a part whose other pixels all moved (a box that kept the old hair colour); the
-    # lines, pure black and pure white (a shine) stay as drawn by design and do not count
+    # lines, pure black and pure white (a shine) stay as drawn by design and do not count, nor what a card's finish
+    # keeps as drawn by rule (a part's far pieces, which RC5 names; a touch's `keep`)
     for j, p in enumerate(plist, start=1):
         if kind_of(p) not in PAINTED_KINDS:
             continue
         m = within & (parts == j)
         if m.sum() < 500:
             continue
-        free = m & ~line & ~black & ~white
+        free = m & ~line & ~black & ~white & ~kept_by_rule
         moved = float(np.median(dE[free])) if free.any() else 0.0
         if moved < 8:
             continue

@@ -67,7 +67,7 @@ It writes:
 Exit code 0: done. 1: done, with doubtful eyes. 2: a bad input, or a model not found (the message says which and where it looked).
 
 What `auto_parts.py --parse` takes from it:
-- **The hair and the skin** of the head (the face, the ears and the nose), held: hint points cannot move them. A hint part named `hair` or `skin` adds what its points reach elsewhere.
+- **The hair and the skin** of the head (the face, the ears and the nose), held: a hint part's growth stops at them, and it takes one of their regions only where one of its points lies (inside its boxes), or with its `within` box. A hint part named `hair` or `skin` adds what its points reach elsewhere.
 - **Each split eye**: its iris becomes the part `irises` (kind `eyes`), taken whole by a colour card, with no colour test to thin it; its white `eye-whites` and its lashes `lashes`, both kept as drawn. An eye kept as drawn becomes `eyes-kept`.
 - **The brows** (what lies above an eye) go with the hair.
 - **Glasses, headwear and earrings** become `eyewear` (kind `metal`), `headwear` and `earwear` (kind `metal`). A hint part of the same name adds to them, its kind replacing theirs.
@@ -121,6 +121,6 @@ Measured on 16 eyes of 8 new pictures, the code frozen before they were opened: 
 - **Small eyes.** An eye a few dozen pixels across gives the segmenter too little to read: enlarge the picture with `prep.py` first, or keep the eye as drawn.
 - **Unusual eye designs.** Eyes drawn as heavy angular shapes, with no round iris, are often split wrong; keep them as drawn.
 - **Closed eyes** have no iris: they are reported as doubtful (no iris), and `auto_parts.py`'s closed-eye test keeps them as drawn, as without a parse.
-- **Hair the parse holds.** The head's hair comes from the parse and hint points cannot move it. A garment the long hair falls over (a striped shirt), a held object (a brush) or a shadow on the neck that the parse reads as hair is recoloured with the hair: after the look, give it back with a touch (the Recolor skill's step 6).
+- **Hair the parse holds.** The parse can read as hair a thing held near the head (a brush's handle), and the hints' growth stops at the hair it holds. Look for such pieces on the parts sheet: a hint point on each takes it (its part's boxes must hold it), and a part's `within` box takes many at once. After the look, a touch does the same (the Recolor skill's step 6).
 - **What the models were trained on.** See-Through learned its parts from anime characters. A semi-realistic painting or a chibi may be read worse; look at the parts sheet as for any draft.
 - **Size and speed.** The environment is about 6 GB, and a picture takes seconds on a GPU. For a batch, parse every picture once and keep the `parse.png` files: they do not change with the hints or the style.

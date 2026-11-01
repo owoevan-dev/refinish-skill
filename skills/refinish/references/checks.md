@@ -9,7 +9,7 @@
 | check | level | what it finds | usual cause | fix |
 |---|---|---|---|---|
 | P1 | WARN | a thick blob much darker or lighter than the rest of its part | a misfit in the part map (a dark lock labelled skin) | a hint point, or a sample |
-| P2 | WARN | the middle of an eye's box labelled hair or cloth (with a colour card, on the part map as the finish mended it, touches included) | an iris as dark as the hair, read as hair | give the irises a part of kind `eyes` |
+| P2 | WARN | the middle of an eye's box labelled hair or cloth | an iris as dark as the hair, read as hair | give the irises a part of kind `eyes` |
 | M1 | FAIL (WARN when near-white or near-black) | a patch inside a part with the colour of a part beside it and none of its own | a piece of one part labelled as another (a neck read as the gold collar beside it, a waistband read as the jacket) | move its region, or add a hint point |
 | O1 | FAIL | a patch kept as drawn while the rest of its part changed | a protected box keeping hair or cloth, or a region left out of its part | tighten the box, or give the region its part |
 | O2 | FAIL | the white of an eye painted as skin | eye whites a few steps from the skin's colour | give the whites a part of kind `eyes` |
@@ -29,7 +29,8 @@
 **Where the checks run:**
 - P1 to O6 run on the cel or paint finish. For an engine built on a cel finish (print, woodblock, wash, pencil, pixel, tone, pop, glass, paper cut, drawing, sticker, neon), they run on that cel base.
 - O7 to O9 run on every engine's own result, the duotones included.
-- RC1 to RC5 run when the subject carries a colour card (the Recolor skill), on what the cel finish painted, with the part map as the finish mended it for the card. They measure the fills: inside the protected boxes RC2 does not look (the features there are kept as drawn by design), none of them counts the source's lines, where the style lays its own ink, and RC1 and RC2 leave out the pieces kept as drawn. On an eyes part, RC2 and RC3 measure its iris alone, as the finish recolours it (its thick round mass in each eye's box, not the lash line or strands joined to it).
+- With a colour card (the Recolor skill), every check reads the part map the finish painted from: mended for the card, the touches included. A patch a touch gave to another part is checked as that part's, and O1 leaves out what the card's finish keeps as drawn by rule (a part's far pieces, which RC5 names; a touch's `keep`).
+- RC1 to RC5 run when the subject carries a colour card, on what the cel finish painted. They measure the fills: inside the protected boxes RC2 does not look (the features there are kept as drawn by design), none of them counts the source's lines, where the style lays its own ink, and RC1 and RC2 leave out the pieces kept as drawn. On an eyes part, RC2 and RC3 measure its iris alone, as the finish recolours it (its thick round mass in each eye's box, not the lash line or strands joined to it).
 
 **How the O7 to O9 thresholds were set:** on 740 results, 37 styles on 20 generated figures, before and after the fixes they point at.
 - **Before the fixes**, they found:

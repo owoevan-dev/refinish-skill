@@ -1101,16 +1101,18 @@ def grab_parts(reg, hint_parts, img, within, locked, s, margin, soft=()):
     return reg, owner
 
 
-def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
+def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None, held=()):
     """The parts pointed at (by whoever looked at the picture: "the hair is here, here and here; the skirt here"),
     grown from the regions under the points, all at once, the way a colourist's bucket fills a drawing (scribble
     colouring, as in LazyBrush, Sykora et al. 2009): each region goes to the part that reaches it first, so a navy
     skirt and navy hair pointed at apart stay apart where they meet. A part grows into a touching region of its
     colour that it borders along a good part of its edge or that carries on below it, and into the small shines it
     rings; never into the locked regions (the eyes and the mouth already carved), nor into the regions owned already
-    (`fixed`: the parts found in their boxes), nor outside its boxes when it has them. Returns {region: index of the
+    (`fixed`: the parts found in their boxes), nor outside its boxes when it has them. Nor into the `held` regions (the
+    head as a part segmentation read it), which a part takes only where whoever looked said so: a point placed on one,
+    or its `within` box (a brush's handle the parse read as hair). Returns {region: index of the
     hint}."""
-    locked = set(locked)
+    locked, held, cut = set(locked), set(held), set(fixed or {})
     import heapq
     owner, heap, colour = dict(fixed or {}), [], []
     for k, hp in enumerate(hint_parts):
@@ -1134,7 +1136,7 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
             continue
         owner[j] = k
         for q in nb.get(j, {}):
-            if q == 0 or q in owner or q in locked or not in_boxes(q, k):
+            if q == 0 or q in owner or q in locked or q in held or not in_boxes(q, k):
                 continue
             edge = sum(c for r, c in nb[q].items() if r != 0)
             shared = sum(c for r, c in nb[q].items() if owner.get(r) == k)
@@ -1154,13 +1156,19 @@ def claim(hint_parts, reg, st, nb, fig, locked=(), budget=14.0, fixed=None):
                     continue
             heapq.heappush(heap, (cost + 1.0 + d / 10.0, q, k))
     # "within": every other region of the part's colour inside the box given (the scattered motifs of a print,
-    # a row of buttons), the way an editor selects similar colours inside a selection
+    # a row of buttons), the way an editor selects similar colours inside a selection; the held regions too, which
+    # only a selection or a point takes, and what another part's box cut gave it when its colour is nearer the
+    # selection's than that part's (a generous box round long hair takes a shirt's dark stripes by their grey; a
+    # selection of the shirt's white leaves the shirt's own cut alone)
     for k, hp in enumerate(hint_parts):
         if "within" not in hp:
             continue
         x0, y0, x1, y1 = hp["within"]
         for q in range(1, len(st["area"])):
-            if q in owner or q in locked or st["area"][q] == 0:
+            if q in locked or st["area"][q] == 0:
+                continue
+            if q in owner and (q not in cut or owner[q] == k or
+                               cdist(st["lab"][q], colour[k]) >= cdist(st["lab"][q], colour[owner[q]])):
                 continue
             if x0 <= st["cx"][q] <= x1 and y0 <= st["cy"][q] <= y1 and cdist(st["lab"][q], colour[k]) <= budget:
                 owner[q] = k
@@ -1919,8 +1927,8 @@ def main():
                       **({"_why": why} if why else {})})
     # the parts pointed at take their regions from whatever part the draft gave them to
     if hints.get("parts"):
-        locked = [i for v in carved.values() for i in v] + parse_locked
-        owner = claim(hints["parts"], reg, st, nb, fig, locked=locked, fixed=grabbed)
+        locked = [i for v in carved.values() for i in v]
+        owner = claim(hints["parts"], reg, st, nb, fig, locked=locked, fixed=grabbed, held=parse_locked)
         if hints.get("complete"):
             # the reviewer named every part: what no point reached joins a touching named part by seeded region
             # growing (Adams and Bischof 1994): of all the unclaimed regions touching a part, the one nearest in colour
@@ -1944,7 +1952,7 @@ def main():
                     return 1e9
                 return min((cdist(st["lab"][i], c) for c in seeds_c[k]), default=1e9)
 
-            lockset = set(locked)
+            lockset = set(locked) | set(parse_locked)
             rest_ids = {i for i in range(1, n + 1) if i not in owner and i not in lockset and st["area"][i] > 0}
             heap = []
             for i in rest_ids:

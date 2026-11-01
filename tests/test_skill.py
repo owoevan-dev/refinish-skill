@@ -1503,6 +1503,37 @@ def test_eye_doubts_flag_a_split_that_looks_wrong():
     assert any("white" in d for d in _eyes.doubts(iris, np.zeros_like(eye), lash, eye))
 
 
+def test_a_point_or_within_takes_what_the_parse_holds():
+    """The parse holds the head's hair, and a part's growth stops at it; a point placed on a region it holds, or the
+    part's within box, takes it (a brush's handle the parse read as hair, in pieces between the fingers)."""
+    import auto_parts as ap
+    reg = np.zeros((40, 40), np.int32)
+    reg[0:10], reg[10:15], reg[15:20], reg[20:40] = 1, 2, 3, 4      # hair, two dark stripes, the white shirt
+    n = 5
+    lab_ = np.zeros((n, 3))
+    lab_[1], lab_[2], lab_[3], lab_[4] = (70, 0, -2), (38, 1, -3), (39, 1, -3), (92, 0, 0)
+    ys, xs = np.mgrid[0:40, 0:40]
+    st = {"area": np.bincount(reg.ravel(), minlength=n).astype(float), "lab": lab_,
+          "cx": np.array([xs[reg == i].mean() if i else 0 for i in range(n)]),
+          "cy": np.array([ys[reg == i].mean() if i else 0 for i in range(n)]),
+          "box": [(slice(int(ys[reg == i].min()), int(ys[reg == i].max()) + 1),
+                   slice(0, 40)) for i in range(1, n)]}
+    nb = {1: {2: 40}, 2: {1: 40, 3: 40}, 3: {2: 40, 4: 40}, 4: {3: 40}}
+    fig = {"area": 1e6}
+    point = [{"name": "stripes", "kind": "cloth-dark", "at": [[20, 12]]}]
+    assert ap.claim(point, reg, st, nb, fig, held=[1, 2, 3]) == {2: 0}          # the point's region, no growth
+    assert ap.claim(point, reg, st, nb, fig).get(3) == 0                        # (nothing held: it grows)
+    sel = [{**point[0], "within": [0, 0, 40, 40]}]
+    assert ap.claim(sel, reg, st, nb, fig, held=[1, 2, 3]) == {2: 0, 3: 0}      # the stripes, not the hair
+    # a selection is surer than another part's box cut (a generous box round long hair takes the stripes by colour)
+    two = [{"name": "hair", "kind": "hair", "at": [[20, 5]]}, sel[0]]
+    assert ap.claim(two, reg, st, nb, fig, fixed={3: 0}, held=[1, 2, 3]).get(3) == 1
+    # but not a region nearer the cutting part's colour: a selection of white leaves the white shirt's own cut alone
+    white = [{"name": "shirt", "kind": "cloth-white", "at": [[20, 30]]},
+             {"name": "pick", "kind": "accessory", "at": [[20, 30]], "within": [0, 0, 40, 40]}]
+    assert ap.claim(white, reg, st, nb, fig, fixed={4: 0}).get(4) == 0
+
+
 def test_an_eye_below_the_nose_is_the_mouth():
     """The part segmentation read a laughing mouth as an eye (its teeth a white, its tongue an iris): what it calls an
     eye below the nose goes to the mouth; the eyes above stay, the lower eye of a tilted head too."""

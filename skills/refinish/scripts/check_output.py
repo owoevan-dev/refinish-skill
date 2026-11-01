@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _check import look_checks, part_map_checks, result_checks, review, verdict  # noqa: E402
+from _check import finish_map, look_checks, part_map_checks, result_checks, review, verdict  # noqa: E402
 from _core import Units, die, emit, load_rgba  # noqa: E402
 from _lines import find_lines  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
@@ -41,8 +41,9 @@ from parts import load_or_build  # noqa: E402
 def run_checks(sj, img, alpha, parts, out, out_alpha):
     U = Units(alpha, sj.get("head_px"))
     line = (find_lines(img, sj.get("upscaled", 1)) > 0.3) & (alpha > 0.5)
-    return (part_map_checks(sj, img, alpha, parts, U, line)
-            + result_checks(sj, img, alpha, parts, out, out_alpha, U, line))
+    mended = finish_map(sj, img, alpha, parts, U)
+    return (part_map_checks(sj, img, alpha, parts, U, line, mended)
+            + result_checks(sj, img, alpha, parts, out, out_alpha, U, line, mended))
 
 
 def main():
@@ -78,8 +79,9 @@ def main():
         note = (f"layers over the finish ({', '.join(layers)}): only the part map was checked; refinish.py checks the "
                 "finish before its layers when it makes the picture")
     elif engine is None or engine in CHECKED:
-        found = (part_map_checks(sj, img, alpha, parts, U, line)
-                 + result_checks(sj, img, alpha, parts, out, out_alpha, U, line)
+        mended = finish_map(sj, img, alpha, parts, U)
+        found = (part_map_checks(sj, img, alpha, parts, U, line, mended)
+                 + result_checks(sj, img, alpha, parts, out, out_alpha, U, line, mended)
                  + look_checks(sj, img, alpha, parts, out, U, engine))
         if sj.get("recolour"):                      # a colour card's parts against the card, as refinish.py checks them
             from _check import recolour_checks
