@@ -1,7 +1,10 @@
 """The repository as it is published: versions, links, install pins, the CI workflow, and what a file may contain."""
 import ast
 import json
+import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import unicodedata
@@ -47,7 +50,16 @@ def test_every_version_agrees():
 def test_both_marketplaces_list_the_plugin():
     claude = load(ROOT / ".claude-plugin" / "plugin.json")
     markets = load(ROOT / ".claude-plugin" / "marketplace.json"), load(ROOT / ".agents" / "plugins" / "marketplace.json")
-    assert all([p["name"] for p in m["plugins"]] == [claude["name"]] for m in markets)
+    assert all(m["name"] == claude["name"] and [p["name"] for p in m["plugins"]] == [claude["name"]] for m in markets)
+    sources = markets[0]["plugins"][0]["source"], markets[1]["plugins"][0]["source"]["path"]
+    assert all((ROOT / s / ".claude-plugin" / "plugin.json").is_file() for s in sources)
+
+
+def test_both_hosts_find_the_same_skills():
+    claude, codex = load(ROOT / ".claude-plugin" / "plugin.json"), load(ROOT / ".codex-plugin" / "plugin.json")
+    listed = {(ROOT / rel).resolve() for rel in claude["skills"]}
+    found = {p.parent.resolve() for p in (ROOT / codex["skills"]).glob("*/SKILL.md")}
+    assert listed == found == {s.resolve() for s in SKILLS} and len(found) == 2
 
 
 def test_listing_icons():
@@ -218,13 +230,22 @@ def test_pins_are_inside_the_tested_range():
         assert all(check_env.in_range(key, v) for v, _ in pins()[name]), name
 
 
-def test_oldest_constraints_sit_at_the_floor():
+def test_ci_covers_both_ends_of_the_tested_range():
+    """What check_env.py calls tested is what CI runs: the oldest versions, and the last release before the limit."""
     import check_env
-    rows = dict(l.split("==") for l in (ROOT / "tests" / "constraints-oldest.txt").read_text(encoding="utf-8").split("\n")
-                if l and not l.startswith("#"))
-    assert check_env.version_tuple(rows["opencv-python-headless"]) == check_env.TESTED["cv2"][0]
-    assert check_env.version_tuple(rows["scipy"]) == check_env.TESTED["scipy"][0]
-    assert check_env.in_range("numpy", rows["numpy"])
+    oldest = {n: v for n, v, _, _ in entries(ROOT / "tests" / "requirements-oldest.txt")}
+    newest = {n: v for n, v, _, _ in entries(ROOT / "tests" / "requirements-newest.txt")}
+    for name, key in (("numpy", "numpy"), ("scipy", "scipy"), ("opencv-python-headless", "cv2")):
+        low, high = check_env.TESTED[key]
+        assert check_env.version_tuple(oldest[name]) == low, name
+        assert check_env.version_tuple(newest[name]) == (high[0], high[1] - 1), name
+
+
+@pytest.mark.parametrize("name", ["requirements-oldest.txt", "requirements-newest.txt"])
+def test_the_range_files_are_pinned_by_hash(name):
+    rows = entries(ROOT / "tests" / name)
+    assert {r[0] for r in rows} == {"numpy", "scipy", "opencv-python-headless"}
+    assert all(len(r[3]) >= 5 and all(re.fullmatch(r"[0-9a-f]{64}", h) for h in r[3]) for r in rows)
 
 
 def test_script_headers_allow_the_pin():
@@ -252,12 +273,12 @@ def test_step_zero_uses_the_environment_check(skill):
 
 # --------------------------------------------------------------------------------------------------- the environment
 
-def fake_env(monkeypatch, versions, errors=None, dists=None, managed=False):
+def fake_env(monkeypatch, versions, errors=None, dists=None, managed=False, venv_ok=True):
     import check_env
     monkeypatch.setattr(check_env, "try_imports", lambda: (dict(versions), dict(errors or {})))
     monkeypatch.setattr(check_env, "installed_opencv", lambda: dict(dists or {}))
-    monkeypatch.setattr(check_env, "_is_installed", lambda n: n in versions)
     monkeypatch.setattr(check_env, "externally_managed", lambda: managed)
+    monkeypatch.setattr(check_env, "can_make_venv", lambda: venv_ok)
     return check_env
 
 
@@ -267,16 +288,36 @@ GONE = {n: "ModuleNotFoundError: no" for n in GOOD}
 
 def test_env_ok(monkeypatch, tmp_path):
     env = fake_env(monkeypatch, GOOD, dists={"opencv-python": "5.0.0.93"})
-    assert env.report(tmp_path / "v") == (env.report(tmp_path / "v")[0], 0)
-    assert env.report(tmp_path / "v")[0]["status"] == "ok"
+    out, code = env.report(tmp_path / "v")
+    assert code == 0 and out["status"] == "ok" and "argv" not in out
 
 
-def test_env_nothing_installed_goes_into_this_python(monkeypatch, tmp_path):
+def test_env_nothing_installed_gets_its_own_environment(monkeypatch, tmp_path):
+    """An empty Python may still be another project's: nothing is installed into it unless asked."""
     env = fake_env(monkeypatch, {}, GONE)
     out, code = env.report(tmp_path / "v")
-    assert code == 2 and out["status"] == "install" and len(out["argv"]) == 1 and out["use_python"] == sys.executable
-    assert "--require-hashes" in out["argv"][0] and ":all:" in out["argv"][0]
-    assert any(a.endswith("requirements.txt") or a.endswith("requirements-headless.txt") for a in out["argv"][0])
+    assert code == 2 and out["status"] == "install" and len(out["argv"]) == 2
+    assert out["argv"][0][1:] == ["-m", "venv", "--prompt", "refinish", str(tmp_path / "v")]
+    assert out["use_python"].startswith(str(tmp_path / "v"))
+    assert "--require-hashes" in out["argv"][1] and ":all:" in out["argv"][1]
+    assert any(a.endswith("requirements.txt") or a.endswith("requirements-headless.txt") for a in out["argv"][1])
+
+
+def test_env_here_installs_into_this_python_only_when_asked(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    out, _ = env.report(tmp_path / "v", here=True)
+    assert len(out["argv"]) == 1 and out["use_python"] == sys.executable
+
+
+def test_env_here_refuses_a_system_managed_python(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE, managed=True)
+    out, code = env.report(tmp_path / "v", here=True)
+    assert code == 2 and out["status"] == "blocked" and "argv" not in out
+
+
+def test_env_honours_the_folder_it_is_given(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    assert str(tmp_path / "elsewhere") in env.report(tmp_path / "elsewhere")[0]["argv"][0]
 
 
 def test_env_some_installed_gets_its_own_environment(monkeypatch, tmp_path):
@@ -289,7 +330,7 @@ def test_env_some_installed_gets_its_own_environment(monkeypatch, tmp_path):
 
 def test_env_two_opencv_packages_get_their_own_environment(monkeypatch, tmp_path):
     env = fake_env(monkeypatch, GOOD, dists={"opencv-python": "5.0.0.93", "opencv-python-headless": "5.0.0.93"})
-    out, code = env.report(tmp_path / "v")
+    out, code = env.report(tmp_path / "v", here=True)
     assert code == 2 and out["status"] == "install" and out["argv"][0][1:3] == ["-m", "venv"]
     assert str(env.REQUIREMENTS[True]) in out["argv"][-1]
 
@@ -300,9 +341,10 @@ def test_env_outside_the_tested_range_still_runs(monkeypatch, tmp_path):
     assert code == 1 and out["status"] == "untested" and out["outside_tested_range"] == ["cv2"]
 
 
-def test_env_system_managed_python_gets_its_own_environment(monkeypatch, tmp_path):
-    env = fake_env(monkeypatch, {}, GONE, managed=True)
-    assert env.report(tmp_path / "v")[0]["argv"][0][1:3] == ["-m", "venv"]
+@pytest.mark.parametrize("name,version", [("numpy", "2.1.0"), ("numpy", "2.6.0"), ("scipy", "1.19.0"), ("cv2", "5.2.0")])
+def test_env_calls_untested_what_ci_does_not_run(monkeypatch, tmp_path, name, version):
+    env = fake_env(monkeypatch, {**GOOD, name: version}, dists={"opencv-python": "5.0.0.93"})
+    assert env.report(tmp_path / "v")[0]["outside_tested_range"] == [name]
 
 
 def test_env_broken_desktop_opencv_suggests_headless(monkeypatch, tmp_path):
@@ -313,9 +355,77 @@ def test_env_broken_desktop_opencv_suggests_headless(monkeypatch, tmp_path):
 
 def test_env_old_python(monkeypatch, tmp_path):
     import check_env
-    monkeypatch.setattr(check_env, "MIN_PYTHON", (99, 0))
+    monkeypatch.setattr(check_env, "PYTHONS", ((99, 0), (99, 1)))
     out, code = check_env.report(tmp_path / "v")
     assert code == 2 and out["status"] == "python-too-old"
+
+
+def test_env_python_past_the_pins_gets_no_commands(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    monkeypatch.setattr(env, "PYTHONS", ((3, 10), (3, 10)))
+    out, code = env.report(tmp_path / "v")
+    assert code == 2 and out["status"] == "blocked" and "argv" not in out
+
+
+def test_env_leaves_a_folder_it_did_not_make_alone(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    (tmp_path / "v").mkdir()
+    (tmp_path / "v" / "keep.txt").write_text("mine", encoding="utf-8")
+    out, code = env.report(tmp_path / "v")
+    assert code == 2 and out["status"] == "blocked" and "argv" not in out
+
+
+def test_env_leaves_another_project_s_environment_alone(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    v = tmp_path / "v"
+    env.venv_python(v).parent.mkdir(parents=True)
+    env.venv_python(v).write_text("", encoding="utf-8")
+    (v / "pyvenv.cfg").write_text("prompt = other\n", encoding="utf-8")
+    assert env.report(v)[0]["status"] == "blocked"
+
+
+def test_env_reuses_its_own_environment(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    v = tmp_path / "v"
+    env.venv_python(v).parent.mkdir(parents=True)
+    env.venv_python(v).write_text("", encoding="utf-8")
+    (v / "pyvenv.cfg").write_text("prompt = 'refinish'\n", encoding="utf-8")
+    out, _ = env.report(v)
+    assert out["status"] == "install" and len(out["argv"]) == 1 and out["argv"][0][0] == str(env.venv_python(v))
+
+
+def test_env_refuses_a_link_where_the_environment_would_go(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE)
+    (tmp_path / "real").mkdir()
+    try:
+        (tmp_path / "v").symlink_to(tmp_path / "real", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("no symbolic links here")
+    assert env.report(tmp_path / "v")[0]["status"] == "blocked"
+
+
+def test_env_without_the_venv_module_says_what_to_install(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {}, GONE, venv_ok=False)
+    out, code = env.report(tmp_path / "v")
+    assert code == 2 and out["status"] == "blocked" and "python3-venv" in out["note"]
+
+
+def test_env_commands_quote_for_each_shell():
+    import check_env
+    path = "C" + ":/Program Files/it's a&b/python.exe"
+    posix = check_env.shell_commands([[path, "-m", "pip"]])["posix"][0]
+    assert shlex.split(posix) == [path, "-m", "pip"]
+    assert check_env.powershell_quote(path) == "'C" + ":/Program Files/it''s a&b/python.exe'"
+
+
+def test_env_share_leaves_out_every_path(monkeypatch, tmp_path):
+    marker = "private_folder_marker"
+    errors = {"cv2": f"ImportError: cannot load /{marker}/cv2.so"}
+    env = fake_env(monkeypatch, {k: v for k, v in GOOD.items() if k != "cv2"}, errors)
+    out, _ = env.report(tmp_path / marker)
+    shared = json.dumps(env.shareable(out))
+    assert marker in json.dumps(out) and marker not in shared and str(tmp_path) not in shared
+    assert env.shareable(out)["error_kinds"] == {"cv2": "ImportError"} and sys.executable not in shared
 
 
 def test_env_script_changes_nothing(tmp_path):
@@ -343,13 +453,17 @@ def workflow():
 
 def test_workflow_reads_only():
     assert workflow()["permissions"] == {"contents": "read"}
-    assert not any("permissions" in j for j in workflow()["jobs"].values())
+    for name, job in workflow()["jobs"].items():
+        if "permissions" in job:
+            assert name == "privacy-audit" and set(job["permissions"].values()) == {"read"}, name
 
 
 def test_workflow_runs_no_untrusted_trigger():
     assert set(workflow()["on"]) == {"push", "pull_request", "schedule", "workflow_dispatch"}
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "pull_request_target" not in text and "workflow_run" not in text and "secrets." not in text
+    for field in ("title", "body", "head_ref", "head.ref", "head.label", "inputs."):
+        assert not re.search(r"\$\{\{[^}]*" + re.escape(field), text), field
 
 
 def test_workflow_pins_every_action_by_commit():
@@ -370,11 +484,38 @@ def test_workflow_jobs_have_time_limits():
     assert all("timeout-minutes" in j for j in workflow()["jobs"].values())
 
 
+REQUIRED = {"tests", "range", "install", "offline", "privacy"}
+
+
 def test_workflow_gate_needs_every_required_job():
     jobs = workflow()["jobs"]
-    assert set(jobs["gate"]["needs"]) == {"tests", "oldest", "install", "privacy"}
-    assert "always()" in jobs["gate"]["if"]
-    assert jobs["latest"]["continue-on-error"] is True and jobs["report"]["continue-on-error"] is True
+    assert set(jobs["gate"]["needs"]) == REQUIRED and "always()" in jobs["gate"]["if"]
+    env = jobs["gate"]["steps"][0]["env"]
+    assert {v for v in env.values()} == {f"${{{{ needs.{n}.result }}}}" for n in REQUIRED}
+    assert jobs["report"]["continue-on-error"] is True
+
+
+def test_a_weekly_failure_shows():
+    jobs = workflow()["jobs"]
+    for name in ("latest", "privacy-audit"):
+        assert "continue-on-error" not in jobs[name], name
+        assert "schedule" in jobs[name]["if"] and "workflow_dispatch" in jobs[name]["if"]
+        assert name not in jobs["gate"]["needs"]
+
+
+@pytest.mark.parametrize("failed", [None, *sorted(REQUIRED)])
+@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped", ""])
+def test_the_gate_passes_only_when_every_job_succeeded(failed, result):
+    bash = shutil.which("bash")
+    if not bash:
+        pytest.skip("no bash here")
+    step = workflow()["jobs"]["gate"]["steps"][0]
+    env = {**os.environ}
+    for key, value in step["env"].items():
+        name = re.search(r"needs\.(\w+)\.", value).group(1)
+        env[key] = result if name == failed else "success"
+    r = subprocess.run([bash, "-c", step["run"]], env=env, capture_output=True, text=True)
+    assert (r.returncode == 0) == (failed is None)
 
 
 def test_workflow_covers_every_supported_python_and_system():
@@ -384,9 +525,21 @@ def test_workflow_covers_every_supported_python_and_system():
     assert {r["opencv"] for r in rows} == {"desktop", "headless"}
     assert all(r["requirements"] == ("requirements.txt" if r["opencv"] == "desktop" else "requirements-headless.txt")
                for r in rows)
+    assert {r["end"] for r in workflow()["jobs"]["range"]["strategy"]["matrix"]["include"]} == {"oldest", "newest"}
+    assert "macos-14" in {r["os"] for r in workflow()["jobs"]["install"]["strategy"]["matrix"]["include"]}
 
 
 def test_workflow_verifies_what_it_downloads():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert re.search(r"GITLEAKS_SHA256: [0-9a-f]{64}", text) and "sha256sum --check" in text
-    assert "--redact" in text
+    assert "--redact" in text and "--retry" in text
+
+
+def test_the_offline_job_removes_the_network():
+    run = " ".join(s.get("run", "") for s in workflow()["jobs"]["offline"]["steps"])
+    assert "unshare --net" in run and "REFINISH_OFFLINE=1" in run
+
+
+def test_bug_reports_ask_for_the_shareable_report():
+    text = (ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml").read_text(encoding="utf-8")
+    assert "check_env.py --share" in text

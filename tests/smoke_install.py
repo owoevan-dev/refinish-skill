@@ -3,13 +3,14 @@
 picture in a project folder that has nothing to do with the skill.
 
   1. check_env.py says what is missing and prints the commands.
-  2. Those commands install the tested versions.
-  3. check_env.py says ok, on exactly the pinned versions.
-  4. Refinish and Recolor each finish the picture, run the way their SKILL.md runs them.
+  2. Those commands, run in the user's own shell, install the tested versions by their hashes.
+  3. check_env.py says ok, on exactly the pinned versions and the right OpenCV package.
+  4. Refinish and Recolor each finish the picture, run the way their SKILL.md runs them, and the card's colour arrives.
 
 python tests/smoke_install.py [--work DIR] [--keep]
 
-Needs the network, for pip. Exit code 0 when every step passed. Not part of the pytest run; CI runs it on its own."""
+Everything happens in a new folder of its own inside --work (or the system's temporary folder), and only that folder is
+removed afterwards. Needs the network, for pip. Exit code 0 when every step passed. CI runs it on its own."""
 import argparse
 import json
 import os
@@ -21,8 +22,30 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-# a space, as in "Program Files" or "My Pictures"
-SPACED = "new user"
+SPACED = "new user"                                     # a space, as in "Program Files" or "My Pictures"
+CARD_COLOUR = "#3f5f8a"
+
+MEASURE = """
+import json, sys
+import cv2, numpy as np
+plain, carded, subject, parts_png, colour = sys.argv[1:6]
+s = json.load(open(subject, encoding="utf-8"))
+hair = [i for i, p in enumerate(s["parts"], 1) if p.get("kind") == "hair"]
+assert hair, "no hair part in the subject"
+parts = cv2.imread(parts_png, cv2.IMREAD_GRAYSCALE)
+a, b = (cv2.imread(p, cv2.IMREAD_UNCHANGED) for p in (plain, carded))
+assert a.shape == b.shape, "the two finishes differ in size"
+m = np.isin(parts, hair) & (b[..., 3] > 200)
+assert m.sum() > 500, "too little hair"
+want = np.uint8([[[int(colour[5:7], 16), int(colour[3:5], 16), int(colour[1:3], 16)]]])
+lab = lambda im: cv2.cvtColor(im[..., :3], cv2.COLOR_BGR2LAB).astype(np.float32)
+target = cv2.cvtColor(want, cv2.COLOR_BGR2LAB).astype(np.float32)[0, 0]
+before, after = (np.linalg.norm(np.median(lab(x)[m], axis=0) - target) for x in (a, b))
+assert after < 14 and after < before - 10, f"the card's colour did not arrive: {before:.1f} to {after:.1f}"
+rest = (parts > 0) & ~np.isin(parts, hair) & (cv2.erode(m.astype(np.uint8), np.ones((3, 3), np.uint8)) == 0)
+rest &= cv2.dilate(m.astype(np.uint8), np.ones((15, 15), np.uint8)) == 0
+assert np.abs(lab(a)[rest] - lab(b)[rest]).mean() < 1.5, "the card changed parts it does not name"
+"""
 
 
 def run(argv, cwd, ok=(0,), env=None):
@@ -52,24 +75,52 @@ def pinned(requirements, package, python_version):
     raise SystemExit(f"no pin for {package} on Python {python_version}")
 
 
+def shipped_skills():
+    """The skills both hosts would find: Claude's list and Codex's folder must name the same ones."""
+    claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    listed = {(ROOT / rel).resolve() for rel in claude["skills"]}
+    found = {p.parent.resolve() for p in (ROOT / codex["skills"]).glob("*/SKILL.md")}
+    if listed != found or len(listed) != 2:
+        raise SystemExit("the Claude and Codex manifests do not find the same skills")
+    return sorted(listed)
+
+
+def run_displayed(commands, cwd, env):
+    """The commands as a person would paste them into their shell."""
+    if os.name == "nt":
+        for line in commands["powershell"]:
+            run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                 f"$ErrorActionPreference='Stop'; {line}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}"], cwd, env=env)
+    else:
+        for line in commands["posix"]:
+            run(["sh", "-c", line], cwd, env=env)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--work")
-    ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--work", help="a folder to work in; a new folder is made inside it")
+    ap.add_argument("--keep", action="store_true", help="keep what it made")
     a = ap.parse_args()
-    work = Path(a.work).resolve() if a.work else Path(tempfile.mkdtemp(prefix="refinish-smoke-"))
+    if a.work:
+        Path(a.work).mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="refinish-smoke-", dir=a.work)).resolve()
+    try:
+        check(work)
+    finally:
+        if a.keep:
+            print("kept:", work)
+        else:
+            shutil.rmtree(work, ignore_errors=True)
+
+
+def check(work):
     base = work / SPACED
-    if base.exists():
-        shutil.rmtree(base)
     home, project = base / "agent skills", base / "my project"
     project.mkdir(parents=True)
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV")}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-
-    # the plugin's own list of what it ships, and nothing else
-    plugin = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    for rel in plugin["skills"]:
-        src = (ROOT / rel).resolve()
+    for src in shipped_skills():
         shutil.copytree(src, home / src.name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     refinish, recolor = home / "refinish", home / "recolor"
     scripts = refinish / "scripts"
@@ -78,24 +129,24 @@ def main():
     fresh = base / "python"
     run([sys.executable, "-m", "venv", fresh], project, env=env)
     py = fresh / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    r = run([py, scripts / "check_env.py"], project, ok=(2,), env=env)
-    state = result(r)
+    state = result(run([py, scripts / "check_env.py"], project, ok=(2,), env=env))
     assert state["status"] == "install", state
+    assert str(project) in state["use_python"], "the install must go into a separate environment"
 
-    print("2. the commands check_env.py printed")
-    for argv in state["argv"]:
-        run(argv, project, env=env)
+    print("2. the commands check_env.py printed, in this system's shell")
+    run_displayed(state["commands"], project, env)
     py = Path(state["use_python"])
 
     print("3. check_env.py again")
     state = result(run([py, scripts / "check_env.py"], project, env=env))
     assert state["status"] == "ok", state
     version = tuple(int(v) for v in state["python_version"].split(".")[:2])
-    requirements = refinish / "requirements.txt"
+    assert len(state["opencv_packages"]) == 1, state
+    package = next(iter(state["opencv_packages"]))
+    requirements = refinish / ("requirements-headless.txt" if "headless" in package else "requirements.txt")
     assert state["versions"]["numpy"] == pinned(requirements, "numpy", version), state
     assert state["versions"]["scipy"] == pinned(requirements, "scipy", version), state
-    assert len(state["opencv_packages"]) == 1, state
-    assert set(state["opencv_packages"].values()) == {pinned(requirements, "opencv-python", version)}, state
+    assert state["opencv_packages"][package] == pinned(requirements, package, version), state
 
     print("4. Refinish, from the project folder")
     draw = ("import sys, cv2; sys.path.insert(0, sys.argv[1]); from figures import draw_figure; "
@@ -104,27 +155,21 @@ def main():
     run([py, scripts / "check_input.py", "drawn.png"], project, ok=(0, 1), env=env)
     run([py, scripts / "prep.py", "drawn.png", "image.png", "--scale", "2"], project, env=env)
     run([py, scripts / "auto_parts.py", "image.png", "subject.json"], project, ok=(0, 1), env=env)
-    made = result(run([py, scripts / "refinish.py", "subject.json", refinish / "styles" / "tv-cel.json", "cel.png"],
-                      project, ok=(0, 1), env=env))
+    style = refinish / "styles" / "tv-cel.json"
+    made = result(run([py, scripts / "refinish.py", "subject.json", style, "cel.png"], project, ok=(0, 1), env=env))
     assert "check" in made and (project / "cel.png").stat().st_size > 1000, made
 
     print("5. Recolor, from its own folder, as its SKILL.md runs it")
     (project / "card.json").write_text(json.dumps({"format": "refinish-palette/1", "name": "smoke",
-                                                   "kinds": {"hair": "#3f5f8a"}}), encoding="utf-8")
+                                                   "kinds": {"hair": CARD_COLOUR}}), encoding="utf-8")
     run([py, "../refinish/scripts/palette.py", "apply", project / "subject.json", project / "card.json",
          project / "carded.json"], recolor, env=env)
-    made = result(run([py, "../refinish/scripts/refinish.py", project / "carded.json",
-                       "../refinish/styles/film-everyday-cel.json", project / "recoloured.png"],
-                      recolor, ok=(0, 1), env=env))
-    assert "check" in made and (project / "recoloured.png").stat().st_size > 1000, made
-    differ = ("import sys, cv2, numpy as np; a, b = (cv2.imread(p, cv2.IMREAD_UNCHANGED) for p in sys.argv[1:3]); "
-              "assert a is not None and b is not None and a.shape == b.shape and (a != b).any()")
-    run([py, "-c", differ, "cel.png", "recoloured.png"], project, env=env)
+    made = result(run([py, "../refinish/scripts/refinish.py", project / "carded.json", "../refinish/styles/tv-cel.json",
+                       project / "recoloured.png"], recolor, ok=(0, 1), env=env))
+    assert "check" in made and made["check"]["verdict"] != "fail", made.get("check")
+    run([py, "-c", MEASURE, "cel.png", "recoloured.png", "subject.json", "subject.parts.png", CARD_COLOUR], project, env=env)
 
-    print("passed:", json.dumps({"python": state["python_version"], **state["versions"],
-                                 "opencv": state["opencv_packages"]}))
-    if not a.keep and not a.work:
-        shutil.rmtree(work, ignore_errors=True)
+    print("passed:", json.dumps({"python": state["python_version"], **state["versions"], "opencv": state["opencv_packages"]}))
 
 
 if __name__ == "__main__":

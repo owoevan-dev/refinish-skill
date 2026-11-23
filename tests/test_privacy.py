@@ -1,8 +1,11 @@
 """The privacy scan works, the repository passes it, and running the skill keeps what it should to itself."""
 import ast
 import hashlib
+import io
 import json
 import os
+import shutil
+import socket
 import struct
 import subprocess
 import sys
@@ -103,7 +106,7 @@ def test_a_rule_finds_a_key_behind_a_line_separator():
 
 def test_private_terms_match_any_case_and_stay_out_of_the_report():
     found = ps.scan_text("made in the SECRET-Project folder", "sample", terms=["secret-project"])
-    assert [f.rule for f in found] == ["private-term"] and "secret" not in str(found[0]).lower().replace("sample", "")
+    assert [f.rule for f in found] == ["private-term"] and "secret" not in str(found[0]).lower()
 
 
 def test_private_terms_are_found_in_a_picture_s_bytes():
@@ -283,14 +286,256 @@ def test_a_draft_is_scanned(tmp_path):
     draft.write_text("Fixes the path " + SAMPLES["path-user"] + "\n", encoding="utf-8")
     r = subprocess.run([sys.executable, str(ROOT / "tests" / "privacy_scan.py"), "--draft", str(draft)],
                        capture_output=True, text=True, encoding="utf-8")
-    assert r.returncode == 1 and "path-user: draft body.md" in r.stdout and SAMPLES["path-user"] not in r.stdout
+    assert r.returncode == 1 and "path-user: item " in r.stdout and SAMPLES["path-user"] not in r.stdout
 
 
 def test_scan_exit_codes(tmp_path):
-    missing = str(tmp_path / "no-such-file")
+    missing = str(tmp_path / "private_folder_marker" / "no-such-file")
     r = subprocess.run([sys.executable, str(ROOT / "tests" / "privacy_scan.py"), "--terms", missing],
                        capture_output=True, text=True, encoding="utf-8")
-    assert r.returncode == 2 and "could not run" in r.stderr
+    assert r.returncode == 2 and "could not run" in r.stderr and "private_folder_marker" not in r.stdout + r.stderr
+
+
+# ------------------------------------------------------------------------------- what the first version of the scan missed
+
+CANARY = "canary" + "marker"
+
+
+def repo_with_scanner(path):
+    """A repository carrying this scanner, as CI runs it."""
+    g = git_repo(path)
+    (path / "tests").mkdir()
+    shutil.copy(ROOT / "tests" / "privacy_scan.py", path / "tests" / "privacy_scan.py")
+    g("add", ".")
+    g("commit", "-qm", "the scanner")
+    return g
+
+
+def run_scan(path, *args):
+    return subprocess.run([sys.executable, str(path / "tests" / "privacy_scan.py"), *args], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
+
+@pytest.mark.parametrize("extra", [[], ["--json"]], ids=["text", "json"])
+def test_a_private_name_never_reaches_the_public_report(tmp_path, extra):
+    g = repo_with_scanner(tmp_path)
+    (tmp_path / CANARY).mkdir()
+    (tmp_path / CANARY / ".env").write_text("A=" + SAMPLES["key-github"] + "\n", encoding="utf-8")
+    g("add", ".")
+    g("commit", "-qm", "oops")
+    r = run_scan(tmp_path, "--history", *extra)
+    assert r.returncode == 1 and "forbidden-file" in r.stdout
+    assert CANARY not in r.stdout + r.stderr and SAMPLES["key-github"] not in r.stdout + r.stderr
+
+
+def test_show_paths_is_for_the_maintainer_s_own_terminal(tmp_path):
+    g = repo_with_scanner(tmp_path)
+    (tmp_path / CANARY).mkdir()
+    (tmp_path / CANARY / ".env").write_text("A=1\n", encoding="utf-8")
+    g("add", ".")
+    g("commit", "-qm", "oops")
+    assert CANARY in run_scan(tmp_path, "--show-paths").stdout
+
+
+def history_rules(path, monkeypatch, terms=(), unreachable=False):
+    monkeypatch.setattr(ps, "ROOT", path)
+    return {f.rule for f in ps.scan_history(terms, unreachable)[0]}
+
+
+def commit_text(g, path, name, text):
+    (path / name).parent.mkdir(parents=True, exist_ok=True)
+    (path / name).write_text(text, encoding="utf-8")
+    g("add", ".")
+    g("commit", "-qm", "c")
+
+
+def test_history_reads_git_notes(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "a.txt", "clean\n")
+    g("notes", "add", "-m", SAMPLES["key-github"])
+    assert "key-github" in history_rules(tmp_path, monkeypatch)
+
+
+def test_history_reads_branch_names(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "a.txt", "clean\n")
+    g("branch", f"feature/{CANARY}")
+    assert "private-term" in history_rules(tmp_path, monkeypatch, [CANARY])
+
+
+def test_history_reads_a_tagger_s_name_and_a_tag_inside_a_tag(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "a.txt", "clean\n")
+    env = {**os.environ, "GIT_COMMITTER_NAME": CANARY, "GIT_COMMITTER_EMAIL": "1+a" + "@users.noreply.github.com"}
+    subprocess.run(["git", "-C", str(tmp_path), "tag", "-a", "inner", "-m", "x"], check=True, env=env)
+    g("tag", "-a", "outer", "inner", "-m", "y")
+    g("tag", "-d", "inner")
+    assert "private-term" in history_rules(tmp_path, monkeypatch, [CANARY])
+
+
+def test_history_reads_a_commit_nothing_points_at(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "a.txt", "clean\n")
+    commit_text(g, tmp_path, "b.txt", SAMPLES["key-github"] + "\n")
+    g("reset", "-q", "--hard", "HEAD~1")
+    g("reflog", "expire", "--expire=now", "--all")
+    assert "key-github" not in history_rules(tmp_path, monkeypatch)        # (a push cannot carry it)
+    assert "key-github" in history_rules(tmp_path, monkeypatch, unreachable=True)
+
+
+def test_history_keeps_a_forbidden_name_behind_identical_bytes(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "readme.txt", "same\n")
+    commit_text(g, tmp_path, ".env", "same\n")
+    assert "forbidden-file" in history_rules(tmp_path, monkeypatch)
+
+
+def test_history_reads_a_private_word_in_a_file_name(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, f"docs/{CANARY}.md", "clean\n")
+    assert "private-term" in history_rules(tmp_path, monkeypatch, [CANARY])
+
+
+@pytest.mark.parametrize("data,rule", [("contact ".encode("utf-16") + SAMPLES["email"].encode("utf-16-le"), "email"),
+                                       (b"PK\x03\x04" + b"\0" * 40, "unreadable-file"),
+                                       (b"II*\0" + b"\0" * 40, "unreadable-file"),
+                                       (b"abc\0def", "binary-file")], ids=["utf16", "zip", "tiff", "binary"])
+def test_history_does_not_forgive_what_it_cannot_read(tmp_path, monkeypatch, data, rule):
+    g = git_repo(tmp_path)
+    (tmp_path / "old.dat").write_bytes(data)
+    g("add", ".")
+    g("commit", "-qm", "c")
+    g("rm", "-q", "old.dat")
+    g("commit", "-qm", "d")
+    assert rule in history_rules(tmp_path, monkeypatch)
+
+
+def test_the_tree_scan_reads_what_is_staged_not_the_working_copy(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    (tmp_path / "a.txt").write_text(SAMPLES["key-github"] + "\n", encoding="utf-8")
+    g("add", ".")
+    (tmp_path / "a.txt").write_text("clean\n", encoding="utf-8")
+    monkeypatch.setattr(ps, "ROOT", tmp_path)
+    monkeypatch.setattr(ps, "APPROVED_IMAGES", tmp_path / "none")
+    assert "key-github" in {f.rule for f in ps.scan_tree()}
+
+
+@pytest.mark.parametrize("mode,rule", [("120000", "link-in-repository"), ("160000", "submodule")])
+def test_links_and_submodules_are_reported(tmp_path, monkeypatch, mode, rule):
+    g = git_repo(tmp_path)
+    commit_text(g, tmp_path, "a.txt", "target\n")
+    sha = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD" if mode == "160000" else "HEAD:a.txt"],
+                         capture_output=True, text=True, check=True).stdout.strip()
+    g("update-index", "--add", "--cacheinfo", f"{mode},{sha},entry")
+    monkeypatch.setattr(ps, "ROOT", tmp_path)
+    monkeypatch.setattr(ps, "APPROVED_IMAGES", tmp_path / "none")
+    assert rule in {f.rule for f in ps.scan_tree()}
+
+
+def test_a_private_word_in_latin1_is_found():
+    found = ps.scan_content("le café secret".encode("latin-1"), "a.txt", ["café"])
+    assert {"not-utf8", "private-term"} <= {f.rule for f in found}
+
+
+def test_an_escaped_address_in_json_is_found():
+    data = ('{"contact": "someone' + "\\" + 'u0040example.org"}').encode()
+    assert "email" in {f.rule for f in ps.scan_content(data, "a.json", suffix=".json")}
+
+
+@pytest.mark.parametrize("text", ["api" + '_key = "violetlantern"', "pass" + "word: 'correcthorse'",
+                                  "API" + "_KEY=violetlantern12", '"client' + '_secret": "plainwords"'])
+def test_a_plain_word_in_a_credential_field_is_found(text):
+    assert "secret-assigned" in rules(text), text
+
+
+@pytest.mark.parametrize("text", ['api_key = "your-api-key"', "password = getpass.getpass()", "api_key = os.environ['X']",
+                                  "token = load_token(path)", "password: <your password>"])
+def test_a_credential_field_without_a_value_passes(text):
+    assert "secret-assigned" not in rules(text), text
+
+
+def test_a_private_word_cannot_hide_in_a_no_reply_address():
+    text = f"Co-Authored-By: x <1+{CANARY}" + "@users.noreply.github.com>"
+    assert "private-term" in {f.rule for f in ps.scan_message(text, "m", [CANARY])}
+
+
+def icc(text):
+    return b"\0" * 128 + text.encode("utf-16-be") + b"\0" * 16
+
+
+def test_a_private_word_in_a_png_colour_profile_is_found():
+    body = b"icc\0\0" + zlib.compress(icc(CANARY))
+    assert "private-term" in {f.rule for f in ps.scan_image(with_chunk(b"iCCP", body), "a.png", [CANARY])}
+
+
+def test_a_private_word_in_a_jpeg_colour_profile_is_found():
+    data = jpeg_with(0xE2, b"ICC_PROFILE\0\x01\x01" + icc(CANARY))
+    assert "private-term" in {f.rule for f in ps.scan_image(data, "a.jpg", [CANARY])}
+
+
+def test_a_private_word_in_a_webp_colour_profile_is_found():
+    assert "private-term" in {f.rule for f in ps.scan_image(webp_with(b"ICCP", icc(CANARY)), "a.webp", [CANARY])}
+
+
+def test_a_private_word_in_compressed_png_text_is_found():
+    body = b"Comment\0\0" + zlib.compress(CANARY.encode())
+    assert "private-term" in {f.rule for f in ps.scan_image(with_chunk(b"zTXt", body), "a.png", [CANARY])}
+
+
+def test_a_second_jpeg_after_the_first_is_found():
+    jpg = cv2.imencode(".jpg", np.full((16, 16, 3), 120, np.uint8))[1].tobytes()
+    assert "image-trailing-data" in {f.rule for f in ps.scan_image(jpg + jpg, "a.jpg")}
+
+
+def test_a_jpeg_with_restart_markers_and_stuffing_is_read_whole():
+    jpg = cv2.imencode(".jpg", np.random.default_rng(1).integers(0, 255, (64, 64, 3), dtype=np.uint8),
+                       [cv2.IMWRITE_JPEG_RST_INTERVAL, 2])[1].tobytes()
+    assert ps.scan_image(jpg, "a.jpg") == []
+
+
+def test_a_truncated_webp_is_found():
+    data = webp_with(b"EXIF", b"some")
+    assert "image-damaged" in {f.rule for f in ps.scan_image(data[:-3], "a.webp")}
+
+
+@pytest.mark.parametrize("text", ['<svg><style>a{fill:url(art.svg#b)}</style></svg>', '<svg><style>@import "x.css";</style></svg>'])
+def test_external_references_in_svg_css_are_found(text):
+    assert "svg-external" in {f.rule for f in ps.scan_svg(text, "a.svg")}
+
+
+def test_svg_is_judged_by_content_not_by_name():
+    data = b'<?xml version="1.0"?><svg><metadata>made by</metadata></svg>'
+    assert "svg-editor-data" in {f.rule for f in ps.scan_content(data, "drawing.xml", suffix=".xml")}
+
+
+def test_a_large_file_pointer_is_found():
+    data = b"version https://git-lfs.github.com/spec/v1\noid sha256:" + b"a" * 64 + b"\nsize 12\n"
+    assert "lfs-pointer" in {f.rule for f in ps.scan_content(data, "a.bin")}
+
+
+def test_compressed_metadata_cannot_fill_the_memory(monkeypatch):
+    monkeypatch.setattr(ps, "MAX_INFLATED", 1024)
+    body = b"Comment\0\0" + zlib.compress(b"x" * 10_000_000)
+    assert "image-metadata" in {f.rule for f in ps.scan_image(with_chunk(b"zTXt", body), "a.png")}
+
+
+def test_a_short_read_from_git_stops_the_scan():
+    class Fake:
+        stdin = io.BytesIO()
+        stdout = io.BytesIO(b"abc blob 10\nshort\n")
+
+        def wait(self):
+            return 0
+    store = ps.Objects()
+    store.cat = Fake()
+    with pytest.raises(ps.ScanError):
+        store.read("abc")
+
+
+def test_a_failed_git_stops_the_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(ps, "ROOT", tmp_path)                 # (not a repository)
+    with pytest.raises(ps.ScanError):
+        ps.git("rev-list", "--all")
 
 
 # --------------------------------------------------------------------------------------------------- the running skill
@@ -392,7 +637,28 @@ def test_pictures_it_writes_carry_no_metadata(private_run):
 
 
 def test_files_it_writes_do_not_name_the_folder(private_run):
-    """A subject or a picture passed to someone else says nothing of where it was made."""
+    """A subject or a picture passed to someone else says nothing of where it was made, in any encoding."""
     d, marker = private_run
-    leaks = [p.name for p in d.iterdir() if p.is_file() and marker.encode() in p.read_bytes()]
+    needles = [marker.encode(e) for e in ("utf-8", "utf-16-le", "utf-16-be")]
+    leaks = [p.name for p in d.rglob("*") if p.is_file() and any(n in p.read_bytes() for n in needles)]
     assert not leaks, leaks
+
+
+def test_a_second_reader_finds_no_metadata_in_its_pictures(private_run):
+    """Pillow, as an independent reader of what the scan's own parser says."""
+    Image = pytest.importorskip("PIL.Image")
+    d, _ = private_run
+    for p in d.rglob("*"):
+        if p.suffix.lower() in (".png", ".jpg"):
+            with Image.open(p) as im:
+                extra = set(im.info) - {"dpi", "jfif", "jfif_version", "jfif_unit", "jfif_density", "gamma", "srgb"}
+                assert not extra and not im.getexif(), (p.name, extra)
+
+
+@pytest.mark.skipif(not os.environ.get("REFINISH_OFFLINE"), reason="only inside CI's network namespace")
+def test_the_kernel_has_really_removed_the_network():
+    s = socket.socket()
+    s.settimeout(3)
+    with pytest.raises(OSError):
+        s.connect(("1.1.1.1", 53))
+    s.close()

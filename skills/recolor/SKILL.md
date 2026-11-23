@@ -22,7 +22,7 @@ What it can and cannot do (tell the user before starting):
 
 Copy this checklist and tick it off. Each step ends on its done-criterion.
 
-- [ ] **0. Tools**: `python ../refinish/scripts/check_env.py` reports `ok` (Recolor runs the Refinish skill's scripts, so the two skills are installed side by side). On `install`, run the `commands` it printed and use the Python it names (`use_python`) for every script: they install the tested versions, in a separate environment if this Python already has some of the packages. On `untested`, the scripts should run: tell the user which versions are outside the tested range.
+- [ ] **0. Tools**: `python ../refinish/scripts/check_env.py` reports `ok` (Recolor runs the Refinish skill's scripts, so the two skills are installed side by side). On `install`, run the `argv` lists it printed in order (`commands` holds the same for a person's shell) and use the Python it names (`use_python`) for every script: they install the tested versions into a separate environment, `.refinish-venv` in the current folder. On `blocked`, its `note` says what to sort out. On `untested`, the scripts should run: tell the user which versions are outside the tested range.
 - [ ] **1. Subject**: a subject file whose parts are right, every part the card will change holding only its own material.
 - [ ] **2. Card**: a colour card the user approved on its board.
 - [ ] **3. Apply**: `palette.py apply` wrote the carded subject; every part the user named is in its report.
