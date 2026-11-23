@@ -62,17 +62,8 @@ def note_input(path):
         _inputs.add(i)
 
 
-def release_input(path):
-    """A cache this run is about to rebuild is no longer something to protect."""
-    _inputs.discard(_identity(path))
-
-
-def is_input(path):
-    return _identity(path) in _inputs
-
-
 def refuse_input(path):
-    if is_input(path):
+    if _identity(path) in _inputs:
         die(f"{path} is one of this run's inputs: give the result another name, so the original is kept")
 
 

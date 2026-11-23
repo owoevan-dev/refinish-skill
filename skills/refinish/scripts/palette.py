@@ -95,7 +95,7 @@ def cmd_apply(a):
     # paths in the subject are relative to it: keep them pointing at the same files from the new place
     src_dir, dst = Path(sj["_dir"]), Path(a.out).resolve()
     for key in ("image", "regions"):
-        if key in out and not Path(out[key]).is_absolute():
+        if key in out:
             out[key] = relative_path(src_dir / out[key], dst.parent)
     write_text(dst, json.dumps(out, ensure_ascii=False, indent=1))
     rec = out["recolour"]["parts"]

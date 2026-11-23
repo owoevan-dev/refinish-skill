@@ -37,7 +37,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _validate  # noqa: E402
-from _files import is_input, read_json, read_picture, relative_path, run_cli, write_text  # noqa: E402
+from _files import read_json, read_picture, relative_path, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
@@ -2130,8 +2130,6 @@ def main():
           "blush": blush}
     write_text(sub_path, json.dumps(sj, ensure_ascii=False, indent=1))
     rv, fv = sub_path.with_name(f"{stem}.auto.jpg"), sub_path.with_name(f"{stem}.face.jpg")
-    if face is None and fv.is_file() and not is_input(fv):
-        fv.unlink()                                     # (an earlier draft's face, not this picture's)
     review(img, alpha, reg, parts, rv, fv, [p["box"] for p in protect], face["box"] if face is not None else None)
     sv = sub_path.with_name(f"{stem}.sheet.jpg")
     parts_sheet(img, alpha, reg, parts, sv, fig["area"])

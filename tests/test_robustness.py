@@ -184,6 +184,20 @@ def test_a_cutout_stops_before_it_replaces_anything(work):
     assert (work / "cut" / "figure.png").read_bytes() == b"earlier"
 
 
+def test_no_check_does_not_reserve_the_check_picture(work):
+    cv2.imwrite(str(work / "render.check.jpg"), draw_figure()[..., :3])
+    cli("auto_parts.py", "render.check.jpg", "s.json", cwd=work)
+    assert cli("refinish.py", "s.json", "style.json", "render.png", "--no-check", cwd=work).returncode == 0
+
+
+def test_a_carded_subject_does_not_keep_an_absolute_path(work):
+    d = json.loads((work / "subject.json").read_text(encoding="utf-8"))
+    d["image"] = str((work / "image.png").resolve()).replace("\\", "/")
+    (work / "absolute.json").write_text(json.dumps(d), encoding="utf-8")
+    cli("palette.py", "apply", "absolute.json", "card.json", "carded.json", cwd=work, codes=(0,))
+    assert json.loads((work / "carded.json").read_text(encoding="utf-8"))["image"] == "image.png"
+
+
 def test_no_face_found_leaves_a_picture_named_like_the_face_sheet_alone(tmp_path):
     im = np.full((600, 400, 4), 255, np.uint8)
     im[100:500, 100:300] = (60, 120, 200, 255)
@@ -282,13 +296,24 @@ def test_writing_does_not_touch_a_file_that_looks_like_its_temporary(tmp_path):
 
 
 def test_a_stale_part_cache_with_bad_numbers_is_rebuilt(work):
+    import _files
     from _style import load_subject
     from parts import load_or_build, parts_path
     sj = load_subject(work / "subject.json")
     good = load_or_build(sj)[2]
     bad = np.full_like(good, len(sj["parts"]) + 7)
     cv2.imwrite(str(parts_path(sj)), bad)
+    _files._inputs.clear()                              # (a new run)
     assert np.array_equal(load_or_build(sj)[2], good)
+
+
+def test_rebuilding_a_part_map_never_writes_over_the_source(tmp_path):
+    """A source that happens to be called like its subject's cache."""
+    cv2.imwrite(str(tmp_path / "portrait.parts.png"), draw_figure())
+    cli("auto_parts.py", "portrait.parts.png", "portrait.json", cwd=tmp_path)
+    before = (tmp_path / "portrait.parts.png").read_bytes()
+    cli("parts.py", "portrait.json", cwd=tmp_path, codes=(2,))
+    assert (tmp_path / "portrait.parts.png").read_bytes() == before
 
 
 # ------------------------------------------------------------------------------------------------------- broken pictures
