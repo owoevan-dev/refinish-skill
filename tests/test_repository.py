@@ -559,7 +559,7 @@ def test_workflow_covers_every_supported_python_and_system():
     assert all(r["requirements"] == ("requirements.txt" if r["opencv"] == "desktop" else "requirements-headless.txt")
                for r in rows)
     assert {r["end"] for r in workflow()["jobs"]["range"]["strategy"]["matrix"]["include"]} == {"oldest", "newest"}
-    assert {"macos-15", "macos-15-intel"} <= {r["os"] for r in workflow()["jobs"]["install"]["strategy"]["matrix"]["include"]}
+    assert {"macos-latest", "macos-15-intel"} <= {r["os"] for r in workflow()["jobs"]["install"]["strategy"]["matrix"]["include"]}
 
 
 def test_workflow_verifies_what_it_downloads():
