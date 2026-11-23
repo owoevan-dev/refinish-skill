@@ -11,6 +11,16 @@ All notable changes to this project are documented here. The format follows [Kee
 - CI on Linux, macOS and Windows, on Python 3.10 to 3.14, at both ends of the supported OpenCV range, from a clean install, with the network removed, and weekly on the newest releases.
 - A privacy scan of the files, the whole history, picture metadata and what is published on GitHub, with a list of the pictures approved for the repository.
 
+### Fixed
+
+- On Windows, a picture in a folder or file named in Chinese, Japanese or Korean could be neither read nor written, so nothing worked from such a folder. Every script now opens any path.
+- A result can no longer replace one of the files its run read. A finish given the source picture's name used to overwrite the source.
+- Files are written whole or not at all: a crash or a full disk leaves the earlier file as it was.
+- A malformed subject, style, recipe, scene, hints or outline file stops with a message naming the field, with exit code 2, instead of a Python traceback.
+- An unexpected error now exits with code 3. It used to exit 1, which also means "done, with something to look at".
+- A cached part map holding part numbers the subject does not have is rebuilt.
+- A picture whose header claims more than 100 million pixels is refused before it is decoded.
+
 ## [0.2.0] - 2026-11-01
 
 ### Added

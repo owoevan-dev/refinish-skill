@@ -25,7 +25,6 @@ def _hatch(h, w, spacing, angle, rng, jitter=0.35):
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     a = np.radians(angle)
     u = xx * np.cos(a) + yy * np.sin(a)
-    v = -xx * np.sin(a) + yy * np.cos(a)
     wob = cv2.GaussianBlur(rng.normal(0, 1, (h, w)).astype(np.float32), (0, 0), spacing * 3) * spacing * jitter * 8
     ph = (u + wob) / spacing
     s = 0.5 + 0.5 * np.cos(2 * np.pi * ph)

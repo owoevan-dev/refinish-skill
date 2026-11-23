@@ -31,7 +31,6 @@ Prints JSON: the output and what each grade did.
 Exit codes: 0 done, 2 bad input or an output that cannot be written.
 """
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -39,6 +38,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, run_cli  # noqa: E402
 from _core import die, emit, lab, rgb, unit_range, write_image  # noqa: E402
 
 
@@ -168,7 +169,7 @@ def load_layer(path, place, W, H, clear_halo=False, pad=0):
     a cast shadow, a half-opaque veil); `clear_halo` first clears a generator's faint halo, the alpha more than 4 px
     from the opaque figure. With `pad`, the frame is that many pixels larger on every side, for a blur that reaches
     into it from what lies just outside."""
-    fig = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    fig = read_picture(path, cv2.IMREAD_UNCHANGED)
     if fig is None or fig.ndim < 3 or fig.shape[2] != 4:
         die(f"{path}: a layer must be an RGBA cut-out")
     fa = unit_range(fig[..., 3])
@@ -206,11 +207,12 @@ def main():
     ap.add_argument("--raw", action="store_true")
     a = ap.parse_args()
     sp = Path(a.scene)
-    sc = json.loads(sp.read_text(encoding="utf-8"))
+    sc = read_json(sp)
+    _validate.scene(sc, a.scene)
     W, H = sc.get("frame", [1920, 1080])
     cam = sc.get("camera", {})
     bk = sc.get("background", {})
-    bg = cv2.imread(str(sp.parent / bk["image"]), cv2.IMREAD_COLOR)
+    bg = read_picture(sp.parent / bk["image"], cv2.IMREAD_COLOR)
     if bg is None:
         die(f"cannot read the background {bk['image']}")
     bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
@@ -277,4 +279,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

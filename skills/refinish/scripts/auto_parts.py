@@ -41,12 +41,14 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
 REGIONS_FORMAT = 1
 # a part segmentation's labels (--parse), as seethrough_parse.py writes them
-from _parse_labels import EYE_PARTS, PARSE, PARSE_PARTS  # noqa: E402
+from _parse_labels import EYE_PARTS, PARSE  # noqa: E402
 # the review's part colours: Kelly's colours of maximum contrast (Kelly 1965), as RGB, white and black left out
 KELLY = [(242, 243, 244), (243, 195, 0), (135, 86, 146), (243, 132, 0), (161, 202, 241), (190, 0, 50), (194, 178, 128),
          (132, 132, 130), (0, 136, 86), (230, 143, 172), (0, 103, 165), (249, 147, 121), (96, 78, 151), (246, 166, 0),
@@ -1648,10 +1650,8 @@ def main():
     a = ap.parse_args()
     hints = {}
     if a.hints:
-        try:
-            hints = json.loads(Path(a.hints).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as e:
-            die(f"cannot read the hints {a.hints}: {e}")
+        hints = read_json(Path(a.hints))
+        _validate.hints(hints, a.hints)
         for hp in hints.get("parts", []):
             if "box" in hp:
                 hp["boxes"] = hp.get("boxes", []) + [hp.pop("box")]
@@ -1675,7 +1675,7 @@ def main():
     # regions of their own
     parse = None
     if a.parse:
-        parse = cv2.imread(a.parse, cv2.IMREAD_GRAYSCALE)
+        parse = read_picture(a.parse, cv2.IMREAD_GRAYSCALE)
         if parse is None or parse.shape != within.shape:
             die(f"{a.parse}: not a part map of this picture ({w}x{h}); make it from this picture with "
                 "scripts/seethrough_parse.py")
@@ -2137,7 +2137,7 @@ def main():
           **({"head_px": a.head_px} if a.head_px else {}),
           "regions": rp.name, "families": fams, "parts": out_parts, "protect": protect, "focal": focal,
           "blush": blush}
-    sub_path.write_text(json.dumps(sj, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_text(sub_path, json.dumps(sj, ensure_ascii=False, indent=1))
     rv, fv = sub_path.with_name(f"{stem}.auto.jpg"), sub_path.with_name(f"{stem}.face.jpg")
     if face is None and fv.is_file():
         fv.unlink()                                     # (an earlier draft's face, not this picture's)
@@ -2154,4 +2154,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

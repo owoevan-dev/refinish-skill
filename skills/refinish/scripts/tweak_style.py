@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _adjectives import ADJECTIVES, DEFAULTS, match  # noqa: E402
+from _files import run_cli, write_text  # noqa: E402
 from _core import die, emit  # noqa: E402
 from _style import load_style, resolve_style  # noqa: E402
 
@@ -119,10 +120,10 @@ def main():
         new["id"] = Path(a.out).stem
         new["summary"] = st.get("summary", "") + f" (tweaked: {', '.join(k for k in hits if k not in skipped)})"
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.out).write_text(json.dumps(new, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_text(Path(a.out), json.dumps(new, ensure_ascii=False, indent=1))
     emit({"out": a.out if changed else None, "engine": eng, "matched": hits, "changed": changed,
           "not_for_this_engine": skipped, "check": measure})
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

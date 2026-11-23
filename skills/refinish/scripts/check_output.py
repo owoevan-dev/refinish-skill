@@ -32,6 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _check import finish_map, look_checks, part_map_checks, result_checks, review, verdict  # noqa: E402
+from _files import run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, load_rgba  # noqa: E402
 from _lines import find_lines  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
@@ -103,10 +104,10 @@ def main():
            **({"note": note} if note else {})}
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.json).write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_text(Path(a.json), json.dumps(res, ensure_ascii=False, indent=1))
     emit(res)
     sys.exit(1 if res["verdict"] == "fail" else 0)
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

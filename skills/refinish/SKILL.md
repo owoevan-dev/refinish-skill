@@ -176,7 +176,7 @@ A style file is numbers only: shadows, lines, palette, touches, texture, the eng
 
 ## Scripts
 
-All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check's FAIL to look at; 2 bad input, or a request the script cannot take.
+All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check's FAIL to look at; 2 bad input, or a request the script cannot take; 3 an error the script did not expect, which is worth reporting. A result never replaces a file its run read: give it another name.
 
 | script | use |
 |---|---|

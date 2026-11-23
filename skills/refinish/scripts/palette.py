@@ -37,6 +37,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _colour as C  # noqa: E402
 import _palette as P  # noqa: E402
+from _files import run_cli, write_text  # noqa: E402
 from _core import die, emit, lab, load_rgba, write_image  # noqa: E402
 from _style import kind_of, load_subject  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -105,7 +106,7 @@ def cmd_apply(a):
             except ValueError:
                 out[key] = str(q).replace("\\", "/")
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_text(dst, json.dumps(out, ensure_ascii=False, indent=1))
     rec = out["recolour"]["parts"]
     kept = [p["name"] for p in sj["parts"] if p["name"] not in rec]
     report = {"subject": str(dst), "card": card["name"],
@@ -265,4 +266,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

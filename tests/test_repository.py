@@ -568,6 +568,11 @@ def test_workflow_verifies_what_it_downloads():
     assert "--redact" in text and "--retry" in text
 
 
+def test_lint_findings_fail_the_build():
+    runs = [s.get("run", "") for s in workflow()["jobs"]["tests"]["steps"]]
+    assert any("ruff check" in r and "|| true" not in r for r in runs)
+
+
 def test_the_offline_job_removes_the_network():
     run = " ".join(s.get("run", "") for s in workflow()["jobs"]["offline"]["steps"])
     assert "unshare --net" in run and "REFINISH_OFFLINE=1" in run

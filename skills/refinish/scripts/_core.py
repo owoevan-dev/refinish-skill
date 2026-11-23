@@ -1,14 +1,15 @@
-"""Shared helpers for the refinish scripts: colour conversions, image files, the style unit, masks and filters.
+"""Shared helpers for the refinish scripts: colour conversions, loading a picture, the style unit, masks and filters.
 
 Images in the engines are float32 RGB in 0..1 with a separate float32 alpha in 0..1, unless a name says otherwise
 (`bgr8` is OpenCV's uint8 BGR; `lab8` is OpenCV's 8-bit Lab as float32, L in 0..255).
 """
 import json
 import sys
-from pathlib import Path
 
 import cv2
 import numpy as np
+
+from _files import die, read_picture, write_image
 
 # The engines' pixel constants were tuned on figures about 3000 px tall, where one style unit (a thousandth of the
 # figure's height) is about 3 px. Constants that are not in a style file are scaled by px_per_u / REF_PX_PER_U.
@@ -26,12 +27,6 @@ for _stream in (sys.stdout, sys.stderr):
 def _utf8_out():
     enc = (getattr(sys.stdout, "encoding", "") or "").lower().replace("-", "").replace("_", "")
     return enc in ("utf8", "utf8sig")
-
-
-def die(msg, code=2):
-    """Stop with an actionable message on stderr."""
-    print(f"error: {msg}", file=sys.stderr)
-    sys.exit(code)
 
 
 def emit(obj):
@@ -82,7 +77,7 @@ def load_rgba(path):
     """A picture as (rgb 0..1, alpha 0..1), from 8 or 16 bits a channel. A picture without alpha is opaque. The colour
     a file keeps under full transparency is hidden and differs from tool to tool (black, white, the last colour
     painted); it is read as black, so no blur that reaches across the figure's edge takes it in."""
-    im = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    im = read_picture(path)
     if im is None:
         die(f"cannot read the image {path}")
     if im.ndim == 2:
@@ -96,19 +91,6 @@ def load_rgba(path):
     rgb_img = cv2.cvtColor(unit_range(bgr), cv2.COLOR_BGR2RGB)
     rgb_img[alpha <= 0] = 0
     return rgb_img, alpha
-
-
-def write_image(path, img, params=()):
-    """Write a picture, its folder made first. A picture that cannot be written stops the script: it never reports a
-    file that is not there."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        ok = cv2.imwrite(str(path), img, list(params))
-    except cv2.error:
-        ok = False
-    if not ok:
-        die(f"cannot write {path}")
 
 
 def save_rgba(path, rgb_img, alpha):

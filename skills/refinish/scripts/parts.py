@@ -22,6 +22,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _files import read_picture, run_cli  # noqa: E402
 from _core import Units, die, emit, load_rgba, write_image  # noqa: E402
 from _parts import misfits, part_map  # noqa: E402
 from _style import load_subject, subject_path  # noqa: E402
@@ -50,8 +51,8 @@ def load_or_build(sj):
             "again")
     if pp.is_file() and all(pp.stat().st_mtime >= s.stat().st_mtime for s in src):
         img, alpha = load_rgba(subject_path(sj, sj["image"]))
-        parts = cv2.imread(str(pp), cv2.IMREAD_GRAYSCALE)
-        if parts is not None and parts.shape == alpha.shape:
+        parts = read_picture(pp, cv2.IMREAD_GRAYSCALE, is_input=False)     # (a cache: rebuilt when stale)
+        if parts is not None and parts.shape == alpha.shape and int(parts.max()) <= len(sj["parts"]):
             return img, alpha, parts
     return build(sj)
 
@@ -88,4 +89,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

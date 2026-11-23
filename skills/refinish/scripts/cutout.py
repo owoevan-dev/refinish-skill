@@ -52,6 +52,8 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba, save_rgba, write_image  # noqa: E402
 from _lines import meanshift  # noqa: E402
 from auto_parts import disk, nearest  # noqa: E402
@@ -156,10 +158,8 @@ def main():
     ap.add_argument("out_dir")
     ap.add_argument("--trimap", help="a painted picture: white figure, black background, grey left to the colours")
     a = ap.parse_args()
-    try:
-        spec = json.loads(Path(a.outline).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        die(f"cannot read the outline {a.outline}: {e}")
+    spec = read_json(Path(a.outline))
+    _validate.outline(spec, a.outline)
     polys = spec.get("outline") or []
     if polys and np.asarray(polys[0]).ndim == 1:          # one polygon given without the outer list
         polys = [polys]
@@ -200,7 +200,7 @@ def main():
     sure_bg &= ~seeds["keep"]
     painted = None
     if a.trimap:
-        t = cv2.imread(a.trimap, cv2.IMREAD_GRAYSCALE)
+        t = read_picture(a.trimap, cv2.IMREAD_GRAYSCALE)
         if t is None or t.shape != (h, w):
             die(f"the trimap must be a picture of the same size as {a.picture} ({w} x {h})")
         painted = (t > 200, t < 55)
@@ -307,10 +307,10 @@ def main():
            "settings": {"band": band, "bands": spec.get("bands", []), "keep": len(spec.get("keep", [])),
                         "drop": len(spec.get("drop", [])), "trimap": bool(a.trimap)},
            "frame_cuts_figure": [k_ for k_, v in edges.items() if v], "doubts": doubts}
-    (out_dir / "cutout.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
+    write_text((out_dir / "cutout.json"), json.dumps(res, indent=1))
     emit(res)
     sys.exit(1 if doubts else 0)
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

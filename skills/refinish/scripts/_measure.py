@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import _lines as ln_
-from _core import lab, tone_cuts
+from _core import die, lab, tone_cuts
 
 
 def outline_coverage(img, alpha, upscaled=1):
@@ -73,6 +73,8 @@ def style_metrics(img, alpha, upscaled=1, parts=None, kinds=None, head_px=None):
     texture          the residual detail left after an edge-preserving smoothing (0 = flat paint)
     """
     within = alpha > 0.5
+    if within.sum() < 16:
+        die("the picture has almost nothing visible to measure: is it fully transparent?")
     ys = np.nonzero(within.any(axis=1))[0]
     unit = (ys[-1] - ys[0] + 1) / 1000.0 if len(ys) else img.shape[0] / 1000.0
     if head_px:                                 # a figure cut off by the frame: seven heads tall

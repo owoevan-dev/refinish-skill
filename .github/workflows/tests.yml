@@ -55,6 +55,8 @@ jobs:
           python -m pip install --only-binary :all: -r tests/requirements-dev.txt
       - name: Compile every script
         run: python -m compileall -q skills tests
+      - name: Ruff, the pyflakes rules
+        run: python -m ruff check --isolated --select F skills tests
       - name: Run the tests
         run: python -m pytest -q tests
 
@@ -240,12 +242,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.13"
-      - name: Install the pinned packages and the two report tools
+      - name: Install the pinned packages and the coverage tool
         run: |
           python -m pip install --only-binary :all: --require-hashes -r skills/refinish/requirements-headless.txt
-          python -m pip install -r tests/requirements-dev.txt ruff==0.15.22 coverage==7.17.4
-      - name: Ruff, the pyflakes rules
-        run: python -m ruff check --isolated --select F --statistics skills tests || true
+          python -m pip install -r tests/requirements-dev.txt coverage==7.17.4
       - name: Coverage, scripts run as subprocesses included
         run: |
           python -m coverage run --rcfile=tests/coveragerc -m pytest -q tests || true

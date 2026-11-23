@@ -25,6 +25,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _files import run_cli  # noqa: E402
 from _core import die, emit, load_rgba, over, resize_premultiplied, save_rgba, write_image  # noqa: E402
 
 
@@ -109,4 +110,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

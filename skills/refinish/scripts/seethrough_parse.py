@@ -26,7 +26,6 @@ pieces found below the nose and given to the mouth (eyes_below_nose), the second
 Exit codes: 0 done, 1 done with doubtful eyes, 2 bad input or a model not found.
 """
 import argparse
-import json
 import os
 import sys
 import time
@@ -37,6 +36,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _eyes  # noqa: E402
+from _files import read_json, run_cli  # noqa: E402
 from _core import die, emit, load_rgba, write_image  # noqa: E402
 
 from _parse_labels import EYE0, EYE_PARTS, PARSE_PARTS  # noqa: E402
@@ -87,10 +87,7 @@ def read(model, rgb):
 
 
 def load_fixes(path):
-    try:
-        d = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        die(f"cannot read the eyes file {path}: {e}")
+    d = read_json(Path(path))
     if not isinstance(d, dict) or d.get("format") != EYES_FORMAT or not isinstance(d.get("eyes"), list):
         die(f"{path}: 'format' must be \"{EYES_FORMAT}\" and 'eyes' a list (see references/seethrough.md)")
     fixes = {}
@@ -318,4 +315,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

@@ -13,7 +13,7 @@ import numpy as np
 
 import _flat
 import _texture as tx
-from _core import lab, protect_mask, rgb
+from _core import protect_mask, rgb
 from _lines import find_lines
 
 

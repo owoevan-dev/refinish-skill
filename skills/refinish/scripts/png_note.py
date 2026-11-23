@@ -17,6 +17,7 @@ Prints JSON. Exit codes: 0 done, 2 bad input.
 """
 import argparse
 import json
+import os
 import struct
 import sys
 import zlib
@@ -99,7 +100,13 @@ def main():
         out += data[i:i + 12 + n]
         if kind == b"IHDR":
             out += text_chunk(a.key, a.text)
-    p.write_bytes(bytes(out))
+    tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")   # (whole or not at all: this file is the user's picture)
+    try:
+        tmp.write_bytes(bytes(out))
+        os.replace(tmp, p)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     notes[a.key] = a.text
     print(json.dumps({"png": a.png, "notes": notes}, ensure_ascii=not UTF8_OUT))
 

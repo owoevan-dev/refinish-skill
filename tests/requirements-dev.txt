@@ -3,3 +3,4 @@ pillow==13.0.0; python_version >= "3.11"
 pillow==12.3.0; python_version < "3.11"
 pyyaml==6.0.4
 pytest==9.2.0
+ruff==0.15.22

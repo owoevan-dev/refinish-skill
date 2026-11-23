@@ -7,13 +7,13 @@ painters and colour designers turn shadows: a step down in lightness, a little m
 the ambient light's (blue-violet, the sky's) for most materials, toward red for skin (light scattered under it), a
 near-neutral given a cool tint (a white shirt's shadow is lavender-grey, not grey). See references/palette-design.md
 in the recolor skill."""
-import json
 import re
 from pathlib import Path
 
 import numpy as np
 
 import _colour as C
+from _files import read_json
 from _core import die, lab
 from _style import KINDS, kind_of
 
@@ -114,10 +114,7 @@ def load_palette(path):
     p = Path(path)
     if not p.is_file():
         die(f"no colour card at {path}")
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        die(f"{path} is not valid JSON: {e}")
+    d = read_json(p)
     if not isinstance(d, dict) or d.get("format") != PALETTE_FORMAT:
         die(f"{path}: 'format' must be \"{PALETTE_FORMAT}\" (see the recolor skill's references/palette-format.md)")
     for key in ("parts", "kinds", "roles", "shadow_rule"):
@@ -174,10 +171,7 @@ def load_touch(path):
     p = Path(path)
     if not p.is_file():
         die(f"no touch file at {path}")
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        die(f"{path} is not valid JSON: {e}")
+    d = read_json(p)
     if not isinstance(d, dict) or d.get("format") != TOUCH_FORMAT:
         die(f"{path}: 'format' must be \"{TOUCH_FORMAT}\" (see the recolor skill's references/palette-format.md)")
     if not isinstance(d.get("touch", []), list):

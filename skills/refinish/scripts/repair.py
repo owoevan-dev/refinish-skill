@@ -33,7 +33,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _core import Units, die, emit, lab, load_rgba, over, rgb, save_rgba, write_image  # noqa: E402
+from _files import run_cli  # noqa: E402
+from _core import Units, die, emit, lab, load_rgba, over, save_rgba, write_image  # noqa: E402
 
 REPAIRS = ("halo", "specks", "lines", "bleed")
 
@@ -438,4 +439,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)
