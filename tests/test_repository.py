@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from conftest import ROOT, SCRIPTS, SKILL
-from privacy_scan import tracked_files
+from privacy_scan import Finding, tracked_files
 
 SKILLS = sorted(p.parent for p in (ROOT / "skills").glob("*/SKILL.md"))
 WORKFLOW = ROOT / ".github" / "workflows" / "tests.yml"
@@ -28,6 +28,12 @@ def load(path):
 
 def repository_files():
     return [ROOT / f for f in tracked_files() if (ROOT / f).is_file()]
+
+
+def fail_masked(rule, places):
+    """A repository check's failure, naming places by the scan's opaque id: CI logs are public and a name can be the leak."""
+    if places:
+        pytest.fail("\n".join(str(Finding(rule, str(p), 0, "")) for p in places), pytrace=False)
 
 
 def frontmatter(skill):
@@ -120,7 +126,7 @@ def test_markdown_links_resolve():
         for target in re.findall(r"\]\(([^)#\s]+)", text) + re.findall(r"(?:src|srcset|href)=\"([^\"#]+)\"", text):
             if not re.match(r"[a-z]+:", target) and not (md.parent / target).exists():
                 bad.append(f"{md.relative_to(ROOT)} -> {target}")
-    assert not bad, bad
+    fail_masked("broken-link", bad)
 
 
 def heading_anchor(heading):
@@ -151,7 +157,7 @@ def test_markdown_section_links_resolve():
             dest = md.parent / target if target else md
             if not re.match(r"[a-z]+:", target) and dest.suffix == ".md" and anchor not in anchors(dest):
                 bad.append(f"{md.relative_to(ROOT)} -> {target}#{anchor}")
-    assert not bad, bad
+    fail_masked("broken-link", bad)
 
 
 def test_readmes_offer_every_language():
@@ -175,27 +181,25 @@ def test_no_hidden_characters():
             bad = sorted({f"U+{ord(c):04X}" for c in line.removesuffix("\r")
                           if unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp", "Co", "Cs") and c != "\t"})
             if bad:
-                hits.append(f"{p.relative_to(ROOT)}:{i}: {', '.join(bad)}")
-    assert not hits, "\n".join(hits[:40])
+                hits.append(f"{p.relative_to(ROOT)}:{i}")
+    fail_masked("hidden-character", hits[:40])
 
 
 def test_files_fit_the_plugin_directory():
     """The repository root is the plugin folder: every file under 5 MiB, and nothing binary but images."""
-    for p in repository_files():
-        assert p.stat().st_size < 5 * 2 ** 20, f"{p.relative_to(ROOT)} is 5 MiB or larger"
-        if p.suffix.lower() not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
-            assert b"\0" not in p.read_bytes(), f"{p.relative_to(ROOT)} is a binary file"
+    files = repository_files()
+    fail_masked("file-too-large", [p.relative_to(ROOT) for p in files if p.stat().st_size >= 5 * 2 ** 20])
+    fail_masked("binary-file", [p.relative_to(ROOT) for p in files if p.suffix.lower() not in (
+        ".png", ".jpg", ".jpeg", ".gif", ".webp") and b"\0" in p.read_bytes()])
 
 
 @pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
 def test_a_skill_ships_only_what_it_should(skill):
     """What an installed skill holds: its documents, scripts, style numbers, drawn eval pictures and icons."""
     allowed = {".md", ".py", ".json", ".yaml", ".txt", ".png", ".svg", ".sh", ""}
-    for f in tracked_files():
-        p = ROOT / f
-        if skill in p.parents:
-            assert p.suffix.lower() in allowed, f
-            assert p.suffix or p.name == "LICENSE", f
+    shipped = [ROOT / f for f in tracked_files() if skill in (ROOT / f).parents]
+    fail_masked("unexpected-file", [p.relative_to(ROOT) for p in shipped if p.suffix.lower() not in allowed or (
+        not p.suffix and p.name != "LICENSE")])
 
 
 # ------------------------------------------------------------------------------------------------------- install pins
@@ -374,6 +378,12 @@ def test_env_broken_desktop_opencv_suggests_headless(monkeypatch, tmp_path):
     errors = {"cv2": "ImportError: libGL.so.1: cannot open shared object file"}
     env = fake_env(monkeypatch, {k: v for k, v in GOOD.items() if k != "cv2"}, errors, dists={"opencv-python": "5.0.0.93"})
     assert str(env.REQUIREMENTS[True]) in env.report(tmp_path / "v")[0]["argv"][-1]
+
+
+def test_env_here_never_adds_a_second_opencv_package(monkeypatch, tmp_path):
+    errors = {"cv2": "ImportError: libGL.so.1: cannot open shared object file"}
+    env = fake_env(monkeypatch, {k: v for k, v in GOOD.items() if k != "cv2"}, errors, dists={"opencv-python": "5.0.0.93"})
+    assert env.report(tmp_path / "v", here=True)[0]["argv"][0][1:3] == ["-m", "venv"]
 
 
 def test_env_old_python(monkeypatch, tmp_path):
