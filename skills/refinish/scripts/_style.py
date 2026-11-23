@@ -3,7 +3,7 @@ the part's kind, then the subject's own rule for that part, merged key by key)."
 from pathlib import Path
 
 import _validate
-from _files import read_json
+from _files import note_input, read_json
 from _core import die
 
 STYLE_FORMAT = "refinish-style/1"
@@ -46,7 +46,7 @@ def load_style(path):
         die(f"{path}: 'format' must be \"{STYLE_FORMAT}\" (see references/style-format.md)")
     if st.get("engine") not in ENGINES:
         die(f"{path}: 'engine' must be one of {', '.join(ENGINES)}")
-    _validate.style(st, path, STYLES)
+    _validate.style(st, path)
     return st
 
 
@@ -59,15 +59,15 @@ def load_subject(path):
         die(f"{path} is not a subject file: a subject is one JSON object (references/subject-file.md)")
     if sj.get("format") != SUBJECT_FORMAT:
         die(f"{path}: 'format' must be \"{SUBJECT_FORMAT}\" (see references/subject-file.md)")
-    for key in ("image", "families", "parts"):
-        if key not in sj:
-            die(f"{path}: '{key}' is missing (see references/subject-file.md)")
     _validate.subject(sj, path)
     for part in sj["parts"]:
         if part.get("family") not in sj["families"]:
             die(f"{path}: part '{part.get('name')}' names the family '{part.get('family')}', which has no samples")
     sj["_dir"] = str(p.resolve().parent)
     sj["_stem"] = p.stem
+    for key in ("image", "regions"):                    # (a result may not replace what the subject is made of)
+        if key in sj:
+            note_input(subject_path(sj, sj[key]))
     return sj
 
 

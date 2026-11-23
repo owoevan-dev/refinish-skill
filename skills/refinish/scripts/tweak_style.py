@@ -115,7 +115,6 @@ def main():
     if changed:
         new["id"] = Path(a.out).stem
         new["summary"] = st.get("summary", "") + f" (tweaked: {', '.join(k for k in hits if k not in skipped)})"
-        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         write_text(Path(a.out), json.dumps(new, ensure_ascii=False, indent=1))
     emit({"out": a.out if changed else None, "engine": eng, "matched": hits, "changed": changed,
           "not_for_this_engine": skipped, "check": measure})

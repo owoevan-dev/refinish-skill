@@ -33,7 +33,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _files import run_cli, write_text  # noqa: E402
+from _files import refuse_input, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, save_rgba  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -166,6 +166,8 @@ def main():
         die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
             "relight a style that keeps the size, or leave --hour out")
     img, alpha, parts = load_or_build(sj)
+    for written in (a.out, Path(a.out).with_suffix(".check.jpg"), Path(a.out).with_suffix(".hex")):
+        refuse_input(written)                           # (before the first file is written, so none is left half done)
     U = Units(alpha, sj.get("head_px"))
     from _check import finish_map
     from _palette import without_card

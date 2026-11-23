@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _validate  # noqa: E402
 from _files import read_json, run_cli  # noqa: E402
 from _core import Units, die, ellipse_mask, emit, lab, rgb, save_rgba  # noqa: E402
-from _style import KINDS, STYLES, kind_of, load_style, load_subject, resolve_style, rule  # noqa: E402
+from _style import KINDS, kind_of, load_style, load_subject, resolve_style, rule  # noqa: E402
 from parts import load_or_build  # noqa: E402
 
 RECIPE_FORMAT = "refinish-recipe/1"
@@ -204,7 +204,7 @@ def main():
         die(f"{a.recipe}: 'format' must be \"{RECIPE_FORMAT}\" (references/recipes.md)")
     if "subject" not in rc or not rc.get("layers") and "base" not in rc:
         die(f"{a.recipe}: a recipe needs a 'subject' and a 'base' or 'layers'")
-    _validate.recipe(rc, a.recipe, STYLES)
+    _validate.recipe(rc, a.recipe)
     sp = Path(rc["subject"])
     sj = load_subject(sp if sp.is_absolute() else rp.parent / sp)
     img, alpha, parts = load_or_build(sj)
@@ -234,8 +234,6 @@ def main():
     mix = mix.copy()
     covered = []
     for i, lay in enumerate(rc.get("layers", [])):
-        if "style" not in lay:
-            die(f"layer {i} has no 'style'")
         layer, layer_alpha = get(lay["style"])
         m = sel.where(lay.get("where")).astype(np.float32)
         f = U.len(lay.get("feather", 1.5))

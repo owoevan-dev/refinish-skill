@@ -3,14 +3,15 @@ that names it. These files are data and may come from someone else: nothing in t
 
 Each check knows the shape of its format (references/subject-file.md, style-format.md, recipes.md, compositing.md,
 cutout.md). A key it does not know is left alone, so a file written for a later version still loads."""
-import json
 import math
-from pathlib import Path
 
 from _files import MAX_PIXELS, die
 
 HOURS = ("night", "sunset", "dusk", "film-night")
 POST_OPS = ("relight", "paper", "grain", "halation", "soften", "curve", "focus", "bokashi", "mist", "wet_sky")
+STYLE_SECTIONS = ("shading", "kinds", "palette", "lines", "touches", "texture", "pieces", "values", "strokes", "edges",
+                  "drawing", "duotone", "deai", "pencil", "wash", "tone", "neon", "papercut", "pixel", "pop", "print",
+                  "glass", "sticker", "woodblock")
 MAX_PARTS = 255                                         # (a part map is 8 bits)
 
 
@@ -134,64 +135,28 @@ def subject(d, path):
     c.field(d, "recolour", is_dict, "the object palette.py wrote")
 
 
-def _kind(v):
-    if isinstance(v, bool):
-        return "bool"
-    if isinstance(v, (int, float)):
-        return "number"
-    return {str: "text", list: "list", dict: "object", type(None): "null"}[type(v)]
+def _curve_value(v):
+    return is_num(v) or is_nums(v, 3)
 
 
-def _learn(v, at, out):
-    out.setdefault(at, set()).add(_kind(v))
-    if isinstance(v, dict):
-        for k, x in v.items():
-            _learn(x, f"{at}.{k}" if at else k, out)
-    elif isinstance(v, list):
-        for x in v:
-            _learn(x, f"{at}[]", out)
-
-
-_shapes = {}
-
-
-def style_shapes(folder):
-    """What each field holds across the bundled styles: a number, a list of numbers, an object..."""
-    if not _shapes:
-        for p in sorted(Path(folder).glob("*.json")):
-            _learn(json.loads(p.read_text(encoding="utf-8")), "", _shapes)
-    return _shapes
-
-
-def _compare(v, at, known, c):
-    if at in known and _kind(v) not in known[at]:
-        c.fail(at, f"{' or '.join(sorted(known[at]))}, as in the bundled styles")
-    if isinstance(v, dict):
-        for k, x in v.items():
-            _compare(x, f"{at}.{k}" if at else k, known, c)
-    elif isinstance(v, list):
-        for x in v:
-            _compare(x, f"{at}[]", known, c)
-
-
-def post_layers(value, c, known):
+def post_layers(value, c):
     if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
         c.fail("post", "a list of objects")
     for i, layer in enumerate(value):
         if layer.get("op") not in POST_OPS:
             c.fail(f"post[{i}].op", f"one of {', '.join(POST_OPS)}")
-        _compare(layer, "post[]", known, c)
+        if layer["op"] == "curve":
+            for key in ("lift", "gain", "gamma"):
+                c.field(layer, key, _curve_value, "a number or [r, g, b]", f"post[{i}].")
 
 
-def style(d, path, folder):
-    """A style's fields hold what the same fields hold in the bundled styles."""
-    if Path(path).resolve().parent == Path(folder).resolve():
-        return
+def style(d, path):
+    """The sections an engine reads as objects, and the post layers. What is inside a section is that engine's own."""
     c = Check(path, "references/style-format.md")
-    known = style_shapes(folder)
+    for key in STYLE_SECTIONS:
+        c.field(d, key, is_dict, "an object")
     if "post" in d:
-        post_layers(d["post"], c, known)
-    _compare({k: v for k, v in d.items() if k != "post"}, "", known, c)
+        post_layers(d["post"], c)
 
 
 def hints(d, path):
@@ -242,7 +207,7 @@ def _where(v):
     return words and ("box" not in v or is_box(v["box"]))
 
 
-def recipe(d, path, folder):
+def recipe(d, path):
     c = Check(path, "references/recipes.md")
     c.field(d, "subject", is_text, "a subject file's path", required=True)
     c.field(d, "base", is_text, "a style or \"source\"")
@@ -255,7 +220,7 @@ def recipe(d, path, folder):
         c.field(lay, "opacity", is_unit, "a number from 0 to 1", at)
         c.field(lay, "feather", is_not_negative, "a number, 0 or more", at)
     if "post" in d:
-        post_layers(d["post"], c, style_shapes(folder))
+        post_layers(d["post"], c)
 
 
 def _grade(g, at, c):
@@ -286,6 +251,7 @@ def scene(d, path):
     for key in ("vignette", "grain"):
         c.field(cam, key, is_not_negative, "a number, 0 or more", "camera.")
     c.field(cam, "seed", is_int, "a whole number", "camera.")
+    c.field(cam, "bokeh", lambda v: not v or is_dict(v), "an object", "camera.")
     if cam.get("bloom"):
         c.field(cam, "bloom", lambda v: isinstance(v, dict) and all(is_num(x) for x in v.values()),
                 "an object of numbers", "camera.")

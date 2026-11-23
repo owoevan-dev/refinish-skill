@@ -118,7 +118,18 @@ def test_reading_by_bytes_gives_what_imread_gave(tmp_path, ext, im, flags):
     from _files import read_picture
     p = tmp_path / f"a{ext}"
     p.write_bytes(cv2.imencode(ext, im)[1].tobytes())
-    assert np.array_equal(read_picture(p, flags), cv2.imdecode(np.fromfile(str(p), np.uint8), flags))
+    assert np.array_equal(read_picture(p, flags), cv2.imread(str(p), flags))
+
+
+def test_an_oriented_jpeg_reads_as_imread_reads_it(tmp_path):
+    from _files import read_picture
+    jpg = cv2.imencode(".jpg", draw_figure(60, 40)[..., :3])[1].tobytes()
+    tiff = b"MM\0*\0\0\0\x08\0\x01\x01\x12\0\x03\0\0\0\x01\0\x06\0\0\0\0\0\0"            # (orientation 6: turned)
+    exif = b"Exif\0\0" + tiff
+    p = tmp_path / "turned.jpg"
+    p.write_bytes(jpg[:2] + b"\xff\xe1" + struct.pack(">H", len(exif) + 2) + exif + jpg[2:])
+    for flags in (cv2.IMREAD_COLOR, cv2.IMREAD_UNCHANGED):
+        assert np.array_equal(read_picture(p, flags), cv2.imread(str(p), flags))
 
 
 def test_writing_gives_the_encoder_s_exact_bytes(tmp_path):
@@ -142,6 +153,9 @@ OVERWRITES = [
     ("recipe.py", ["recipe.json", "image.png"], "image.png"),
     ("tweak_style.py", ["style.json", "style.json", "softer shadows"], "style.json"),
     ("auto_parts.py", ["image.png", "subject.json", "--hints", "subject.json"], "subject.json"),
+    ("refinish.py", ["subject.json", "style.json", "subject.regions.png"], "subject.regions.png"),
+    ("refinish.py", ["subject.json", "style.json", "subject.parts.png"], "subject.parts.png"),
+    ("check_output.py", ["subject.json", "made.png", "--json", "made.png"], "made.png"),
 ]
 
 
@@ -151,6 +165,43 @@ def test_a_result_never_replaces_an_input(work, script, args, victim):
     r = cli(script, *args, cwd=work, codes=(2,))
     assert "error:" in r.stderr
     assert (work / victim).read_bytes() == before
+
+
+def test_a_clash_with_a_side_file_stops_before_anything_is_written(work):
+    """The check picture of `render.png` is `render.check.jpg`: here that is the source."""
+    cv2.imwrite(str(work / "render.check.jpg"), draw_figure()[..., :3])
+    cli("auto_parts.py", "render.check.jpg", "s.json", cwd=work)
+    before = (work / "render.check.jpg").read_bytes()
+    cli("refinish.py", "s.json", "style.json", "render.png", cwd=work, codes=(2,))
+    assert (work / "render.check.jpg").read_bytes() == before and not (work / "render.png").exists()
+
+
+def test_a_cutout_stops_before_it_replaces_anything(work):
+    (work / "cut").mkdir()
+    shutil.copy(work / "image.png", work / "cut" / "background.png")
+    (work / "cut" / "figure.png").write_bytes(b"earlier")
+    cli("cutout.py", "cut/background.png", "outline.json", "cut", cwd=work, codes=(2,))
+    assert (work / "cut" / "figure.png").read_bytes() == b"earlier"
+
+
+def test_no_face_found_leaves_a_picture_named_like_the_face_sheet_alone(tmp_path):
+    im = np.full((600, 400, 4), 255, np.uint8)
+    im[100:500, 100:300] = (60, 120, 200, 255)
+    p = tmp_path / "draft.face.png"
+    cv2.imwrite(str(p), im)
+    (tmp_path / "draft.face.jpg").write_bytes(cv2.imencode(".jpg", im[..., :3])[1].tobytes())
+    before = (tmp_path / "draft.face.jpg").read_bytes()
+    r = cli("auto_parts.py", "draft.face.jpg", "draft.json", cwd=tmp_path)
+    assert (tmp_path / "draft.face.jpg").read_bytes() == before, r.stderr[-300:]
+
+
+def test_the_style_fitter_does_not_render_over_a_reference(work):
+    (work / "fit").mkdir()
+    shutil.copy(work / "made.png", work / "fit" / "start_tv-cel.png")
+    before = (work / "fit" / "start_tv-cel.png").read_bytes()
+    cli("fit_style.py", "subject.json", "fit/start_tv-cel.png", "--out", "o.json", "--work", "fit", "--start", "tv-cel",
+        "--rounds", "1", cwd=work, codes=(2,))
+    assert (work / "fit" / "start_tv-cel.png").read_bytes() == before
 
 
 def test_a_hard_link_to_the_input_is_the_input(work):
@@ -207,13 +258,27 @@ def test_a_moment_s_file_lock_is_waited_out(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
-def test_a_replaced_file_keeps_its_mode(tmp_path):
+def test_a_replaced_file_keeps_its_mode_and_a_new_one_follows_the_umask(tmp_path):
     import _files
     p = tmp_path / "a.txt"
     p.write_text("x", encoding="utf-8")
-    os.chmod(p, 0o640)
+    os.chmod(p, 0o600)
     _files.write_text(p, "y")
-    assert p.stat().st_mode & 0o777 == 0o640
+    assert p.stat().st_mode & 0o777 == 0o600
+    old = os.umask(0o027)
+    try:
+        _files.write_text(tmp_path / "b.txt", "z")
+    finally:
+        os.umask(old)
+    assert (tmp_path / "b.txt").stat().st_mode & 0o777 == 0o640
+
+
+def test_writing_does_not_touch_a_file_that_looks_like_its_temporary(tmp_path):
+    import _files
+    other = tmp_path / f".a.txt.{os.getpid()}.tmp"
+    other.write_text("someone else's", encoding="utf-8")
+    _files.write_text(tmp_path / "a.txt", "new")
+    assert other.read_text(encoding="utf-8") == "someone else's"
 
 
 def test_a_stale_part_cache_with_bad_numbers_is_rebuilt(work):
@@ -235,7 +300,7 @@ def png_claiming(w, h):
         chunk(b"IDAT", zlib.compress(b"\0" * 100)) + chunk(b"IEND", b"")
 
 
-@pytest.mark.parametrize("ext,im", [(".png", (70, 40)), (".jpg", (70, 40)), (".webp", (70, 40)), (".bmp", (70, 40))])
+@pytest.mark.parametrize("ext,im", [(".png", (70, 40)), (".jpg", (70, 40)), (".webp", (70, 40))])
 def test_the_size_is_read_from_the_header(ext, im):
     from _files import picture_size
     data = cv2.imencode(ext, np.zeros((im[1], im[0], 3), np.uint8))[1]
@@ -353,12 +418,10 @@ def mutations(obj):
 @pytest.mark.parametrize("kind", ["subject", "hints", "outline", "recipe", "scene", "style"])
 def test_the_validators_accept_or_refuse_but_never_break(base, kind):
     import _validate
-    from _style import STYLES
     file = {"style": "style.json"}.get(kind, f"{kind}.json")
     good = json.loads((base / file).read_text(encoding="utf-8"))
     check = {"subject": _validate.subject, "hints": _validate.hints, "outline": _validate.outline, "scene": _validate.scene,
-             "recipe": lambda d, p: _validate.recipe(d, p, STYLES),
-             "style": lambda d, p: _validate.style(d, str(base / "custom.json"), STYLES)}[kind]
+             "recipe": _validate.recipe, "style": _validate.style}[kind]
     check(good, file)
     refused = 0
     for name, d in mutations(good):
@@ -379,6 +442,36 @@ def test_a_wrong_subject_field_is_named(work, field, value):
     (work / "x.json").write_text(json.dumps(d), encoding="utf-8")
     r = cli("refinish.py", "x.json", "style.json", "o.png", cwd=work, codes=(2,))
     assert field in r.stderr
+
+
+@pytest.mark.parametrize("extra", [{"print": {"inks": [[50, 20, 30], [80, 0, 0]]}}, {"sticker": {"edge": None}},
+                                   {"duotone": {"stops": ["#101820", "#f2e9dc"]}},
+                                   {"post": [{"op": "curve", "lift": 0.03}]},
+                                   {"post": [{"op": "curve", "gain": [1, 0.98, 0.95]}]}], ids=lambda e: next(iter(e)))
+def test_what_the_style_format_documents_is_accepted(extra):
+    import _validate
+    _validate.style({"format": "refinish-style/1", "engine": "cel", **extra}, "custom.json")
+
+
+@pytest.mark.parametrize("extra", [{"shading": 3}, {"post": [{"op": "curve", "lift": [0, 1]}]}, {"post": "grain"}],
+                         ids=["section", "curve", "post"])
+def test_a_wrong_style_shape_is_refused(extra):
+    import _validate
+    with pytest.raises(SystemExit) as e:
+        _validate.style({"format": "refinish-style/1", "engine": "cel", **extra}, "custom.json")
+    assert e.value.code == 2
+
+
+def test_results_do_not_name_the_folders_above_them(work):
+    marker = work.parent.name
+    (work / "a").mkdir()
+    (work / "b").mkdir()
+    shutil.copy(work / "image.png", work / "a" / "image.png")
+    cli("auto_parts.py", "a/image.png", "a/subject.json", cwd=work)
+    cli("palette.py", "apply", "a/subject.json", "card.json", "b/carded.json", cwd=work, codes=(0,))
+    cli("measure_style.py", "a/image.png", "--out", "b/metrics.json", cwd=work)
+    for name in ("b/carded.json", "b/metrics.json"):
+        assert marker not in (work / name).read_text(encoding="utf-8"), name
 
 
 def test_a_style_cannot_name_a_module(work):
@@ -411,7 +504,8 @@ def test_an_unexpected_error_is_not_read_as_done_with_doubts(capsys):
     with pytest.raises(SystemExit) as e:
         run_cli(boom)
     err = capsys.readouterr().err
-    assert e.value.code == 3 and "a surprise" in err and "Traceback" not in err and "report" in err
+    assert e.value.code == 3 and "ValueError" in err and "Traceback" not in err and "report" in err
+    assert "a surprise" not in err                      # (a message can quote a path; this line is meant to be shared)
 
 
 def test_debug_mode_shows_the_traceback(capsys, monkeypatch):

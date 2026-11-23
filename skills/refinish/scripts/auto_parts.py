@@ -28,7 +28,6 @@ Exit codes: 0 done, 1 done with doubts, 2 bad input.
 import argparse
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -38,7 +37,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _validate  # noqa: E402
-from _files import read_json, read_picture, run_cli, write_text  # noqa: E402
+from _files import is_input, read_json, read_picture, relative_path, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
@@ -2115,16 +2114,12 @@ def main():
 
     # 5. write
     sub_path = Path(a.subject)
-    sub_path.parent.mkdir(parents=True, exist_ok=True)
     stem = sub_path.stem
     rp = sub_path.with_name(f"{stem}.regions.png")
     if n > 65535:
         die("more than 65535 regions: the picture is too noisy for automatic parts")
     write_image(str(rp), reg.astype(np.uint16))
-    try:
-        image_rel = os.path.relpath(Path(a.image).resolve(), sub_path.resolve().parent).replace("\\", "/")
-    except ValueError:
-        image_rel = str(Path(a.image).resolve()).replace("\\", "/")
+    image_rel = relative_path(a.image, sub_path.resolve().parent)
     fams = {p["name"]: samples(p["regions"], reg) for p in parts}
     out_parts = [{"name": p["name"], "family": p["name"], "kind": p["kind"], "regions": [int(i) for i in p["regions"]],
                   **({"exact": True} if p.get("exact") else {}), **({"prop": True} if p.get("prop") else {})}
@@ -2135,7 +2130,7 @@ def main():
           "blush": blush}
     write_text(sub_path, json.dumps(sj, ensure_ascii=False, indent=1))
     rv, fv = sub_path.with_name(f"{stem}.auto.jpg"), sub_path.with_name(f"{stem}.face.jpg")
-    if face is None and fv.is_file():
+    if face is None and fv.is_file() and not is_input(fv):
         fv.unlink()                                     # (an earlier draft's face, not this picture's)
     review(img, alpha, reg, parts, rv, fv, [p["box"] for p in protect], face["box"] if face is not None else None)
     sv = sub_path.with_name(f"{stem}.sheet.jpg")
@@ -2145,7 +2140,7 @@ def main():
                      "share": round(float(st["area"][p["regions"]].sum() / fig["area"]), 4),
                      **({"why": p["_why"]} if p.get("_why") else {})} for p in parts],
           "protect": protect, "focal": focal, "doubts": doubts,
-          "review": [str(v) for v in (rv, fv, sv) if v.is_file()]})
+          "review": [str(v) for v in (rv, fv if face is not None else None, sv) if v is not None and v.is_file()]})
     sys.exit(1 if doubts else 0)
 
 

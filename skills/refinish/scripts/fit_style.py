@@ -28,7 +28,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from _files import run_cli, write_text  # noqa: E402
+from _files import refuse_input, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba  # noqa: E402
 from _measure import FINISH, style_metrics  # noqa: E402
 from _style import load_style, load_subject, resolve_style, subject_path  # noqa: E402
@@ -58,10 +58,11 @@ def score(target, got):
 
 
 def render(subject, style, out):
+    refuse_input(out)                                   # (the child process does not know this run's references)
     r = subprocess.run([sys.executable, str(HERE / "refinish.py"), subject, style, str(out), "--no-check"],
                        capture_output=True, text=True)
     if r.returncode:
-        die(f"refinish.py failed on {style}: {r.stderr[-400:]}")
+        die(f"refinish.py failed on {style}: {r.stderr[-400:]}", r.returncode if r.returncode == 3 else 2)
 
 
 def get(d, path, dflt=None):
@@ -221,7 +222,6 @@ def main():
     style["id"] = Path(a.out).stem
     style["summary"] = (style.get("summary", "") + f" Fitted to {len(a.refs)} reference picture(s) by measurement "
                         f"from '{start}' ({best[0][0]} of {len(target)} finish numbers within 10 %).").strip()
-    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     write_text(Path(a.out), json.dumps(style, ensure_ascii=False, indent=1))
     still = [{"metric": f, "target": target[f], "result": rounds[best[2]]["numbers"].get(f)} for f in target
              if f in rounds[best[2]]["numbers"] and

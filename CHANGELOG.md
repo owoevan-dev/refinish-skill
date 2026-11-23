@@ -19,7 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - A malformed subject, style, recipe, scene, hints or outline file stops with a message naming the field, with exit code 2, instead of a Python traceback.
 - An unexpected error now exits with code 3. It used to exit 1, which also means "done, with something to look at".
 - A cached part map holding part numbers the subject does not have is rebuilt.
-- A picture whose header claims more than 100 million pixels is refused before it is decoded.
+- A picture of more than 100 million pixels is refused, and a PNG, JPEG or WebP claiming that is refused before it is decoded.
 
 ## [0.2.0] - 2026-11-01
 

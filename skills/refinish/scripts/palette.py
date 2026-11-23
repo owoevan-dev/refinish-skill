@@ -33,7 +33,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _colour as C  # noqa: E402
 import _palette as P  # noqa: E402
-from _files import run_cli, write_text  # noqa: E402
+from _files import relative_path, run_cli, write_text  # noqa: E402
 from _core import die, emit, lab, load_rgba, write_image  # noqa: E402
 from _style import kind_of, load_subject  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -96,12 +96,7 @@ def cmd_apply(a):
     src_dir, dst = Path(sj["_dir"]), Path(a.out).resolve()
     for key in ("image", "regions"):
         if key in out and not Path(out[key]).is_absolute():
-            q = (src_dir / out[key]).resolve()
-            try:
-                out[key] = str(q.relative_to(dst.parent)).replace("\\", "/")
-            except ValueError:
-                out[key] = str(q).replace("\\", "/")
-    dst.parent.mkdir(parents=True, exist_ok=True)
+            out[key] = relative_path(src_dir / out[key], dst.parent)
     write_text(dst, json.dumps(out, ensure_ascii=False, indent=1))
     rec = out["recolour"]["parts"]
     kept = [p["name"] for p in sj["parts"] if p["name"] not in rec]

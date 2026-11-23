@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _files import read_picture, run_cli  # noqa: E402
+from _files import note_input, read_picture, release_input, run_cli  # noqa: E402
 from _core import Units, die, emit, load_rgba, write_image  # noqa: E402
 from _parts import misfits, part_map  # noqa: E402
 from _style import load_subject, subject_path  # noqa: E402
@@ -31,7 +31,9 @@ def parts_path(sj):
 def build(sj):
     img, alpha = load_rgba(subject_path(sj, sj["image"]))
     parts = part_map(sj, img, alpha)
+    release_input(parts_path(sj))
     write_image(str(parts_path(sj)), parts)
+    note_input(parts_path(sj))
     return img, alpha, parts
 
 
@@ -49,6 +51,7 @@ def load_or_build(sj):
         img, alpha = load_rgba(subject_path(sj, sj["image"]))
         parts = read_picture(pp, cv2.IMREAD_GRAYSCALE, is_input=False)     # (a cache: rebuilt when stale)
         if parts is not None and parts.shape == alpha.shape and int(parts.max()) <= len(sj["parts"]):
+            note_input(pp)
             return img, alpha, parts
     return build(sj)
 

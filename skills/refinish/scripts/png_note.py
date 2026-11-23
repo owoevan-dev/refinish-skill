@@ -17,11 +17,12 @@ Prints JSON. Exit codes: 0 done, 2 bad input.
 """
 import argparse
 import json
-import os
 import struct
 import sys
 import zlib
 from pathlib import Path
+
+from _files import die, run_cli, write_bytes
 
 SIG = b"\x89PNG\r\n\x1a\n"
 # escaped JSON (still valid) when the console is not UTF-8: a note's text may hold characters its code page lacks
@@ -31,7 +32,11 @@ UTF8_OUT = (getattr(sys.stdout, "encoding", "") or "").lower().replace("-", "") 
 def chunks(data):
     i = 8
     while i < len(data):
+        if i + 12 > len(data):
+            die("the PNG is damaged: a chunk is cut short")
         n = struct.unpack(">I", data[i:i + 4])[0]
+        if i + 12 + n > len(data):
+            die("the PNG is damaged: a chunk runs past the file")
         kind = data[i + 4:i + 8]
         yield i, n, kind, data[i + 8:i + 8 + n]
         i += 12 + n
@@ -100,16 +105,10 @@ def main():
         out += data[i:i + 12 + n]
         if kind == b"IHDR":
             out += text_chunk(a.key, a.text)
-    tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")   # (whole or not at all: this file is the user's picture)
-    try:
-        tmp.write_bytes(bytes(out))
-        os.replace(tmp, p)
-    finally:
-        if tmp.exists():
-            tmp.unlink()
+    write_bytes(p, bytes(out))
     notes[a.key] = a.text
     print(json.dumps({"png": a.png, "notes": notes}, ensure_ascii=not UTF8_OUT))
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

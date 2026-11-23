@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _check import finish_map, look_checks, part_map_checks, result_checks, review, verdict  # noqa: E402
-from _files import run_cli, write_text  # noqa: E402
+from _files import note_input, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, load_rgba  # noqa: E402
 from _lines import find_lines  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
@@ -53,6 +53,7 @@ def main():
     ap.add_argument("--review", help="review picture (default: <out>.check.jpg)")
     ap.add_argument("--json", help="also write the report here")
     a = ap.parse_args()
+    note_input(a.out)
     sj = load_subject(a.subject)
     st = load_style(resolve_style(a.style)) if a.style else None
     img, alpha, parts = load_or_build(sj)
@@ -99,7 +100,6 @@ def main():
            "warn": sum(f["level"] == "WARN" for f in found), "findings": found, "review": str(rv),
            **({"note": note} if note else {})}
     if a.json:
-        Path(a.json).parent.mkdir(parents=True, exist_ok=True)
         write_text(Path(a.json), json.dumps(res, ensure_ascii=False, indent=1))
     emit(res)
     sys.exit(1 if res["verdict"] == "fail" else 0)

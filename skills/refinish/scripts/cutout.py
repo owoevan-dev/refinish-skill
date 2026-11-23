@@ -49,7 +49,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _validate  # noqa: E402
-from _files import read_json, read_picture, run_cli, write_text  # noqa: E402
+from _files import read_json, read_picture, refuse_input, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba, save_rgba, write_image  # noqa: E402
 from _lines import meanshift  # noqa: E402
 from auto_parts import disk, nearest  # noqa: E402
@@ -214,6 +214,8 @@ def main():
         m[painted[1]] = cv2.GC_BGD
     # GrabCut on the figure's surroundings only: the colours far off say nothing about this edge
     live = cv2.dilate((m != cv2.GC_BGD).astype(np.uint8), disk(int(2 * band))) > 0
+    if not live.any():
+        die("the outline and the trimap leave no figure: draw it round the figure, inside the picture")
     ys, xs = np.nonzero(live)
     y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
     bgr8 = cv2.cvtColor((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR)
@@ -252,7 +254,8 @@ def main():
     else:
         fig_rgb = img
     out_dir = Path(a.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("figure.png", "background.png", "review.jpg", "cutout.json"):
+        refuse_input(out_dir / name)
     save_rgba(out_dir / "figure.png", fig_rgb, alpha)
     hole = cv2.dilate(fig.astype(np.uint8), disk(3)) > 0
     save_rgba(out_dir / "background.png", push_pull_fill(img, hole), np.ones((h, w), np.float32))

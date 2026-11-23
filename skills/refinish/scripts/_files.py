@@ -6,14 +6,13 @@ did not expect."""
 import json
 import math
 import os
+import stat
 import struct
 import sys
+import tempfile
 import time
 import traceback
 from pathlib import Path
-
-import cv2
-import numpy as np
 
 MAX_PIXELS = 100_000_000                                # (10000 x 10000; a header can claim far more than a file holds)
 MAX_JSON_BYTES = 32 * 2 ** 20
@@ -41,10 +40,10 @@ def run_cli(main):
     except Exception as e:
         if os.environ.get("REFINISH_DEBUG"):
             traceback.print_exc()
-        last = traceback.extract_tb(e.__traceback__)[-1]
-        message = " ".join(str(e).split())[:240]
-        print(f"error: unexpected {type(e).__name__} at {Path(last.filename).name}:{last.lineno}: {message}. Check the "
-              "input files; if they are right, this is a bug: please report it with this line.", file=sys.stderr)
+        last = traceback.extract_tb(e.__traceback__)[-1]    # (no message: it can quote a path or an input's value)
+        print(f"error: unexpected {type(e).__name__} at {Path(last.filename).name}:{last.lineno}. Check the input "
+              "files; if they are right, this is a bug: please report this line. REFINISH_DEBUG=1 shows the details.",
+              file=sys.stderr)
         sys.exit(3)
 
 
@@ -63,20 +62,34 @@ def note_input(path):
         _inputs.add(i)
 
 
+def release_input(path):
+    """A cache this run is about to rebuild is no longer something to protect."""
+    _inputs.discard(_identity(path))
+
+
+def is_input(path):
+    return _identity(path) in _inputs
+
+
 def refuse_input(path):
-    if _identity(path) in _inputs:
+    if is_input(path):
         die(f"{path} is one of this run's inputs: give the result another name, so the original is kept")
 
 
+def relative_path(target, start):
+    """A path as a subject file keeps it: relative where it can be, so the file does not name the folders above it."""
+    try:
+        return os.path.relpath(Path(target).resolve(), Path(start).resolve()).replace("\\", "/")
+    except ValueError:                                  # (another drive, on Windows)
+        return str(Path(target).resolve()).replace("\\", "/")
+
+
 def picture_size(data):
-    """(width, height) from a PNG, JPEG, WebP or BMP header, before anything is decoded; None for another format."""
+    """(width, height) from a PNG, JPEG or WebP header, before anything is decoded; None for another format."""
     b = data[:64].tobytes() if hasattr(data, "tobytes") else bytes(data[:64])
     try:
         if b[:8] == b"\x89PNG\r\n\x1a\n":
             return struct.unpack(">II", b[16:24])
-        if b[:2] == b"BM":
-            w, h = struct.unpack("<ii", b[18:26])
-            return abs(w), abs(h)
         if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
             if b[12:16] == b"VP8X":
                 return 1 + int.from_bytes(b[24:27], "little"), 1 + int.from_bytes(b[27:30], "little")
@@ -103,9 +116,12 @@ def picture_size(data):
     return None
 
 
-def read_picture(path, flags=cv2.IMREAD_UNCHANGED, is_input=True):
+def read_picture(path, flags=-1, is_input=True):
     """cv2.imread that opens any path: on Windows imread cannot open a folder or file named in Chinese, Japanese or
-    Korean. Refuses a picture whose header claims more than MAX_PIXELS before decoding it. None if it cannot be read."""
+    Korean. Refuses a picture whose header claims more than MAX_PIXELS before decoding it. None if it cannot be read.
+    flags: OpenCV's; -1 is IMREAD_UNCHANGED."""
+    import cv2
+    import numpy as np
     try:
         data = np.fromfile(str(path), np.uint8)
     except (OSError, ValueError):
@@ -118,9 +134,21 @@ def read_picture(path, flags=cv2.IMREAD_UNCHANGED, is_input=True):
     if is_input:
         note_input(path)
     try:
-        return cv2.imdecode(data, flags)
+        im = cv2.imdecode(data, flags)
     except cv2.error:
         return None
+    if im is not None and im.shape[0] * im.shape[1] > MAX_PIXELS:     # (a format whose header is not read above)
+        die(f"{path} is {im.shape[1]}x{im.shape[0]}, more than the {MAX_PIXELS} pixels the scripts take")
+    return im
+
+
+def _mode_for(path):
+    """The mode a replaced file had, or what a new file gets under this process's umask."""
+    if path.is_file():
+        return stat.S_IMODE(os.stat(path).st_mode)
+    mask = os.umask(0)
+    os.umask(mask)
+    return 0o666 & ~mask
 
 
 def write_bytes(path, data):
@@ -128,15 +156,16 @@ def write_bytes(path, data):
     the earlier file as it was. It never replaces one of this run's inputs."""
     path = Path(path)
     refuse_input(path)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(tmp, "wb") as f:
+        fd, tmp = tempfile.mkstemp(prefix=".refinish-", suffix=".tmp", dir=path.parent)    # (private until it is whole)
+        with os.fdopen(fd, "wb") as f:
             f.write(data)
             f.flush()
             os.fsync(f.fileno())
-        if path.is_file():
-            os.chmod(tmp, os.stat(path).st_mode & 0o777)
+        if os.name != "nt":
+            os.chmod(tmp, _mode_for(path))
         for attempt in range(6):
             try:
                 os.replace(tmp, path)
@@ -148,10 +177,8 @@ def write_bytes(path, data):
     except OSError as e:
         die(f"cannot write {path}: {e.strerror or e}")
     finally:
-        try:
+        if tmp and os.path.exists(tmp):
             os.unlink(tmp)
-        except OSError:
-            pass
 
 
 def write_text(path, content):
@@ -200,6 +227,7 @@ def read_json(path):
 def write_image(path, img, params=()):
     """Write a picture, whole or not at all. A picture that cannot be written stops the script: it never reports a
     file that is not there."""
+    import cv2
     path = Path(path)
     try:
         ok, buf = cv2.imencode(path.suffix, img, list(params))
