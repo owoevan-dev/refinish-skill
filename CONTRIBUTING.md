@@ -33,4 +33,4 @@ They take a few minutes. CI runs them on Linux, macOS and Windows, on every supp
 
 ## Privacy
 
-`python tests/privacy_scan.py --history` looks through every object in the repository for paths, addresses, keys, picture metadata and other things that should not be published. CI runs it too, and its report never prints what it found. Add `--show-paths` in your own terminal to see where. A new picture also needs its hash in `tests/public_images.sha256`, added after someone has looked at it.
+`python tests/privacy_scan.py --history` looks through the files and the whole history for paths, addresses, keys, picture metadata and other things that should not be published. CI runs it too, and its report never prints what it found. Add `--show-paths` in your own terminal to see where. A new picture also needs its hash in `tests/public_images.sha256`, added after someone has looked at it.
