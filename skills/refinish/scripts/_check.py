@@ -580,6 +580,10 @@ def recolour_checks(subject, img, alpha, parts, out, U, mended=None):
         if kind_of(p) == "eyes":
             core = m if p.get("exact") else rc_.iris_core(subject, m & iris_src) | (m & touched_eyes)
         m2 = (m & ~in_box & ~ink if core is None else core & ~lost_box) & (f[..., 0] >= 25)
+        if kind_of(p) == "hair" and rc_.hair_can_thin_out(fs, m, skin):
+            # (a pale fringe's edge is a mix of the hair's new colour and the skin: no old colour left)
+            r_ = 2 * max(2, int(round(U.len(rc_.HAIR_EDGE_REACH)))) + 1
+            m2 &= cv2.dilate(skin.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r_, r_))) == 0
         old = np.median(fs[inner], axis=0)
         old_c = float(np.hypot(old[1], old[2]))
         if old_c >= 8:

@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- A colour card on pale hair no longer leaves blotches. A faint sheen or shadow on silver, blonde or pink hair used to be painted at the card's full highlight and shadow steps. Each now keeps the strength it had in the drawing.
+- A pale fringe that thins out over the face no longer ends in a jagged, hard edge in the cel finishes. Its border with the skin now follows the source. Dark hair, which has a hard edge as drawn, finishes exactly as before.
 - On Windows, a picture in a folder or file named in Chinese, Japanese or Korean could be neither read nor written, so nothing worked from such a folder. Every script now opens any path.
 - A result can no longer replace one of the files its run read. A finish given the source picture's name used to overwrite the source.
 - Files are written whole or not at all: a crash or a full disk leaves the earlier file as it was.
