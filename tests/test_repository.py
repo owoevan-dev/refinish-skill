@@ -47,30 +47,63 @@ def test_every_version_agrees():
     assert len(versions) == 1, versions
 
 
-def test_both_marketplaces_list_the_plugin():
-    claude = load(ROOT / ".claude-plugin" / "plugin.json")
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_skill_frontmatter(skill):
+    text = (skill / "SKILL.md").read_text(encoding="utf-8")
+    front = frontmatter(skill)                          # (a strict parser, as the agents' skill loaders use)
+    assert front["name"] == skill.name and re.fullmatch(r"[a-z0-9-]{1,64}", front["name"])
+    assert 0 < len(front["description"]) <= 1024
+    assert "<" not in front["description"] and ">" not in front["description"]
+    assert len(front.get("compatibility", "")) <= 500
+    assert all(isinstance(v, str) for v in front.get("metadata", {}).values())
+    assert len(text.splitlines()) < 500
+
+
+def test_both_hosts_find_the_same_plugin_and_skills():
+    claude, codex = load(ROOT / ".claude-plugin" / "plugin.json"), load(ROOT / ".codex-plugin" / "plugin.json")
+    for key in ("name", "version", "description", "author", "homepage", "repository", "license", "keywords"):
+        assert codex[key] == claude[key], key
+    listed = {(ROOT / rel).resolve() for rel in claude["skills"]}
+    found = {p.parent.resolve() for p in (ROOT / codex["skills"]).glob("*/SKILL.md")}
+    assert listed == found == {s.resolve() for s in SKILLS} and len(found) == 2
     markets = load(ROOT / ".claude-plugin" / "marketplace.json"), load(ROOT / ".agents" / "plugins" / "marketplace.json")
     assert all(m["name"] == claude["name"] and [p["name"] for p in m["plugins"]] == [claude["name"]] for m in markets)
     sources = markets[0]["plugins"][0]["source"], markets[1]["plugins"][0]["source"]["path"]
     assert all((ROOT / s / ".claude-plugin" / "plugin.json").is_file() for s in sources)
 
 
-def test_both_hosts_find_the_same_skills():
-    claude, codex = load(ROOT / ".claude-plugin" / "plugin.json"), load(ROOT / ".codex-plugin" / "plugin.json")
-    listed = {(ROOT / rel).resolve() for rel in claude["skills"]}
-    found = {p.parent.resolve() for p in (ROOT / codex["skills"]).glob("*/SKILL.md")}
-    assert listed == found == {s.resolve() for s in SKILLS} and len(found) == 2
-
-
-def test_listing_icons():
-    """Every icon a listing names is square and at least 48 px; Claude's directory wants 512 to 2048 px, under 2 MB."""
+def icon_size(path):
+    """(width, height) of a raster icon or an SVG's viewBox."""
+    if path.suffix == ".svg":
+        w, h = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', path.read_text(encoding="utf-8")).groups()
+        return float(w), float(h)
     cv2 = pytest.importorskip("cv2")
+    h, w = cv2.imread(str(path), cv2.IMREAD_UNCHANGED).shape[:2]
+    return w, h
+
+
+def test_listings():
+    """What the two directories ask of a listing: its limits, square icons, and 512 to 2048 px under 2 MB for Claude's."""
     claude, codex = load(ROOT / ".claude-plugin" / "plugin.json"), load(ROOT / ".codex-plugin" / "plugin.json")
-    icon = ROOT / claude["icon"]
-    h, w = cv2.imread(str(icon), cv2.IMREAD_UNCHANGED).shape[:2]
-    assert w == h and 512 <= w <= 2048 and icon.stat().st_size < 2_000_000
-    assert all((ROOT / rel).is_file() for rel in (codex["interface"]["composerIcon"], codex["interface"]["logo"],
-                                                  *codex["interface"].get("screenshots", [])))
+    ui = codex["interface"]
+    assert len(ui["displayName"]) <= 30 and len(ui["shortDescription"]) <= 30 and len(ui["longDescription"]) <= 4000
+    assert len(ui["defaultPrompt"]) <= 3 and all(len(p) <= 128 for p in ui["defaultPrompt"])
+    assert re.fullmatch(r"#[0-9A-Fa-f]{6}", ui["brandColor"])
+    for rel in (claude["icon"], ui["composerIcon"], ui["logo"]):
+        w, h = icon_size(ROOT / rel)
+        assert w == h >= 48, rel
+    assert 512 <= icon_size(ROOT / claude["icon"])[0] <= 2048 and (ROOT / claude["icon"]).stat().st_size < 2_000_000
+    assert all((ROOT / rel).is_file() for rel in ui.get("screenshots", []))
+
+
+@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
+def test_a_skill_travels_with_its_icons_and_licence(skill):
+    """A skill is often copied on its own, without the repository round it."""
+    yaml = pytest.importorskip("yaml")
+    ui = yaml.safe_load((skill / "agents" / "openai.yaml").read_text(encoding="utf-8"))["interface"]
+    for key, brand in (("icon_small", "icon-small.svg"), ("icon_large", "icon-512.png")):
+        assert (skill / ui[key]).read_bytes() == (ROOT / "assets" / "brand" / brand).read_bytes(), key
+    assert (skill / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")
 
 
 # -------------------------------------------------------------------------------------------------------------- links

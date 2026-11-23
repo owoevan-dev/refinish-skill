@@ -117,15 +117,11 @@ def powershell_quote(arg):
     return "'" + arg.replace("'", "''") + "'"
 
 
-def windows_line(argv):
-    return "& " + " ".join(powershell_quote(a) for a in argv)
-
-
 def shell_commands(steps):
     """The same commands for a person's shell. Agents should prefer "argv", which needs no quoting at all."""
     out = {"posix": [shlex.join(s) for s in steps]}
     if os.name == "nt":
-        out["powershell"] = [windows_line(s) for s in steps]
+        out["powershell"] = ["& " + " ".join(powershell_quote(a) for a in s) for s in steps]
     return out
 
 

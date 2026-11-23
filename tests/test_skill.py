@@ -1,4 +1,4 @@
-"""The skill's tests: its packaging, its style files, its scripts, its tools, and one figure through the whole
+"""The skill's tests: its style files, its scripts, its tools, and one figure through the whole
 workflow. Run from the repository's root: python -m pytest -q tests"""
 import json
 import re
@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import pytest
 
-from conftest import ROOT, SCRIPTS, SKILL
+from conftest import SCRIPTS, SKILL
 
 import cv2  # noqa: E402
 
@@ -19,86 +19,6 @@ def run(script, *args):
     r = subprocess.run([PY, str(SCRIPTS / script), *map(str, args)], capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     return r, (json.loads(r.stdout) if r.stdout.strip().startswith("{") else None)
-
-
-# ---------------------------------------------------------------------------------------------------------- packaging
-
-SKILLS = sorted(p.parent for p in (ROOT / "skills").glob("*/SKILL.md"))
-
-
-@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
-def test_skill_frontmatter(skill):
-    yaml = pytest.importorskip("yaml")
-    text = (skill / "SKILL.md").read_text(encoding="utf-8")
-    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
-    assert m, "SKILL.md starts with a YAML frontmatter"
-    # a strict parser, as the agents' skill loaders use: an unquoted value holding ": " does not load
-    front = yaml.safe_load(m.group(1))
-    assert front["name"] == skill.name and re.fullmatch(r"[a-z0-9-]{1,64}", front["name"])
-    assert 0 < len(front["description"]) <= 1024
-    assert "<" not in front["description"] and ">" not in front["description"]
-    assert len(front.get("compatibility", "")) <= 500
-    assert all(isinstance(v, str) for v in front.get("metadata", {}).values())
-    assert len(text.splitlines()) < 500
-
-
-def test_plugin_manifest():
-    pj = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    for path in pj["skills"]:
-        assert (ROOT / path / "SKILL.md").is_file()
-    assert sorted((ROOT / p).resolve() for p in pj["skills"]) == [s.resolve() for s in SKILLS]
-    if "icon" in pj:
-        assert (ROOT / pj["icon"]).is_file()
-
-
-def square_icon(path):
-    """An icon a listing takes: square and at least 48 pixels, raster or SVG."""
-    if path.suffix == ".svg":
-        w, h = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', path.read_text(encoding="utf-8")).groups())
-    else:
-        h, w = cv2.imread(str(path), cv2.IMREAD_UNCHANGED).shape[:2]
-    return w == h >= 48
-
-
-def test_codex_listing():
-    """Codex reads its own manifest and marketplace: the same plugin as Claude's, every image it names, and the
-    listing's limits (a name and subtitle of 30 characters, up to three prompts of 128)."""
-    claude = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    codex = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    for key in ("name", "version", "description", "author", "homepage", "repository", "license", "keywords"):
-        assert codex[key] == claude[key], key
-    ui = codex["interface"]
-    assert len(ui["displayName"]) <= 30 and len(ui["shortDescription"]) <= 30 and len(ui["longDescription"]) <= 4000
-    assert len(ui["defaultPrompt"]) <= 3 and all(len(p) <= 128 for p in ui["defaultPrompt"])
-    assert re.fullmatch(r"#[0-9A-Fa-f]{6}", ui["brandColor"])
-    assert square_icon(ROOT / ui["composerIcon"]) and square_icon(ROOT / ui["logo"])
-    assert all((ROOT / p).is_file() for p in ui["screenshots"])
-    market = json.loads((ROOT / ".agents" / "plugins" / "marketplace.json").read_text(encoding="utf-8"))
-    claude_market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
-    assert market["name"] == claude_market["name"] and [p["name"] for p in market["plugins"]] == [codex["name"]]
-
-
-@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
-def test_skill_carries_its_codex_icons(skill):
-    """The skill's own Codex metadata travels with the folder: its icons are inside it, the brand's own."""
-    yaml = pytest.importorskip("yaml")
-    ui = yaml.safe_load((skill / "agents" / "openai.yaml").read_text(encoding="utf-8"))["interface"]
-    for key, brand in (("icon_small", "icon-small.svg"), ("icon_large", "icon-512.png")):
-        assert (skill / ui[key]).read_bytes() == (ROOT / "assets" / "brand" / brand).read_bytes(), key
-
-
-@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
-def test_skill_folder_carries_the_licence(skill):
-    """The skill is often copied on its own, without the repository round it: its folder keeps the licence."""
-    assert (skill / "LICENSE").read_text(encoding="utf-8") == (ROOT / "LICENSE").read_text(encoding="utf-8")
-
-
-@pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
-def test_references_linked_from_skill_exist(skill):
-    """Every page a skill links to is there, its own references and its neighbour's alike."""
-    for page in [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]:
-        for rel in set(re.findall(r"\]\(((?:\.\./)*[\w./-]+\.md)(?:#[^)]*)?\)", page.read_text(encoding="utf-8"))):
-            assert (page.parent / rel).is_file(), (page.name, rel)
 
 
 # ------------------------------------------------------------------------------------------------------------ styles
