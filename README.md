@@ -137,7 +137,7 @@ Copy or link `skills/refinish` and `skills/recolor` into your agent's skills fol
 npx skills add owoevan-dev/refinish-skill
 ```
 
-The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). No GPU, no network, no model downloads. One step is optional: two segmentation models, See-Through and SAM 2 (both Apache-2.0, installed apart, best on an NVIDIA GPU), can read a figure's head and split its eyes into iris, white and lashes ([seethrough.md](skills/refinish/references/seethrough.md)). They label pixels and draw nothing.
+The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). `skills/refinish/scripts/check_env.py` checks them and prints the commands that install the versions Refinish is tested with. No GPU, no network, no model downloads. One step is optional: two segmentation models, See-Through and SAM 2 (both Apache-2.0, installed apart, best on an NVIDIA GPU), can read a figure's head and split its eyes into iris, white and lashes ([seethrough.md](skills/refinish/references/seethrough.md)). They label pixels and draw nothing.
 
 ## Using it
 

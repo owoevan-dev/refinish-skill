@@ -137,7 +137,7 @@ Refinish 是一個 [Agent Skill](https://agentskills.io)，替手邊已有的圖
 npx skills add owoevan-dev/refinish-skill
 ```
 
-腳本需要 Python 3.10 以上，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。不需要 GPU、網路，也不用下載模型。只有一個步驟可選：兩個分割模型 See-Through 與 SAM 2（皆為 Apache-2.0，另外安裝，最好有 NVIDIA 顯示卡）能讀出角色的頭部，並把眼睛分成虹膜、眼白和睫毛（[seethrough.md](skills/refinish/references/seethrough.md)）。它們只標記像素，不畫任何東西。
+腳本需要 Python 3.10 以上，以及 `numpy`、`opencv-python`、`scipy`（`Pillow` 可選）。`skills/refinish/scripts/check_env.py` 會檢查這些套件，並列出安裝已測試版本的指令。不需要 GPU、網路，也不用下載模型。只有一個步驟可選：兩個分割模型 See-Through 與 SAM 2（皆為 Apache-2.0，另外安裝，最好有 NVIDIA 顯示卡）能讀出角色的頭部，並把眼睛分成虹膜、眼白和睫毛（[seethrough.md](skills/refinish/references/seethrough.md)）。它們只標記像素，不畫任何東西。
 
 ## 使用方式
 

@@ -137,7 +137,7 @@ Refinish は、手元にあるイラストを仕上げ直すための [Agent Ski
 npx skills add owoevan-dev/refinish-skill
 ```
 
-スクリプトには Python 3.10 以降と `numpy`、`opencv-python`、`scipy` が必要です（`Pillow` は任意）。GPU もネットワークも、モデルのダウンロードも要りません。任意の手順が一つだけあります。二つのセグメンテーションモデル、See-Through と SAM 2（どちらも Apache-2.0、別途インストール、NVIDIA の GPU 推奨）が、キャラクターの頭部を読み取り、目を虹彩・白目・まつ毛に分けます（[seethrough.md](skills/refinish/references/seethrough.md)）。モデルは画素に印を付けるだけで、何も描きません。
+スクリプトには Python 3.10 以降と `numpy`、`opencv-python`、`scipy` が必要です（`Pillow` は任意）。`skills/refinish/scripts/check_env.py` がこれらを確認し、テスト済みのバージョンを入れるコマンドを表示します。GPU もネットワークも、モデルのダウンロードも要りません。任意の手順が一つだけあります。二つのセグメンテーションモデル、See-Through と SAM 2（どちらも Apache-2.0、別途インストール、NVIDIA の GPU 推奨）が、キャラクターの頭部を読み取り、目を虹彩・白目・まつ毛に分けます（[seethrough.md](skills/refinish/references/seethrough.md)）。モデルは画素に印を付けるだけで、何も描きません。
 
 ## 使い方
 

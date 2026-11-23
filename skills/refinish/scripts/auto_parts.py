@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
+# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
 # ///
 """Write a subject file without placing a sample: the figure's parts found, named and given kinds, the eyes and the
 mouth boxed, the face made the focal area.

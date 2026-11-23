@@ -137,7 +137,7 @@ Refinish는 이미 가지고 있는 그림을 새로 마감하는 [Agent Skill](
 npx skills add owoevan-dev/refinish-skill
 ```
 
-스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). GPU, 네트워크, 모델 다운로드는 필요 없습니다. 선택 단계가 하나 있습니다. 두 분할 모델 See-Through와 SAM 2(둘 다 Apache-2.0, 따로 설치, NVIDIA GPU 권장)가 캐릭터의 머리를 읽고 눈을 홍채, 흰자, 속눈썹으로 나눕니다([seethrough.md](skills/refinish/references/seethrough.md)). 모델은 픽셀에 표시만 할 뿐 아무것도 그리지 않습니다.
+스크립트를 실행하려면 Python 3.10 이상과 `numpy`, `opencv-python`, `scipy`가 필요합니다(`Pillow`는 선택). `skills/refinish/scripts/check_env.py`가 이를 확인하고, 테스트한 버전을 설치하는 명령을 알려 줍니다. GPU, 네트워크, 모델 다운로드는 필요 없습니다. 선택 단계가 하나 있습니다. 두 분할 모델 See-Through와 SAM 2(둘 다 Apache-2.0, 따로 설치, NVIDIA GPU 권장)가 캐릭터의 머리를 읽고 눈을 홍채, 흰자, 속눈썹으로 나눕니다([seethrough.md](skills/refinish/references/seethrough.md)). 모델은 픽셀에 표시만 할 뿐 아무것도 그리지 않습니다.
 
 ## 사용법
 

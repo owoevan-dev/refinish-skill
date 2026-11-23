@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
+# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
 # ///
 """Colour cards (refinish-palette/1): write one into a subject, derive the colours it leaves out, read the swatches
 of a colour card picture, draw a card to show before finishing.

@@ -101,24 +101,6 @@ def test_references_linked_from_skill_exist(skill):
             assert (page.parent / rel).is_file(), (page.name, rel)
 
 
-def test_no_personal_data():
-    """Nothing of the people who made it: no paths on their machines, no keys, no addresses."""
-    bad = [re.compile(p) for p in (r"(?<![A-Za-z])[A-Za-z]:[\\/](?!/)", r"[\\/]Users[\\/]", r"[\\/]home[\\/]\w",
-                                   r"\bsk-[A-Za-z0-9_-]{16,}", r"\b[\w.+-]+@[\w-]+\.[\w.]+\b",
-                                   r"(?i)api[_-]?key\s*[:=]\s*['\"]?\w{12,}")]
-    hits = []
-    for p in ROOT.rglob("*"):
-        if not p.is_file() or "__pycache__" in p.parts or ".git" in p.parts or p.suffix not in (
-                ".py", ".md", ".json", ".txt", ".yaml", ".yml", ".toml", ""):
-            continue
-        if p == ROOT / "tests" / "test_skill.py":
-            continue
-        for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            if any(b.search(line) for b in bad):
-                hits.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()[:80]}")
-    assert not hits, "\n".join(hits)
-
-
 # ------------------------------------------------------------------------------------------------------------ styles
 
 def test_every_style_loads():

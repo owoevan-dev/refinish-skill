@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python"]
+# dependencies = ["numpy", "opencv-python>=4.12,<5.1"]
 # ///
 """Lay re-finished figures over a background and give the frame a camera (撮影処理): the depth of field, with the
 lights out of focus opening into discs (bokeh), the background's light wrapping the figures' edges, a grade of the

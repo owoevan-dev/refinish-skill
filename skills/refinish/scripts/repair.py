@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
+# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
 # ///
 """Repair a source picture's defects by code, without changing its style: a cut-out's fringe, stray specks, gaps in
 its line art, colour that ran from one material into the next.

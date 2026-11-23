@@ -1,0 +1,5 @@
+# The oldest versions Refinish supports, for the CI job of the same name on Python 3.10.
+# OpenCV 4.12 needs NumPy below 2.3, so this set cannot use skills/refinish/requirements-headless.txt.
+numpy==2.2.6
+scipy==1.15.3
+opencv-python-headless==4.12.0.88
