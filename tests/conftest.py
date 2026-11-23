@@ -16,6 +16,13 @@ import cv2  # noqa: E402
 from figures import draw_figure  # noqa: E402,F401
 
 
+@pytest.fixture(autouse=True)
+def no_inputs_from_another_test():
+    """What counts as a run's input is per process; here one process runs many tests."""
+    import _files
+    _files._inputs.clear()
+
+
 @pytest.fixture(scope="session")
 def figure(tmp_path_factory):
     d = tmp_path_factory.mktemp("figure")

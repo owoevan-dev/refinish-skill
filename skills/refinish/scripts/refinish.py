@@ -166,8 +166,11 @@ def main():
         die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
             "relight a style that keeps the size, or leave --hour out")
     img, alpha, parts = load_or_build(sj)
-    for written in (a.out, Path(a.out).with_suffix(".check.jpg"), Path(a.out).with_suffix(".hex")):
-        refuse_input(written)                           # (before the first file is written, so none is left half done)
+    refuse_input(a.out)                                 # (before the first file is written, so none is left half done)
+    if not a.no_check:
+        refuse_input(Path(a.out).with_suffix(".check.jpg"))
+    if st["engine"] == "pixel":
+        refuse_input(Path(a.out).with_suffix(".hex"))
     U = Units(alpha, sj.get("head_px"))
     from _check import finish_map
     from _palette import without_card

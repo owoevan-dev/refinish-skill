@@ -221,7 +221,7 @@ def main():
     style = best[1]
     style["id"] = Path(a.out).stem
     style["summary"] = (style.get("summary", "") + f" Fitted to {len(a.refs)} reference picture(s) by measurement "
-                        f"from '{start}' ({best[0][0]} of {len(target)} finish numbers within 10 %).").strip()
+                        f"from '{Path(start).stem}' ({best[0][0]} of {len(target)} finish numbers within 10 %).").strip()
     write_text(Path(a.out), json.dumps(style, ensure_ascii=False, indent=1))
     still = [{"metric": f, "target": target[f], "result": rounds[best[2]]["numbers"].get(f)} for f in target
              if f in rounds[best[2]]["numbers"] and
