@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
-# ///
 """Cut a figure out of a picture that has a background: the figure as a cut-out for the figure styles, and the
 background with the figure's place filled, so each can be finished on its own and the figure put back where it was.
 

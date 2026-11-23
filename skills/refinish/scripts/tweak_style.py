@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
-# ///
 """Change a style file by the words people use about a finish: "softer shadows", "more vivid", "陰影柔一點",
 "線を太く". Each word found moves its keys one step (scripts/_adjectives.py); --steps repeats it.
 

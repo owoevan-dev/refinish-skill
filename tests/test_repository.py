@@ -281,21 +281,11 @@ def test_the_range_files_are_pinned_by_hash(name):
     assert all(len(r[3]) >= 5 and all(re.fullmatch(r"[0-9a-f]{64}", h) for h in r[3]) for r in rows)
 
 
-def test_script_headers_allow_the_pin():
-    """`uv run` reads the header of a script: it must resolve to the version the constraints pin."""
-    pin = pins()["opencv-python"][0][0]
-    pin_t = tuple(int(v) for v in pin.split(".")[:2])
-    seen = 0
+def test_requirements_are_the_only_install_route():
+    """No script carries its own unpinned dependency list for `uv run` to resolve."""
     for p in SCRIPTS.glob("*.py"):
         head = re.search(r"^# dependencies = (\[.*\])$", p.read_text(encoding="utf-8"), re.M)
-        if not head:
-            continue
-        for dep in json.loads(head.group(1)):
-            if dep.startswith("opencv"):
-                seen += 1
-                low, high = re.fullmatch(r"opencv-python>=([\d.]+),<([\d.]+)", dep).groups()
-                assert tuple(map(int, low.split("."))) <= pin_t < tuple(map(int, high.split("."))), p.name
-    assert seen >= 15
+        assert not head or json.loads(head.group(1)) == [], p.name
 
 
 @pytest.mark.parametrize("skill", SKILLS, ids=lambda p: p.name)
