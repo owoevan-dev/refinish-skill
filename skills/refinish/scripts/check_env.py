@@ -183,7 +183,9 @@ def report(venv, here=False):
                     "with the tested ones", 1)
     note = ("two OpenCV packages share one cv2 here, so a separate environment is the safe way" if clash
             else "the commands install the tested versions")
-    return plan(out, venv, here and not clash, headless, "install", note, 2)
+    # (switching OpenCV package in place would leave two of them sharing one cv2)
+    switches = bool(dists) and any("headless" in d for d in dists) != headless
+    return plan(out, venv, here and not clash and not switches, headless, "install", note, 2)
 
 
 def shareable(result):
