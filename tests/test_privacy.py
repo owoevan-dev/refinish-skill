@@ -1,6 +1,5 @@
 """The privacy scan works, the repository passes it, and running the skill keeps what it should to itself."""
 import ast
-import hashlib
 import io
 import json
 import os
@@ -10,7 +9,6 @@ import struct
 import subprocess
 import sys
 import zlib
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -219,15 +217,8 @@ def test_ordinary_names(name):
 
 def test_the_repository_passes_the_scan():
     found = ps.scan_tree()
-    assert not found, "\n".join(map(str, found[:40]))
-
-
-def test_every_picture_was_approved():
-    """A picture joins the repository only with its hash in tests/public_images.sha256, after a person has looked at it."""
-    listed = ps.approved_images()
-    for rel in ps.tracked_files():
-        if Path(rel).suffix.lower() in ps.IMAGE:
-            assert listed.get(rel) == hashlib.sha256((ROOT / rel).read_bytes()).hexdigest(), rel
+    if found:
+        pytest.fail("\n".join(map(str, found[:40])), pytrace=False)     # (masked: CI logs are public)
 
 
 def git_repo(path, email="1+someone" + "@users.noreply.github.com"):
@@ -430,6 +421,26 @@ def test_links_and_submodules_are_reported(tmp_path, monkeypatch, mode, rule):
     monkeypatch.setattr(ps, "ROOT", tmp_path)
     monkeypatch.setattr(ps, "APPROVED_IMAGES", tmp_path / "none")
     assert rule in {f.rule for f in ps.scan_tree()}
+
+
+def test_a_finding_prints_masked_however_it_is_printed():
+    f = ps.Finding("forbidden-file", f"{CANARY}/.env", 3, "")
+    assert CANARY not in str(f) and CANARY not in repr(f) and CANARY not in repr([f])
+
+
+def test_a_picture_added_and_removed_again_is_still_found(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    (tmp_path / "shot.png").write_bytes(plain_png())
+    g("add", ".")
+    g("commit", "-qm", "c")
+    g("rm", "-q", "shot.png")
+    g("commit", "-qm", "d")
+    assert "image-not-approved" in history_rules(tmp_path, monkeypatch)
+
+
+def test_an_address_in_a_colour_profile_is_found():
+    body = b"icc\0\0" + zlib.compress(icc("made by someone" + "@example.org"))
+    assert "email" in {f.rule for f in ps.scan_image(with_chunk(b"iCCP", body), "a.png")}
 
 
 def test_a_private_word_in_latin1_is_found():

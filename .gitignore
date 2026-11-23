@@ -18,6 +18,9 @@ __pycache__/
 !skills/refinish/assets/*.png
 !skills/recolor/assets/*.png
 
+# The environment check_env.py builds
+.refinish-venv/
+
 # Local secrets
 .env
 .env.*

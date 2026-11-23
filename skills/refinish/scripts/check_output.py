@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
-# ///
 """Check a re-finished picture against its source for the mistakes a careful reviewer looks for first.
 
 Usage:

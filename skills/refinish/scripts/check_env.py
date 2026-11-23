@@ -131,7 +131,7 @@ def install_steps(venv, here, headless, state="new"):
     steps = []
     if not here and state == "new":
         steps.append([sys.executable, "-m", "venv", "--prompt", VENV_PROMPT, str(venv)])
-    steps.append([python, "-m", "pip", "install", "--only-binary", ":all:", "--require-hashes", "-r",
+    steps.append([python, "-m", "pip", "install", "--progress-bar", "off", "--only-binary", ":all:", "--require-hashes", "-r",
                   str(REQUIREMENTS[bool(headless)])])
     return steps, python
 

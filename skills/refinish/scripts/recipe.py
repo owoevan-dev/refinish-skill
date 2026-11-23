@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
-# ///
 """Mix finishes on one picture: a base finish, and layers of other finishes laid over it, each limited to some of the
 picture's parts or areas and blended in (the clothes in watercolour and the face in TV cel; a screentone multiplied
 over a watercolour; a heavy cel with 30 % of the film everyday look).

@@ -37,6 +37,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APPROVED_IMAGES = ROOT / "tests" / "public_images.sha256"
+RETIRED_IMAGES = ROOT / "tests" / "retired_images.sha256"     # (old versions, still in the history)
 RASTER = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".ico", ".avif", ".heic"}
 IMAGE = RASTER | {".svg"}
 MAX_BLOB = 64 * 2 ** 20
@@ -50,7 +51,7 @@ class ScanError(Exception):
     """The scan could not finish; its message holds nothing from the files."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class Finding:
     rule: str
     where: str
@@ -66,6 +67,8 @@ class Finding:
     def __str__(self):
         at = f"item {self.item()}" + (f":{self.line}" if self.line else "")
         return f"{self.rule}: {at}" + (f" ({self.hint})" if self.hint else "")
+
+    __repr__ = __str__                                  # (pytest prints a failed assertion's values)
 
     def local(self):
         at = f"{self.where}:{self.line}" if self.line else self.where
@@ -266,7 +269,7 @@ def profile_text(data):
 
 
 def scan_profile(data, where, terms):
-    return [Finding(f.rule, where, 0, "in an ICC profile") for f in term_hits(profile_text(data), where, terms)]
+    return [Finding(f.rule, where, 0, "in an ICC profile") for f in scan_text(profile_text(data), where, terms)]
 
 
 def scan_png(data, where, terms=()):
@@ -511,11 +514,15 @@ def tracked_files():
     return [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*") if p.is_file() and not skip & set(p.relative_to(ROOT).parts)]
 
 
-def approved_images():
-    if not APPROVED_IMAGES.is_file():
+def image_list(path):
+    if not path.is_file():
         return {}
-    rows = (l.split(maxsplit=1) for l in APPROVED_IMAGES.read_text(encoding="utf-8").splitlines() if l.strip())
+    rows = (l.split(maxsplit=1) for l in path.read_text(encoding="utf-8").splitlines() if l.strip())
     return {name.strip().lstrip("*"): sha for sha, name in rows}
+
+
+def approved_images():
+    return image_list(APPROVED_IMAGES)
 
 
 def scan_tree(terms=()):
@@ -627,7 +634,7 @@ def scan_history(terms=(), unreachable=False):
         sha, _, path = line.partition(" ")
         if path:
             named.setdefault(sha, path)
-    commits = 0
+    commits, known = 0, {*approved_images().values(), *image_list(RETIRED_IMAGES).values()}
     with Objects() as store:
         for sha, kind, size in objects:
             where = f"{kind} {sha[:12]}" + (f" {named[sha]}" if sha in named else "")
@@ -636,7 +643,10 @@ def scan_history(terms=(), unreachable=False):
                 continue
             _, data = store.read(sha)
             if kind == "blob":
-                found += scan_content(data, where, terms, Path(named.get(sha, "")).suffix.lower())
+                suffix = Path(named.get(sha, "")).suffix.lower()
+                found += scan_content(data, where, terms, suffix)
+                if (suffix in IMAGE or image_kind(data)) and hashlib.sha256(data).hexdigest() not in known:
+                    found.append(Finding("image-not-approved", where, 0, "in the history, on neither image list"))
             elif kind == "tree":
                 for mode, name in parse_tree(data):
                     entry = f"{where}/{name}"

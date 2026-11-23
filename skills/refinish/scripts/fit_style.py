@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python>=4.12,<5.1", "scipy"]
-# ///
 """Write a style from reference pictures by measuring them: the loop of references/replicating-a-style.md, run
 for you. The references' finish is measured; the bundled style nearest it is found on your subject; then each round
 applies the style, measures the result the same way, and moves every number more than 10 % off one step toward the
