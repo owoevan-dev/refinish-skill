@@ -131,8 +131,9 @@ def install_steps(venv, here, headless, state="new"):
     steps = []
     if not here and state == "new":
         steps.append([sys.executable, "-m", "venv", "--prompt", VENV_PROMPT, str(venv)])
-    steps.append([python, "-m", "pip", "install", "--progress-bar", "off", "--only-binary", ":all:", "--require-hashes", "-r",
-                  str(REQUIREMENTS[bool(headless)])])
+    # quiet: pip's status lines crash its logging on a Unicode path in a console that is not UTF-8
+    steps.append([python, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "--only-binary", ":all:",
+                  "--require-hashes", "-r", str(REQUIREMENTS[bool(headless)])])
     return steps, python
 
 
