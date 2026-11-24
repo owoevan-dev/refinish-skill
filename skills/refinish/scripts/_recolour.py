@@ -203,6 +203,13 @@ def hair_can_thin_out(Lab, hair, skin):
             and abs(float(np.median(Lab[..., 0][hair])) - float(np.median(Lab[..., 0][skin]))) < 25)
 
 
+def fringe_zone(hair, skin, face, U):
+    """Where a cel finish softens a pale fringe: within HAIR_EDGE_REACH of where the hair touches the skin on the face."""
+    contact = hair & face & (cv2.dilate(skin.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
+    r = max(2, int(round(U.len(HAIR_EDGE_REACH))))
+    return cv2.dilate(contact.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))) > 0
+
+
 def on_a_blend(Lab, a, b, tol=6.0):
     """The pixels whose colour lies on the straight line between colours a and b: a mix of the two, in some share."""
     v = np.asarray(b, np.float32) - np.asarray(a, np.float32)
