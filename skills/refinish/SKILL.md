@@ -20,7 +20,7 @@ What it can and cannot do (tell the user before starting):
 
 Copy this checklist and tick it off. Each step ends on its done-criterion.
 
-- [ ] **0. Tools**: `python -c "import numpy, cv2, scipy"` succeeds. If it does not, install them by their package names: `python -m pip install numpy scipy opencv-python`; on a server or in a sandbox, `opencv-python-headless` instead, since the desktop build needs graphics libraries those often lack.
+- [ ] **0. Tools**: `python scripts/check_env.py` reports `ok`. On `install`, run the `argv` lists it printed in order (`commands` holds the same for a person's shell) and use the Python it names (`use_python`) for every script: they install the tested versions into a separate environment, `.refinish-venv` in the current folder. On `blocked`, its `note` says what to sort out. On `untested`, the scripts should run: tell the user which versions are outside the tested range.
 - [ ] **1. Source**: `scripts/check_input.py` graded the picture; a figure is a cut-out (transparent background), or was cut out of its scene with `scripts/cutout.py`; below 2000 px tall it was enlarged with `scripts/prep.py`.
 - [ ] **2. Subject**: a subject file whose parts are right on the parts sheet (`scripts/auto_parts.py`, with a hints file for the cel, paint and print styles), or `scripts/scene_subject.py` for a background.
 - [ ] **3. Style**: chosen from [references/presets.md](references/presets.md) with the user, or written or measured (steps 7–8).
@@ -180,6 +180,7 @@ All print JSON on stdout. Exit code 0 means done; 1 done, with doubts or a check
 
 | script | use |
 |---|---|
+| `check_env.py [--venv DIR] [--here] [--share]` | step 0: are the packages there, in tested versions; the commands to install them if not; `--share` for a bug report, with no paths |
 | `cutout.py PICTURE.png OUTLINE.json OUT_DIR [--trimap T.png]` | cut a figure out of a picture with a background |
 | `prep.py SRC.png OUT.png [--scale 2]` | crop to the figure and enlarge; `--restore SRC.png --box B` puts a finish back on the source's canvas |
 | `check_input.py PICTURE.png \| SUBJECT.json` | grade a source |

@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python"]
-# ///
 """Enlarge a part of a picture, with a grid numbered in the picture's own pixels, to read off where things are.
 
 Usage:

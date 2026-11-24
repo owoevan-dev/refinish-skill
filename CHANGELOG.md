@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- `check_env.py`, step 0 of both skills. It says whether this Python can run the scripts on tested versions and prints the commands to install them into a separate environment, so your own Python and other projects are left as they are. `--share` prints a version of the report with no paths, for a bug report.
+- `requirements.txt` and `requirements-headless.txt`: the tested versions of NumPy, SciPy and OpenCV for each Python from 3.10 to 3.14, with the SHA-256 of every wheel, so pip installs them only as published.
+- CI on Linux, macOS and Windows, on Python 3.10 to 3.14, at both ends of the supported OpenCV range, from a clean install, with the network removed, and weekly on the newest releases.
+- A privacy scan of the files, the whole history, picture metadata and what is published on GitHub, with a list of the pictures approved for the repository.
+
 ## [0.2.0] - 2026-11-01
 
 ### Added

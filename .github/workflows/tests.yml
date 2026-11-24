@@ -2,26 +2,252 @@ name: tests
 
 on:
   push:
+    branches: [main]
   pull_request:
+  schedule:
+    # Mondays at 03:17 UTC. Nothing is pushed when a new OpenCV or NumPy comes out; this run is how we find out.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+# A pull request's branch is tested once, and a newer commit on it cancels the older run. Each push to main is its own
+# group, so a waiting run is never replaced by a later push. Tags are not tested again: they mark commits main has tested.
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  # The versions and hashes in skills/refinish/requirements*.txt, which is what a new user gets.
   tests:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    name: pinned (${{ matrix.os }}, ${{ matrix.python-version }}, ${{ matrix.opencv }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        include:
+          - {os: ubuntu-24.04, python-version: "3.10", opencv: headless, requirements: requirements-headless.txt}
+          - {os: ubuntu-24.04, python-version: "3.11", opencv: headless, requirements: requirements-headless.txt}
+          - {os: ubuntu-24.04, python-version: "3.12", opencv: headless, requirements: requirements-headless.txt}
+          - {os: ubuntu-24.04, python-version: "3.13", opencv: headless, requirements: requirements-headless.txt}
+          - {os: ubuntu-24.04, python-version: "3.14", opencv: headless, requirements: requirements-headless.txt}
+          - {os: macos-latest, python-version: "3.13", opencv: desktop, requirements: requirements.txt}
+          - {os: windows-latest, python-version: "3.13", opencv: desktop, requirements: requirements.txt}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      # Each action by its commit, so a tag moved later cannot change what runs here.
+      # The releases those commits are: checkout v7.0.1, setup-python v7.1.0.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install the dependencies
-        run: pip install numpy scipy opencv-python-headless pillow pyyaml pytest
+      - name: Install the pinned packages
+        # Hash-checking mode covers everything in that command, so the test tools go in a command of their own.
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r "skills/refinish/${{ matrix.requirements }}"
+          python -m pip install --only-binary :all: -r tests/requirements-dev.txt
       - name: Compile every script
-        run: python -m py_compile skills/refinish/scripts/*.py tests/*.py
+        run: python -m compileall -q skills tests
       - name: Run the tests
         run: python -m pytest -q tests
+
+  # The two ends of the range check_env.py calls tested.
+  range:
+    if: github.event_name != 'schedule'
+    name: range (${{ matrix.end }}, ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {end: oldest, python-version: "3.10"}
+          - {end: newest, python-version: "3.13"}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install that end of the range
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r "tests/requirements-${{ matrix.end }}.txt"
+          python -m pip install --only-binary :all: -r tests/requirements-dev.txt
+      - name: Run the tests
+        run: python -m pytest -q tests
+
+  # From nothing, as a new user: only the shipped folders, the commands the skill prints, both skills.
+  install:
+    if: github.event_name != 'schedule'
+    name: install (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, python-version: "3.10"}
+          - {os: ubuntu-24.04, python-version: "3.14"}
+          - {os: macos-15-intel, python-version: "3.13"}
+          - {os: macos-latest, python-version: "3.13"}
+          - {os: windows-latest, python-version: "3.13"}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install as a new user would
+        run: python tests/smoke_install.py
+
+  # The whole workflow in a network namespace with no interfaces: the kernel, not a patched Python, keeps it offline.
+  offline:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Install the pinned packages
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r skills/refinish/requirements-headless.txt
+          python -m pip install --only-binary :all: -r tests/requirements-dev.txt
+      - name: Run the workflow with the network removed
+        run: |
+          sudo unshare --net -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups \
+            env PATH="$PATH" HOME="$HOME" LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" REFINISH_OFFLINE=1 \
+            python -m pytest -q tests/test_privacy.py -k "network or metadata or folder"
+
+  # Every object in the repository, by our own scan and by a second, independent one.
+  privacy:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: The privacy scan, over the files and the history
+        run: python tests/privacy_scan.py --history
+      - name: Gitleaks, over the history
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --retry 5 --retry-all-errors --retry-delay 5 --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --quiet
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1 .
+
+  # The one check main's rule requires, so the list of jobs above can change without touching the rule.
+  gate:
+    if: always() && github.event_name != 'schedule'
+    needs: [tests, range, install, offline, privacy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every required job passed
+        env:
+          TESTS: ${{ needs.tests.result }}
+          RANGE: ${{ needs.range.result }}
+          INSTALL: ${{ needs.install.result }}
+          OFFLINE: ${{ needs.offline.result }}
+          PRIVACY: ${{ needs.privacy.result }}
+        run: |
+          for job in "tests=$TESTS" "range=$RANGE" "install=$INSTALL" "offline=$OFFLINE" "privacy=$PRIVACY"; do
+            echo "$job"
+            [ "${job#*=}" = success ] || exit 1
+          done
+
+  # The newest release of everything, weekly and on demand. A failure turns this workflow red and GitHub says so by
+  # email; it blocks no pull request, because this job does not run on one.
+  latest:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Install the newest releases
+        run: |
+          python -m pip install --upgrade --only-binary :all: numpy scipy opencv-python-headless pillow pyyaml pytest
+          python -m pip list --format=freeze | grep -iE '^(numpy|scipy|opencv)'
+      - name: Run the tests
+        run: python -m pytest -q tests
+
+  # Weekly, from main: everything the project has published, including refs a pull request's checkout does not fetch.
+  privacy-audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Fetch every ref on GitHub
+        run: git fetch --quiet "https://github.com/$GITHUB_REPOSITORY.git" '+refs/*:refs/audit/*'
+      - name: The privacy scan, over the history and what is published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tests/privacy_scan.py --history --github --repo "$GITHUB_REPOSITORY"
+
+  # Figures to read, not a gate: this job cannot fail a build or hold up a pull request.
+  report:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Install the pinned packages and the two report tools
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r skills/refinish/requirements-headless.txt
+          python -m pip install -r tests/requirements-dev.txt ruff==0.15.22 coverage==7.17.4
+      - name: Ruff, the pyflakes rules
+        run: python -m ruff check --isolated --select F --statistics skills tests || true
+      - name: Coverage, scripts run as subprocesses included
+        run: |
+          python -m coverage run --rcfile=tests/coveragerc -m pytest -q tests || true
+          python -m coverage combine --rcfile=tests/coveragerc || true
+          python -m coverage report --rcfile=tests/coveragerc --skip-covered --sort=-miss | tail -n 40

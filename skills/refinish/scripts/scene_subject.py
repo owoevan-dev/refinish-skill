@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Write a subject file for a scene (a background, a landscape, a room) instead of a figure: no face is looked for,
 the picture's frame is its border (nothing is outlined along it), and the parts are the scene's materials found by
 colour, not by lines: a painted background closes few areas with lines, so its colours are flattened (mean shift),

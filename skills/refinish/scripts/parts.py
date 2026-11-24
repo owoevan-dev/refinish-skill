@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Build a subject's part map and check it.
 
 Usage:

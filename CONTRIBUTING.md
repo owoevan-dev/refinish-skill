@@ -24,8 +24,13 @@ Pull requests from outside the project are closed for now; only collaborators ca
 ## Running the tests
 
 ```bash
-pip install numpy scipy opencv-python-headless pillow pyyaml pytest
+python -m pip install --only-binary :all: --require-hashes -r skills/refinish/requirements-headless.txt
+python -m pip install --only-binary :all: -r tests/requirements-dev.txt
 python -m pytest -q tests
 ```
 
-They take two to three minutes and run on every push.
+They take a few minutes. CI runs them on Linux, macOS and Windows, on every supported Python, and at both ends of the OpenCV range the skill supports. It also installs the skill from nothing the way a new user would (`tests/smoke_install.py`), and runs the workflow with the network removed.
+
+## Privacy
+
+`python tests/privacy_scan.py --history` looks through the files and the whole history for paths, addresses, keys, picture metadata and other things that should not be published. CI runs it too, and its report never prints what it found. Add `--show-paths` in your own terminal to see where. A new picture also needs its hash in `tests/public_images.sha256`, added after someone has looked at it.

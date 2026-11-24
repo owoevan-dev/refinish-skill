@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Measure a picture's finish as numbers a style file can be written from, and compare two measurements.
 
 Usage:

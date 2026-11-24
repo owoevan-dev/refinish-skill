@@ -35,15 +35,16 @@ body:
     id: command
     attributes:
       label: Command and output
-      description: The command you ran and the JSON it printed.
+      description: The command you ran and the JSON it printed. Please remove your user name and folder names first.
       render: shell
   - type: textarea
     id: pictures
     attributes:
       label: Pictures
       description: The source, or a crop of it, and the result. Drag them in here.
-  - type: input
+  - type: textarea
     id: setup
     attributes:
       label: Python, OpenCV and system
-      placeholder: Python 3.12, opencv-python 4.12, Windows 11
+      description: Paste the output of `python skills/refinish/scripts/check_env.py --share`. It leaves out every path.
+      render: json

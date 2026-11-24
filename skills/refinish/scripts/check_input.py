@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Grade a source picture before re-finishing it: what each family of styles can be expected to do with it.
 
 Usage:

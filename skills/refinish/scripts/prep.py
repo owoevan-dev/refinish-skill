@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python"]
-# ///
 """Make a source picture ready to re-finish: crop it to the figure and enlarge it the traditional way.
 
 Usage:

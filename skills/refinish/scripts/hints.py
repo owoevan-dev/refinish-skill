@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Help with a hints file for scripts/auto_parts.py: where its points land, and points for the regions a review
 picture numbers.
 

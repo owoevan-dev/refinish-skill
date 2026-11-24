@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["numpy", "opencv-python", "scipy"]
-# ///
 """Re-finish a subject in a style: the picture's drawing kept, its surface painted again by the style's rules.
 
 Usage:
