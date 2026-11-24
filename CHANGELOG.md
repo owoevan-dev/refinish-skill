@@ -16,7 +16,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - A colour card on pale hair no longer leaves blotches. A faint sheen or shadow on silver, blonde or pink hair used to be painted at the card's full highlight and shadow steps. Each now keeps the strength it had in the drawing.
-- A pale fringe that thins out over the face no longer ends in a jagged, hard edge in the cel finishes. Its border with the skin now follows the source. Dark hair, which has a hard edge as drawn, finishes exactly as before.
+- Where a pale fringe thins out over the face, its border with the skin now follows the source in the cel finishes instead of ending in a jagged, hard edge. This needs the fringe to be read as hair: where pale hair beside the eyes is read as skin, the edge stays as it was. Dark hair, which has a hard edge as drawn, finishes exactly as before.
 - On Windows, a picture in a folder or file named in Chinese, Japanese or Korean could be neither read nor written, so nothing worked from such a folder. Every script now opens any path.
 - A result can no longer replace one of the files its run read. A finish given the source picture's name used to overwrite the source.
 - Files are written whole or not at all: a crash or a full disk leaves the earlier file as it was.
@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - An unexpected error now exits with code 3. It used to exit 1, which also means "done, with something to look at".
 - A cached part map holding part numbers the subject does not have is rebuilt.
 - A picture of more than 100 million pixels is refused, and a PNG, JPEG or WebP claiming that is refused before it is decoded.
+
+### Known issues
+
+- Pale hair right beside the eyes can be read as skin. A recolour then leaves it in its old colour, and the new hair colour stops in a hard edge at the eye. On the picture where this showed in testing, another round of hints did not fix it.
+- A recolour from dark hair to light can turn the dark shadow under the chin into a grey patch.
 
 ## [0.2.0] - 2026-11-01
 

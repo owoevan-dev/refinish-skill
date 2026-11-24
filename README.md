@@ -105,6 +105,7 @@ The figures below come from the project's own runs on pictures the code had neve
 
 - **Parts.** On two sets of new characters, parts drafted with an agent's hints were right for 39 of 41 within two rounds.
 - **Recolour.** Eight new characters, three colour cards each. 134 of the 135 recoloured parts came out within 3.0 (CIEDE2000) of their card colour, 132 before any touch-ups. With at most two rounds of clicks on the eye review sheet, every character's eyes took the new colour. The optional head models made the difference there: without them, a pair of eyes behind glasses was missed and an eye under bangs came out wrong. The first set of eight had missed on leftover colour, eyes and lines; the fixes were made on that set and a second one, then tested on this third set.
+- **Recolour on pale hair (0.2.1).** Eight more new characters, five of them with pale hair, recoloured to a dark card. No step crashed, the blotches were gone from all five pale-haired results, and no finish failed a check that 0.2.0 had passed. One character still fell short: the pale hair beside her eyes was read as skin, so the dark hair stops in a hard edge there, as it did in 0.2.0.
 - **All 37 finishes on 16 new characters** (10 with darker skin, 4 with soft airbrushed shading). 21 finishes passed every measure:
   - every cel finish except the sunset and 90s ones;
   - both de-AI finishes;
@@ -117,6 +118,8 @@ The figures below come from the project's own runs on pictures the code had neve
   - pop art still leaves boxes round the face;
   - the ukiyo-e print lightens tan skin;
   - soft airbrushed sources break into ragged shadows under every flat-tone finish.
+  - pale hair right beside the eyes can be read as skin, and then keeps its old colour in a recolour;
+  - a recolour from dark hair to light can turn the dark shadow under the chin into a grey patch.
 - **Against the real thing.** The woodblock, watercolour and ink finishes were compared with public-domain museum scans for paper colour, darkest ink, flat area and edge darkening.
 - **Match a reference** (development tests, not frozen runs). On a closed loop (references drawn in one bundled style, fitted from another on a different character), three rounds brought 6 of the 8 finish numbers within 10%. On frames from a TV anime, 4 to 5 of 8: the softness that compositing adds to the frames is beyond the cel finishes.
 
@@ -138,6 +141,8 @@ npx skills add owoevan-dev/refinish-skill
 ```
 
 The scripts need Python 3.10 or newer with `numpy`, `opencv-python` and `scipy` (`Pillow` is optional). `skills/refinish/scripts/check_env.py` checks them and prints the commands that install the versions Refinish is tested with. No GPU, no network, no model downloads. One step is optional: two segmentation models, See-Through and SAM 2 (both Apache-2.0, installed apart, best on an NVIDIA GPU), can read a figure's head and split its eyes into iris, white and lashes ([seethrough.md](skills/refinish/references/seethrough.md)). They label pixels and draw nothing.
+
+CI tests every change on Linux with Python 3.10 to 3.14 and on Windows and macOS with Python 3.13, and on Linux at both ends of the supported OpenCV range (4.12 and 5.1). A clean install of the pinned versions is tested on all three systems, on macOS 15 for both Apple silicon and Intel. The pins use OpenCV 5.0.0.93, because the 5.1 wheels for macOS need macOS 15. Older macOS versions are not tested, and neither are the optional head models.
 
 ## Using it
 
