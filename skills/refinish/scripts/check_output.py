@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _check import finish_map, look_checks, part_map_checks, result_checks, review, verdict  # noqa: E402
-from _files import note_input, run_cli, write_text  # noqa: E402
+from _files import note_input, relative_path, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, load_rgba  # noqa: E402
 from _lines import find_lines  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
@@ -100,7 +100,8 @@ def main():
            "warn": sum(f["level"] == "WARN" for f in found), "findings": found, "review": str(rv),
            **({"note": note} if note else {})}
     if a.json:
-        write_text(Path(a.json), json.dumps(res, ensure_ascii=False, indent=1))
+        saved = {**res, "review": relative_path(rv, Path(a.json).parent)}   # (the report may be passed on)
+        write_text(Path(a.json), json.dumps(saved, ensure_ascii=False, indent=1))
     emit(res)
     sys.exit(1 if res["verdict"] == "fail" else 0)
 

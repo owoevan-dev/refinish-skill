@@ -32,6 +32,7 @@ def build(sj):
     img, alpha = load_rgba(subject_path(sj, sj["image"]))
     parts = part_map(sj, img, alpha)
     write_image(str(parts_path(sj)), parts)
+    note_input(parts_path(sj))                          # (a result of this run may not replace it)
     return img, alpha, parts
 
 

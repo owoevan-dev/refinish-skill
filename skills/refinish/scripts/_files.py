@@ -70,9 +70,9 @@ def refuse_input(path):
 def relative_path(target, start):
     """A path as a subject file keeps it: relative where it can be, so the file does not name the folders above it."""
     try:
-        return os.path.relpath(Path(target).resolve(), Path(start).resolve()).replace("\\", "/")
+        return os.path.relpath(os.path.abspath(target), os.path.abspath(start)).replace("\\", "/")
     except ValueError:                                  # (another drive, on Windows)
-        return str(Path(target).resolve()).replace("\\", "/")
+        return os.path.abspath(target).replace("\\", "/")
 
 
 def picture_size(data):
@@ -147,6 +147,8 @@ def write_bytes(path, data):
     the earlier file as it was. It never replaces one of this run's inputs."""
     path = Path(path)
     refuse_input(path)
+    if path.is_file() and not os.access(path, os.W_OK):  # (moving a file in would get past its read-only mark)
+        die(f"cannot write {path}: it is read-only")
     tmp = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

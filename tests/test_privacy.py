@@ -488,6 +488,24 @@ def test_a_private_word_in_a_webp_colour_profile_is_found():
     assert "private-term" in {f.rule for f in ps.scan_image(webp_with(b"ICCP", icc(CANARY)), "a.webp", [CANARY])}
 
 
+def test_an_address_in_a_colour_profile_s_name_is_found():
+    body = b"made by someone" + b"@example.org\0\0" + zlib.compress(icc("sRGB"))
+    assert "email" in {f.rule for f in ps.scan_image(with_chunk(b"iCCP", body), "a.png")}
+
+
+def test_a_removed_link_and_a_config_folder_are_found(tmp_path, monkeypatch):
+    g = git_repo(tmp_path)
+    name = ".config" + "/gh/hosts.yml"
+    commit_text(g, tmp_path, name, "clean\n")
+    sha = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD:" + name], capture_output=True,
+                         text=True, check=True).stdout.strip()
+    g("update-index", "--add", "--cacheinfo", f"120000,{sha},linked")
+    g("commit", "-qm", "d")
+    g("rm", "-q", "--cached", "linked")
+    g("commit", "-qm", "e")
+    assert {"forbidden-folder", "link-in-repository"} <= history_rules(tmp_path, monkeypatch)
+
+
 def test_a_private_word_in_compressed_png_text_is_found():
     body = b"Comment\0\0" + zlib.compress(CANARY.encode())
     assert "private-term" in {f.rule for f in ps.scan_image(with_chunk(b"zTXt", body), "a.png", [CANARY])}

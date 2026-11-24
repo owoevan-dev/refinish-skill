@@ -176,6 +176,36 @@ def test_a_clash_with_a_side_file_stops_before_anything_is_written(work):
     assert (work / "render.check.jpg").read_bytes() == before and not (work / "render.png").exists()
 
 
+def test_a_new_part_cache_is_not_replaced_by_the_finish(work):
+    (work / "subject.parts.png").unlink()
+    cli("refinish.py", "subject.json", "style.json", "subject.parts.png", cwd=work, codes=(2,))
+
+
+def test_a_clash_of_names_stops_auto_parts_before_it_writes_the_region_map(work):
+    before = (work / "subject.regions.png").read_bytes()
+    cli("auto_parts.py", "image.png", "subject.json", "--hints", "subject.json", cwd=work, codes=(2,))
+    assert (work / "subject.regions.png").read_bytes() == before
+
+
+def test_a_read_only_result_is_not_replaced(work):
+    p = work / "done.png"
+    p.write_bytes(b"finished earlier")
+    os.chmod(p, 0o444)
+    try:
+        cli("refinish.py", "subject.json", "style.json", "done.png", "--no-check", cwd=work, codes=(2,))
+        assert p.read_bytes() == b"finished earlier"
+    finally:
+        os.chmod(p, 0o644)
+
+
+def test_the_saved_reports_do_not_name_the_folders_above_them(work):
+    cli("cutout.py", work / "image.png", work / "outline.json", work / "cut", codes=(0, 1))
+    saved = json.loads((work / "cut" / "cutout.json").read_text(encoding="utf-8"))
+    assert (saved["figure"], saved["background"], saved["review"]) == ("figure.png", "background.png", "review.jpg")
+    cli("check_output.py", work / "subject.json", work / "made.png", "--json", work / "report.json", codes=(0, 1))
+    assert json.loads((work / "report.json").read_text(encoding="utf-8"))["review"] == "made.check.jpg"
+
+
 def test_a_cutout_stops_before_it_replaces_anything(work):
     (work / "cut").mkdir()
     shutil.copy(work / "image.png", work / "cut" / "background.png")

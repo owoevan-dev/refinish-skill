@@ -247,12 +247,10 @@ def main():
     alpha = np.clip(cv2.GaussianBlur(fig.astype(np.float32), (0, 0), 0.6), 0, 1)
     alpha[inner] = 1.0
     alpha[~(cv2.dilate(fig.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)] = 0.0
-    if inner.any():
-        _, near = nearest(np.where(inner, np.arange(1, h * w + 1, dtype=np.int64).reshape(h, w), 0))
-        col = img.reshape(-1, 3)[np.clip(near.ravel() - 1, 0, h * w - 1)].reshape(h, w, 3)
-        fig_rgb = np.where(inner[..., None], img, col)
-    else:
-        fig_rgb = img
+    seed = inner if inner.any() else fig                # (a figure too thin to erode: the background must not stay under it)
+    _, near = nearest(np.where(seed, np.arange(1, h * w + 1, dtype=np.int64).reshape(h, w), 0))
+    col = img.reshape(-1, 3)[np.clip(near.ravel() - 1, 0, h * w - 1)].reshape(h, w, 3)
+    fig_rgb = np.where(seed[..., None], img, col)
     out_dir = Path(a.out_dir)
     for name in ("figure.png", "background.png", "review.jpg", "cutout.json"):
         refuse_input(out_dir / name)
@@ -306,7 +304,9 @@ def main():
            "settings": {"band": band, "bands": spec.get("bands", []), "keep": len(spec.get("keep", [])),
                         "drop": len(spec.get("drop", [])), "trimap": bool(a.trimap)},
            "frame_cuts_figure": [k_ for k_, v in edges.items() if v], "doubts": doubts}
-    write_text((out_dir / "cutout.json"), json.dumps(res, indent=1))
+    # (the file may be passed on: it names its three neighbours, not the folders above them)
+    write_text(out_dir / "cutout.json", json.dumps({**res, "figure": "figure.png", "background": "background.png",
+                                                    "review": Path(rv).name}, indent=1))
     emit(res)
     sys.exit(1 if doubts else 0)
 
