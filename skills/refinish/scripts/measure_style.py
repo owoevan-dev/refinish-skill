@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _files import read_json, run_cli, write_text  # noqa: E402
+from _files import note_input, read_json, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba  # noqa: E402
 from _measure import FINISH, style_metrics  # noqa: E402
 from _style import kind_of, load_subject  # noqa: E402
@@ -127,6 +127,8 @@ def main():
     if a.source.lower().endswith(".json"):
         sj = load_subject(a.source)
         from parts import load_or_build
+        if a.image:
+            note_input(a.image)
         img, alpha, parts = load_or_build(sj)
         if a.image:
             img2, alpha2 = load_rgba(a.image)

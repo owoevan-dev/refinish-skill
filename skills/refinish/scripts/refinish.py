@@ -33,7 +33,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _files import refuse_input, run_cli, write_text  # noqa: E402
+from _files import note_input, refuse_input, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, save_rgba  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -165,6 +165,8 @@ def main():
     if st["engine"] in RESIZING and (a.hour or st.get("post")):
         die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
             "relight a style that keeps the size, or leave --hour out")
+    if a.palette_from:
+        note_input(a.palette_from)
     img, alpha, parts = load_or_build(sj)
     refuse_input(a.out)                                 # (before the first file is written, so none is left half done)
     if not a.no_check:

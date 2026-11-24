@@ -28,6 +28,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from parts import parts_path  # noqa: E402
 from _files import refuse_input, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba  # noqa: E402
 from _measure import FINISH, style_metrics  # noqa: E402
@@ -61,8 +62,10 @@ def render(subject, style, out):
     refuse_input(out)                                   # (the child process does not know this run's references)
     r = subprocess.run([sys.executable, str(HERE / "refinish.py"), subject, style, str(out), "--no-check"],
                        capture_output=True, text=True)
+    if r.returncode == 3:                               # (its one line is made to be shared: nothing is added to it)
+        die(r.stderr.strip().splitlines()[-1].removeprefix("error: "), 3)
     if r.returncode:
-        die(f"refinish.py failed on {style}: {r.stderr[-400:]}", r.returncode if r.returncode == 3 else 2)
+        die(f"refinish.py failed on {style}: {r.stderr[-400:]}")
 
 
 def get(d, path, dflt=None):
@@ -177,6 +180,7 @@ def main():
         if not Path(r).is_file():
             die(f"no reference picture {r}")
     heights = [figure_height(load_rgba(p)[1]) for p in [str(src)] + a.refs]
+    refuse_input(parts_path(sj))                        # (the renders rebuild this cache: it may not be a reference)
     H = a.height or min(heights)
     target = profile([measure(r, H, a.clusters) for r in a.refs])
     source = measure(str(src), H, a.clusters)

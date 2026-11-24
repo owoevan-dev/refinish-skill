@@ -56,7 +56,7 @@ jobs:
       - name: Compile every script
         run: python -m compileall -q skills tests
       - name: Ruff, the pyflakes rules
-        run: python -m ruff check --isolated --select F skills tests
+        run: python -m ruff check --isolated --select F --statistics skills tests   # (counts: a file's name can be private)
       - name: Run the tests
         run: python -m pytest -q tests
 

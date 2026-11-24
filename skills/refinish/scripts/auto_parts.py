@@ -37,7 +37,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _validate  # noqa: E402
-from _files import read_json, read_picture, relative_path, run_cli, write_text  # noqa: E402
+from _files import read_json, read_picture, refuse_input, relative_path, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
@@ -2116,6 +2116,8 @@ def main():
     sub_path = Path(a.subject)
     stem = sub_path.stem
     rp = sub_path.with_name(f"{stem}.regions.png")
+    refuse_input(sub_path)                              # (before the first file is written)
+    refuse_input(rp)
     if n > 65535:
         die("more than 65535 regions: the picture is too noisy for automatic parts")
     write_image(str(rp), reg.astype(np.uint16))
