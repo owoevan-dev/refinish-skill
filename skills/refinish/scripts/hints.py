@@ -20,7 +20,6 @@ of its colour's largest patch, as far from its edges as the patch allows.
 Prints JSON. Exit codes: 0 done (check: no point marked), 1 check marked some points, 2 bad input.
 """
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -29,6 +28,8 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, run_cli  # noqa: E402
 from _core import die, emit, lab, load_rgba  # noqa: E402
 from _style import load_subject, subject_path  # noqa: E402
 
@@ -36,7 +37,7 @@ from _style import load_subject, subject_path  # noqa: E402
 def region_map(sj):
     if "regions" not in sj:
         die("the subject has no region map: write it with scripts/auto_parts.py first")
-    reg = cv2.imread(str(subject_path(sj, sj["regions"])), cv2.IMREAD_UNCHANGED)
+    reg = read_picture(subject_path(sj, sj["regions"]), cv2.IMREAD_UNCHANGED)
     if reg is None:
         die(f"cannot read the region map {sj['regions']}")
     return reg.astype(np.int32)
@@ -48,10 +49,8 @@ def tolerant(a, b):
 
 
 def cmd_check(a):
-    try:
-        hints = json.loads(Path(a.hints).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        die(f"cannot read {a.hints}: {e}")
+    hints = read_json(Path(a.hints))
+    _validate.hints(hints, a.hints)
     sj = load_subject(a.subject)
     reg = region_map(sj)
     img, alpha = load_rgba(subject_path(sj, sj["image"]))
@@ -188,4 +187,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

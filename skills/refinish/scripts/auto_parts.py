@@ -28,7 +28,6 @@ Exit codes: 0 done, 1 done with doubts, 2 bad input.
 import argparse
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -37,12 +36,14 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, refuse_input, relative_path, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, lab, load_rgba, over, write_image  # noqa: E402
 from _lines import find_lines  # noqa: E402
 
 REGIONS_FORMAT = 1
 # a part segmentation's labels (--parse), as seethrough_parse.py writes them
-from _parse_labels import EYE_PARTS, PARSE, PARSE_PARTS  # noqa: E402
+from _parse_labels import EYE_PARTS, PARSE  # noqa: E402
 # the review's part colours: Kelly's colours of maximum contrast (Kelly 1965), as RGB, white and black left out
 KELLY = [(242, 243, 244), (243, 195, 0), (135, 86, 146), (243, 132, 0), (161, 202, 241), (190, 0, 50), (194, 178, 128),
          (132, 132, 130), (0, 136, 86), (230, 143, 172), (0, 103, 165), (249, 147, 121), (96, 78, 151), (246, 166, 0),
@@ -1644,10 +1645,8 @@ def main():
     a = ap.parse_args()
     hints = {}
     if a.hints:
-        try:
-            hints = json.loads(Path(a.hints).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as e:
-            die(f"cannot read the hints {a.hints}: {e}")
+        hints = read_json(Path(a.hints))
+        _validate.hints(hints, a.hints)
         for hp in hints.get("parts", []):
             if "box" in hp:
                 hp["boxes"] = hp.get("boxes", []) + [hp.pop("box")]
@@ -1671,7 +1670,7 @@ def main():
     # regions of their own
     parse = None
     if a.parse:
-        parse = cv2.imread(a.parse, cv2.IMREAD_GRAYSCALE)
+        parse = read_picture(a.parse, cv2.IMREAD_GRAYSCALE)
         if parse is None or parse.shape != within.shape:
             die(f"{a.parse}: not a part map of this picture ({w}x{h}); make it from this picture with "
                 "scripts/seethrough_parse.py")
@@ -2115,16 +2114,14 @@ def main():
 
     # 5. write
     sub_path = Path(a.subject)
-    sub_path.parent.mkdir(parents=True, exist_ok=True)
     stem = sub_path.stem
     rp = sub_path.with_name(f"{stem}.regions.png")
+    refuse_input(sub_path)                              # (before the first file is written)
+    refuse_input(rp)
     if n > 65535:
         die("more than 65535 regions: the picture is too noisy for automatic parts")
     write_image(str(rp), reg.astype(np.uint16))
-    try:
-        image_rel = os.path.relpath(Path(a.image).resolve(), sub_path.resolve().parent).replace("\\", "/")
-    except ValueError:
-        image_rel = str(Path(a.image).resolve()).replace("\\", "/")
+    image_rel = relative_path(a.image, sub_path.resolve().parent)
     fams = {p["name"]: samples(p["regions"], reg) for p in parts}
     out_parts = [{"name": p["name"], "family": p["name"], "kind": p["kind"], "regions": [int(i) for i in p["regions"]],
                   **({"exact": True} if p.get("exact") else {}), **({"prop": True} if p.get("prop") else {})}
@@ -2133,10 +2130,8 @@ def main():
           **({"head_px": a.head_px} if a.head_px else {}),
           "regions": rp.name, "families": fams, "parts": out_parts, "protect": protect, "focal": focal,
           "blush": blush}
-    sub_path.write_text(json.dumps(sj, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_text(sub_path, json.dumps(sj, ensure_ascii=False, indent=1))
     rv, fv = sub_path.with_name(f"{stem}.auto.jpg"), sub_path.with_name(f"{stem}.face.jpg")
-    if face is None and fv.is_file():
-        fv.unlink()                                     # (an earlier draft's face, not this picture's)
     review(img, alpha, reg, parts, rv, fv, [p["box"] for p in protect], face["box"] if face is not None else None)
     sv = sub_path.with_name(f"{stem}.sheet.jpg")
     parts_sheet(img, alpha, reg, parts, sv, fig["area"])
@@ -2145,9 +2140,9 @@ def main():
                      "share": round(float(st["area"][p["regions"]].sum() / fig["area"]), 4),
                      **({"why": p["_why"]} if p.get("_why") else {})} for p in parts],
           "protect": protect, "focal": focal, "doubts": doubts,
-          "review": [str(v) for v in (rv, fv, sv) if v.is_file()]})
+          "review": [str(v) for v in (rv, fv if face is not None else None, sv) if v is not None and v.is_file()]})
     sys.exit(1 if doubts else 0)
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

@@ -25,10 +25,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _lines as ln_  # noqa: E402
+from _files import run_cli  # noqa: E402
 from _core import Units, emit, load_rgba  # noqa: E402
 from _measure import flatness, outline_coverage  # noqa: E402
 from _parts import misfits  # noqa: E402
-from _style import kind_of, load_subject, subject_path  # noqa: E402
+from _style import kind_of, load_subject  # noqa: E402
 
 OUTLINE_GOOD, OUTLINE_FAIR = 0.85, 0.65
 SIDE_GAP = 0.12
@@ -125,4 +126,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

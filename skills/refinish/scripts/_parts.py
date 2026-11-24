@@ -5,6 +5,7 @@ lies. A subject written by scripts/auto_parts.py names a region map instead: eac
 import cv2
 import numpy as np
 
+from _files import read_picture
 from _core import die, lab
 from _style import subject_path
 
@@ -86,7 +87,7 @@ def nearest_label(labels, todo):
 
 def region_map(subject, shape):
     """The region map a subject names (each pixel's region number), checked against the picture's size."""
-    reg = cv2.imread(str(subject_path(subject, subject["regions"])), cv2.IMREAD_UNCHANGED)
+    reg = read_picture(subject_path(subject, subject["regions"]), cv2.IMREAD_UNCHANGED)
     if reg is None:
         die(f"cannot read the region map {subject['regions']}; run scripts/auto_parts.py again")
     if reg.shape != shape:

@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _files import note_input, refuse_input, run_cli, write_text  # noqa: E402
 from _core import Units, die, emit, save_rgba  # noqa: E402
 from _style import load_style, load_subject, resolve_style  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -164,7 +165,14 @@ def main():
     if st["engine"] in RESIZING and (a.hour or st.get("post")):
         die(f"the {st['engine']} finish changes the picture's size, so it takes no --hour and no post layers; "
             "relight a style that keeps the size, or leave --hour out")
+    if a.palette_from:
+        note_input(a.palette_from)
     img, alpha, parts = load_or_build(sj)
+    refuse_input(a.out)                                 # (before the first file is written, so none is left half done)
+    if not a.no_check:
+        refuse_input(Path(a.out).with_suffix(".check.jpg"))
+    if st["engine"] == "pixel":
+        refuse_input(Path(a.out).with_suffix(".hex"))
     U = Units(alpha, sj.get("head_px"))
     from _check import finish_map
     from _palette import without_card
@@ -195,8 +203,7 @@ def main():
     pal = info.pop("palette", None)
     if pal is not None:                             # a pixel sprite's palette, for an editor (Lospec .hex)
         hexp = Path(a.out).with_suffix(".hex")
-        hexp.write_text("\n".join("%02x%02x%02x" % tuple(int(round(float(v) * 255)) for v in c) for c in pal) + "\n",
-                        encoding="utf-8")
+        write_text(hexp, "\n".join("%02x%02x%02x" % tuple(int(round(float(v) * 255)) for v in c) for c in pal) + "\n")
         info.update({"palette": str(hexp), "colours": len(pal)})
     check = {}
     if not a.no_check:
@@ -221,4 +228,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

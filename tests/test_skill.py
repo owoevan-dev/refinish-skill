@@ -887,10 +887,11 @@ def test_more_bad_input_stops_with_a_message(draft, figure, tmp_path):
     cv2.ellipse(im, (150, 300), (100, 240), 0, 0, 360, (160, 90, 40, 255), -1)
     cv2.ellipse(im, (150, 300), (100, 240), 0, 0, 360, (40, 32, 36, 255), 2)
     cv2.imwrite(str(tmp_path / "noface.png"), im)
-    (tmp_path / "noface_sub.face.jpg").write_bytes(b"an earlier draft's face sheet")
+    (tmp_path / "noface_sub.face.jpg").write_bytes(b"a file this run did not make")
     r, d = run("auto_parts.py", tmp_path / "noface.png", tmp_path / "noface_sub.json")
     assert r.returncode in (0, 1) and d["review"] and all(Path(f).is_file() for f in d["review"])
-    assert not (tmp_path / "noface_sub.face.jpg").exists()
+    assert (tmp_path / "noface_sub.face.jpg").read_bytes() == b"a file this run did not make"
+    assert not any(f.endswith("noface_sub.face.jpg") for f in d["review"])
 
 
 # ----------------------------------------------------------------------------------------------------------- recolour

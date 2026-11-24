@@ -19,7 +19,6 @@ Prints JSON: the output, each finish and its check's verdict, and each layer's s
 Exit codes: 0 done; 1 done, with a FAIL in a finish's checks to look at; 2 bad input.
 """
 import argparse
-import json
 import sys
 import time
 from pathlib import Path
@@ -29,6 +28,8 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, run_cli  # noqa: E402
 from _core import Units, die, ellipse_mask, emit, lab, rgb, save_rgba  # noqa: E402
 from _style import KINDS, kind_of, load_style, load_subject, resolve_style, rule  # noqa: E402
 from parts import load_or_build  # noqa: E402
@@ -196,16 +197,14 @@ def main():
     a = ap.parse_args()
     t0 = time.time()
     rp = Path(a.recipe)
-    try:
-        rc = json.loads(rp.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        die(f"cannot read the recipe {a.recipe}: {e}")
+    rc = read_json(rp)
     if not isinstance(rc, dict):
         die(f"{a.recipe} is not a recipe: a recipe is one JSON object (references/recipes.md)")
     if rc.get("format") != RECIPE_FORMAT:
         die(f"{a.recipe}: 'format' must be \"{RECIPE_FORMAT}\" (references/recipes.md)")
     if "subject" not in rc or not rc.get("layers") and "base" not in rc:
         die(f"{a.recipe}: a recipe needs a 'subject' and a 'base' or 'layers'")
+    _validate.recipe(rc, a.recipe)
     sp = Path(rc["subject"])
     sj = load_subject(sp if sp.is_absolute() else rp.parent / sp)
     img, alpha, parts = load_or_build(sj)
@@ -235,8 +234,6 @@ def main():
     mix = mix.copy()
     covered = []
     for i, lay in enumerate(rc.get("layers", [])):
-        if "style" not in lay:
-            die(f"layer {i} has no 'style'")
         layer, layer_alpha = get(lay["style"])
         m = sel.where(lay.get("where")).astype(np.float32)
         f = U.len(lay.get("feather", 1.5))
@@ -256,4 +253,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

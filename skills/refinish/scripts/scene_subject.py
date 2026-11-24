@@ -17,7 +17,6 @@ Prints JSON: the subject, the parts with their kind, colour and share. Exit code
 import argparse
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -26,6 +25,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _files import relative_path, run_cli, write_text  # noqa: E402
 from _core import die, emit, lab, load_rgba, write_image  # noqa: E402
 
 KINDS = ("sky", "far", "water", "foliage", "ground", "wood", "roof", "stone", "wall", "cloth")
@@ -76,9 +76,14 @@ def main():
     a = ap.parse_args()
     if not Path(a.image).is_file():
         die(f"no picture {a.image}")
+    if not 1 <= a.families <= 64:
+        die("--families: from 1 to 64")
+    if not 0 < a.detail <= 100:
+        die("--detail: a positive number, 1 by default")
     img, alpha = load_rgba(a.image)
-    within = alpha > 0.5
     H, W = alpha.shape
+    if H * W < 16 * a.families:
+        die(f"{a.image} is {W}x{H}: too small to find {a.families} colour families in")
     # the work is done at about 900 px: a scene's materials are large, and mean shift is slow
     s = min(1.0, 900.0 / max(H, W))
     small = cv2.resize(img, (max(1, int(W * s)), max(1, int(H * s))), interpolation=cv2.INTER_AREA)
@@ -184,24 +189,20 @@ def main():
                       "_colour": np.median(Lp[m], axis=0), "_share": float(area_full[regs].sum() / (H * W)),
                       "_samples": [[int(x / s), int(y / s)] for x, y in samples(m)]})
     sub_path = Path(a.subject)
-    sub_path.parent.mkdir(parents=True, exist_ok=True)
     rp = sub_path.with_name(f"{sub_path.stem}.regions.png")
     if n > 65535:
         die("more than 65535 areas: raise the floor with --detail below 1")
     write_image(str(rp), full.astype(np.uint16))
-    try:
-        image_rel = os.path.relpath(Path(a.image).resolve(), sub_path.resolve().parent).replace("\\", "/")
-    except ValueError:
-        image_rel = str(Path(a.image).resolve()).replace("\\", "/")
+    image_rel = relative_path(a.image, sub_path.resolve().parent)
     sj = {"format": "refinish-subject/1", "image": image_rel, "upscaled": 1, "scene": True,
           "regions": rp.name, "families": {p["name"]: p["_samples"] for p in parts},
           "parts": [{k_: v for k_, v in p.items() if not k_.startswith("_")} for p in parts],
           "protect": [], "focal": [], "blush": []}
-    sub_path.write_text(json.dumps(sj, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_text(sub_path, json.dumps(sj, ensure_ascii=False, indent=1))
     emit({"subject": str(sub_path), "areas": n,
           "parts": [{"name": p["name"], "kind": p["kind"], "colour_lab": [round(float(v), 1) for v in p["_colour"]],
                      "share": round(p["_share"], 4)} for p in parts]})
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

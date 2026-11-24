@@ -28,6 +28,8 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from parts import parts_path  # noqa: E402
+from _files import refuse_input, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba  # noqa: E402
 from _measure import FINISH, style_metrics  # noqa: E402
 from _style import load_style, load_subject, resolve_style, subject_path  # noqa: E402
@@ -57,8 +59,11 @@ def score(target, got):
 
 
 def render(subject, style, out):
+    refuse_input(out)                                   # (the child process does not know this run's references)
     r = subprocess.run([sys.executable, str(HERE / "refinish.py"), subject, style, str(out), "--no-check"],
                        capture_output=True, text=True)
+    if r.returncode == 3:                               # (its one line is made to be shared: nothing is added to it)
+        die(r.stderr.strip().splitlines()[-1].removeprefix("error: "), 3)
     if r.returncode:
         die(f"refinish.py failed on {style}: {r.stderr[-400:]}")
 
@@ -175,6 +180,7 @@ def main():
         if not Path(r).is_file():
             die(f"no reference picture {r}")
     heights = [figure_height(load_rgba(p)[1]) for p in [str(src)] + a.refs]
+    refuse_input(parts_path(sj))                        # (the renders rebuild this cache: it may not be a reference)
     H = a.height or min(heights)
     target = profile([measure(r, H, a.clusters) for r in a.refs])
     source = measure(str(src), H, a.clusters)
@@ -200,7 +206,7 @@ def main():
             break
         sp = work / f"round{i}.json"
         st["id"] = Path(a.out).stem
-        sp.write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_text(sp, json.dumps(st, ensure_ascii=False, indent=1))
         out = work / f"round{i}.png"
         render(a.subject, str(sp), out)
         new = measure(str(out), H, a.clusters)
@@ -219,9 +225,8 @@ def main():
     style = best[1]
     style["id"] = Path(a.out).stem
     style["summary"] = (style.get("summary", "") + f" Fitted to {len(a.refs)} reference picture(s) by measurement "
-                        f"from '{start}' ({best[0][0]} of {len(target)} finish numbers within 10 %).").strip()
-    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(a.out).write_text(json.dumps(style, ensure_ascii=False, indent=1), encoding="utf-8")
+                        f"from '{Path(start).stem}' ({best[0][0]} of {len(target)} finish numbers within 10 %).").strip()
+    write_text(Path(a.out), json.dumps(style, ensure_ascii=False, indent=1))
     still = [{"metric": f, "target": target[f], "result": rounds[best[2]]["numbers"].get(f)} for f in target
              if f in rounds[best[2]]["numbers"] and
              abs(rounds[best[2]]["numbers"][f] - target[f]) / max(abs(target[f]), 1e-6) > TOL]
@@ -234,4 +239,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

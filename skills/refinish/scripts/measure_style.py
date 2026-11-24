@@ -20,9 +20,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _files import note_input, read_json, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba  # noqa: E402
 from _measure import FINISH, style_metrics  # noqa: E402
-from _style import kind_of, load_subject, subject_path  # noqa: E402
+from _style import kind_of, load_subject  # noqa: E402
 
 
 def auto_parts(img, alpha, k, upscaled=1):
@@ -112,14 +113,13 @@ def main():
                     help="several references' measurements as one target (the median of each number)")
     a = ap.parse_args()
     if a.profile:
-        p = profile([json.loads(Path(q).read_text(encoding="utf-8")) for q in a.profile])
+        p = profile([read_json(q) for q in a.profile])
         if a.out:
-            Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-            Path(a.out).write_text(json.dumps(p, ensure_ascii=False, indent=1), encoding="utf-8")
+            write_text(Path(a.out), json.dumps(p, ensure_ascii=False, indent=1))
         emit(p)
         return
     if a.compare:
-        ref, res = (json.loads(Path(p).read_text(encoding="utf-8")) for p in a.compare)
+        ref, res = (read_json(p) for p in a.compare)
         emit(compare(ref, res, FINISH if a.finish else None))
         return
     if not a.source:
@@ -127,6 +127,8 @@ def main():
     if a.source.lower().endswith(".json"):
         sj = load_subject(a.source)
         from parts import load_or_build
+        if a.image:
+            note_input(a.image)
         img, alpha, parts = load_or_build(sj)
         if a.image:
             img2, alpha2 = load_rgba(a.image)
@@ -134,20 +136,18 @@ def main():
                 die(f"{a.image} is not the size of the subject's picture")
             img, alpha = img2, alpha2
         m = style_metrics(img, alpha, sj.get("upscaled", 1), parts, [kind_of(p) for p in sj["parts"]], sj.get("head_px"))
-        m["source"] = a.image or str(subject_path(sj, sj["image"]))
+        m["source"] = Path(a.image or sj["image"]).name
     else:
         img, alpha = load_rgba(a.source)
         if a.at_height:
             img, alpha = at_height(img, alpha, a.at_height)
         parts, kinds = (auto_parts(img, alpha, a.auto_parts, a.upscaled or 1) if a.auto_parts else (None, None))
         m = style_metrics(img, alpha, a.upscaled or 1, parts, kinds)
-        m["source"] = a.source
+        m["source"] = Path(a.source).name
     if a.out:
-        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.out).write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_text(Path(a.out), json.dumps(m, ensure_ascii=False, indent=1))
     emit(m)
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)

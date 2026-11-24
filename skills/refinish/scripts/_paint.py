@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 
 import _lines as ln_
+from _files import read_picture
 from _core import (bgr8_of, boundary, clean_shape, die, ellipse_mask, grain, lab, lab8, piece_blur, protect_mask,
                    slow_noise)
 from _style import kind_of, rule
@@ -243,7 +244,7 @@ def run(subject, style, img, alpha, parts_u8, U, seed=None, palette_from=None):
     pal = style.get("palette", {})
     pal_src = [Ls[within & ~is_line].reshape(-1, 3)]
     if palette_from:                                                  # the scene the figure stands in
-        scene = cv2.imread(str(palette_from))
+        scene = read_picture(palette_from, cv2.IMREAD_COLOR)
         if scene is None:                                             # asked for, so never skipped in silence
             die(f"cannot read the palette picture {palette_from}")
         pal_src.append(lab8(cv2.resize(scene, (scene.shape[1] // 4, scene.shape[0] // 4))).reshape(-1, 3))

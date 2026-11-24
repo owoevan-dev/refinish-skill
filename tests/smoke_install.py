@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPACED = "new user"                                     # a space, as in "Program Files" or "My Pictures"
+SPACED = "new user 角色 テスト"                          # a space and other scripts, as in a real user's folders
 CARD_COLOUR = "#3f5f8a"
 
 MEASURE = """

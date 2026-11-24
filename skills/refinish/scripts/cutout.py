@@ -48,6 +48,8 @@ import numpy as np
 from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _validate  # noqa: E402
+from _files import read_json, read_picture, refuse_input, run_cli, write_text  # noqa: E402
 from _core import die, emit, load_rgba, save_rgba, write_image  # noqa: E402
 from _lines import meanshift  # noqa: E402
 from auto_parts import disk, nearest  # noqa: E402
@@ -152,10 +154,8 @@ def main():
     ap.add_argument("out_dir")
     ap.add_argument("--trimap", help="a painted picture: white figure, black background, grey left to the colours")
     a = ap.parse_args()
-    try:
-        spec = json.loads(Path(a.outline).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        die(f"cannot read the outline {a.outline}: {e}")
+    spec = read_json(Path(a.outline))
+    _validate.outline(spec, a.outline)
     polys = spec.get("outline") or []
     if polys and np.asarray(polys[0]).ndim == 1:          # one polygon given without the outer list
         polys = [polys]
@@ -196,7 +196,7 @@ def main():
     sure_bg &= ~seeds["keep"]
     painted = None
     if a.trimap:
-        t = cv2.imread(a.trimap, cv2.IMREAD_GRAYSCALE)
+        t = read_picture(a.trimap, cv2.IMREAD_GRAYSCALE)
         if t is None or t.shape != (h, w):
             die(f"the trimap must be a picture of the same size as {a.picture} ({w} x {h})")
         painted = (t > 200, t < 55)
@@ -214,6 +214,8 @@ def main():
         m[painted[1]] = cv2.GC_BGD
     # GrabCut on the figure's surroundings only: the colours far off say nothing about this edge
     live = cv2.dilate((m != cv2.GC_BGD).astype(np.uint8), disk(int(2 * band))) > 0
+    if not live.any():
+        die("the outline and the trimap leave no figure: draw it round the figure, inside the picture")
     ys, xs = np.nonzero(live)
     y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
     bgr8 = cv2.cvtColor((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR)
@@ -245,14 +247,13 @@ def main():
     alpha = np.clip(cv2.GaussianBlur(fig.astype(np.float32), (0, 0), 0.6), 0, 1)
     alpha[inner] = 1.0
     alpha[~(cv2.dilate(fig.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)] = 0.0
-    if inner.any():
-        _, near = nearest(np.where(inner, np.arange(1, h * w + 1, dtype=np.int64).reshape(h, w), 0))
-        col = img.reshape(-1, 3)[np.clip(near.ravel() - 1, 0, h * w - 1)].reshape(h, w, 3)
-        fig_rgb = np.where(inner[..., None], img, col)
-    else:
-        fig_rgb = img
+    seed = inner if inner.any() else fig                # (a figure too thin to erode: the background must not stay under it)
+    _, near = nearest(np.where(seed, np.arange(1, h * w + 1, dtype=np.int64).reshape(h, w), 0))
+    col = img.reshape(-1, 3)[np.clip(near.ravel() - 1, 0, h * w - 1)].reshape(h, w, 3)
+    fig_rgb = np.where(seed[..., None], img, col)
     out_dir = Path(a.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("figure.png", "background.png", "review.jpg", "cutout.json"):
+        refuse_input(out_dir / name)
     save_rgba(out_dir / "figure.png", fig_rgb, alpha)
     hole = cv2.dilate(fig.astype(np.uint8), disk(3)) > 0
     save_rgba(out_dir / "background.png", push_pull_fill(img, hole), np.ones((h, w), np.float32))
@@ -303,10 +304,12 @@ def main():
            "settings": {"band": band, "bands": spec.get("bands", []), "keep": len(spec.get("keep", [])),
                         "drop": len(spec.get("drop", [])), "trimap": bool(a.trimap)},
            "frame_cuts_figure": [k_ for k_, v in edges.items() if v], "doubts": doubts}
-    (out_dir / "cutout.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
+    # (the file may be passed on: it names its three neighbours, not the folders above them)
+    write_text(out_dir / "cutout.json", json.dumps({**res, "figure": "figure.png", "background": "background.png",
+                                                    "review": Path(rv).name}, indent=1))
     emit(res)
     sys.exit(1 if doubts else 0)
 
 
 if __name__ == "__main__":
-    main()
+    run_cli(main)
