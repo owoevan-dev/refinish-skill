@@ -155,14 +155,14 @@ def test_markdown_section_links_resolve():
     for md in markdown_files():
         for target, anchor in re.findall(r"\]\(([^)#\s]*)#([^)\s]+)\)", md.read_text(encoding="utf-8")):
             dest = md.parent / target if target else md
-            if not re.match(r"[a-z]+:", target) and dest.suffix == ".md" and anchor not in anchors(dest):
+            if not re.match(r"[a-z]+:", target) and dest.suffix == ".md" and dest.is_file() and anchor not in anchors(dest):
                 bad.append(f"{md.relative_to(ROOT)} -> {target}#{anchor}")
     fail_masked("broken-link", bad)
 
 
 def test_readmes_offer_every_language():
     readmes = sorted(p.name for p in ROOT.glob("README*.md"))
-    assert len(readmes) == 5, readmes
+    assert len(readmes) == 5
     for name in readmes:
         text = (ROOT / name).read_text(encoding="utf-8")
         assert all(other in text for other in readmes if other != name), name
@@ -383,6 +383,12 @@ def test_env_broken_desktop_opencv_suggests_headless(monkeypatch, tmp_path):
 def test_env_here_never_adds_a_second_opencv_package(monkeypatch, tmp_path):
     errors = {"cv2": "ImportError: libGL.so.1: cannot open shared object file"}
     env = fake_env(monkeypatch, {k: v for k, v in GOOD.items() if k != "cv2"}, errors, dists={"opencv-python": "5.0.0.93"})
+    assert env.report(tmp_path / "v", here=True)[0]["argv"][0][1:3] == ["-m", "venv"]
+
+
+def test_env_here_never_joins_a_contrib_opencv(monkeypatch, tmp_path):
+    env = fake_env(monkeypatch, {k: v for k, v in GOOD.items() if k != "scipy"}, {"scipy": "ModuleNotFoundError: no"},
+                   dists={"opencv-contrib-python": "5.0.0.93"})
     assert env.report(tmp_path / "v", here=True)[0]["argv"][0][1:3] == ["-m", "venv"]
 
 

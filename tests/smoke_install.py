@@ -141,9 +141,10 @@ def check(work):
     state = result(run([py, scripts / "check_env.py"], project, env=env))
     assert state["status"] == "ok", state
     version = tuple(int(v) for v in state["python_version"].split(".")[:2])
-    assert len(state["opencv_packages"]) == 1, state
-    package = next(iter(state["opencv_packages"]))
-    requirements = refinish / ("requirements-headless.txt" if "headless" in package else "requirements.txt")
+    headless = sys.platform.startswith("linux") and not (env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"))
+    package = "opencv-python-headless" if headless else "opencv-python"
+    assert list(state["opencv_packages"]) == [package], state
+    requirements = refinish / ("requirements-headless.txt" if headless else "requirements.txt")
     assert state["versions"]["numpy"] == pinned(requirements, "numpy", version), state
     assert state["versions"]["scipy"] == pinned(requirements, "scipy", version), state
     assert state["opencv_packages"][package] == pinned(requirements, package, version), state
