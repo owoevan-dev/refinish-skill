@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.10+ with numpy, opencv-python and scipy. Runs the Refinish skill's scripts, which ship beside it in the same plugin. No image model, no network, no GPU. Two optional segmentation models (See-Through, SAM 2), installed apart and best on an NVIDIA GPU, can read the head and split the eyes (../refinish/references/seethrough.md).
 metadata:
   author: "owoevan-dev"
-  version: "0.2.0"
+  version: "0.2.1"
 ---
 
 # Recolor

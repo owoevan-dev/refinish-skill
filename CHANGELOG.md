@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-24
+
 ### Added
 
 - `check_env.py`, step 0 of both skills. It says whether this Python can run the scripts on tested versions and prints the commands to install them into a separate environment, so your own Python and other projects are left as they are. `--share` prints a version of the report with no paths, for a bug report.
@@ -152,6 +154,7 @@ All 37 finishes were run on 16 characters the code had never seen (10 with darke
 - Screen-print inks are the colours of the parts they print, not a mean of two neighbours.
 - The paint styles keep a mass of pure black black.
 
-[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/owoevan-dev/refinish-skill/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/owoevan-dev/refinish-skill/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/owoevan-dev/refinish-skill/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/owoevan-dev/refinish-skill/releases/tag/v0.1.0
