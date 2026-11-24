@@ -203,6 +203,13 @@ def hair_can_thin_out(Lab, hair, skin):
             and abs(float(np.median(Lab[..., 0][hair])) - float(np.median(Lab[..., 0][skin]))) < 25)
 
 
+def on_a_blend(Lab, a, b, tol=6.0):
+    """The pixels whose colour lies on the straight line between colours a and b: a mix of the two, in some share."""
+    v = np.asarray(b, np.float32) - np.asarray(a, np.float32)
+    t = np.clip(np.sum((Lab - a) * v, axis=2) / max(float(v @ v), 1.0), 0, 1)
+    return np.linalg.norm(Lab - (a + t[..., None] * v), axis=2) < tol
+
+
 def iris_core(subject, m):
     """The iris in an eyes part's iris-like pixels m: per eye box (widened by IRIS_PAD), what a disc of IRIS_OPEN x the
     iris's inscribed radius fits in (a morphological opening), with two pixels of its edge back (the opening rounds the

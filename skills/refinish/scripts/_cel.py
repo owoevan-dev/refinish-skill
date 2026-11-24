@@ -271,8 +271,11 @@ def run(subject, style, img, alpha, parts, U, mended=None):
                 # likewise a card's shadow: as deep, for its base, as the drawn one was for its own
                 drawn_depth = 1 - float(np.median(Lf[cand])) / max(ref, 1e-3)
                 card_depth = 1 - lab_px(shade)[0] / max(lab_px(base)[0], 1.0)
-                a_sh = a_sh * np.clip(drawn_depth / max(card_depth, 1e-3), 0, 1)
-            layer = layer * (1 - a_sh[..., None]) + shade * a_sh[..., None]
+                sh_strength = np.clip(drawn_depth / max(card_depth, 1e-3), 0, 1)
+            else:
+                sh_strength = 1.0
+            # (the strength is for this tone's paint: the shape stays whole for the second shadow chosen inside it)
+            layer = layer * (1 - sh_strength * a_sh[..., None]) + shade * sh_strength * a_sh[..., None]
             if tones >= 3:
                 # the second shadow (二影): the deepest of the drawn shadow, under the chin, inside a collar
                 cand_d = core & (Lf < t_dp) & (a_sh > 0.5)
@@ -304,7 +307,7 @@ def run(subject, style, img, alpha, parts, U, mended=None):
             if p["name"] in rec and cand.any():
                 # a card's light is only as strong against its base as the drawn light was: the faint sheen on pale
                 # hair, carried at the full step of a dark card's highlight, comes out as blotches
-                drawn_step = 100.0 * float(np.median(Lv[cand]) - np.median(Lv[src_px]))
+                drawn_step = 100.0 * float(np.percentile(Lv[cand], 90) - np.median(Lv[src_px]))    # (a glint counts)
                 a_hl = a_hl * np.clip(drawn_step / max(lab_px(hl_col)[0] - lab_px(base)[0], 1.0), 0, 1)
             layer = layer * (1 - a_hl[..., None]) + hl_col * a_hl[..., None]
         if drawn:
@@ -591,32 +594,39 @@ def guided_filter(mask, guide, radius, eps):
 
 
 def soft_hair_edge(out, img, hair, skin, face, is_line, U):
-    """A fringe that thins out over the face with no line at its edge: a flat fill ends it in a hard, blunt shape. The
-    border between the hair and the skin is softened to follow the source, and each pixel near it takes the two paints
+    """A fringe that thins out over the face with no line at its edge: a flat fill ends it in a hard, blunt shape. Where
+    the hair touches the skin, the border is softened to follow the source, and each pixel near it takes the two paints
     in that share."""
-    f = lab(img)
-    if not (hair & face).any() or not (skin & face).any() or not rc_.hair_can_thin_out(f, hair, skin):
+    contact = hair & face & (cv2.dilate(skin.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
+    if not contact.any():
         return out
     r = max(2, int(round(U.len(rc_.HAIR_EDGE_REACH))))
+    ys, xs = np.nonzero(contact)
+    box = (slice(max(0, ys.min() - 3 * r), ys.max() + 3 * r + 1), slice(max(0, xs.min() - 3 * r), xs.max() + 3 * r + 1))
+    f, hair_b, skin_b, line_b = lab(img[box]), hair[box], skin[box], is_line[box]    # (a small face costs a small face)
+    if not rc_.hair_can_thin_out(f, hair_b, skin_b):
+        return out
 
     def colour_round(m):
-        weight = (m & ~is_line).astype(np.float32)
+        weight = (m & ~line_b).astype(np.float32)
         return cv2.GaussianBlur(f * weight[..., None], (0, 0), r) / np.maximum(
             cv2.GaussianBlur(weight, (0, 0), r)[..., None], 1e-3)
-    hair_c, skin_c = colour_round(hair), colour_round(skin)
+    hair_c, skin_c = colour_round(hair_b), colour_round(skin_b)
     axis = hair_c - skin_c
     gap = np.sum(axis * axis, axis=2)
     # from the skin (0) to the hair (1), no further: a black line in the window would otherwise flatten the fit
     guide = np.clip(np.sum((f - skin_c) * axis, axis=2) / np.maximum(gap, 1.0), 0, 1)
-    share = np.clip((guided_filter(hair.astype(np.float32), guide.astype(np.float32), r, 0.002) - 0.3) / 0.4, 0, 1)
-    # only where the two meet (hair beside a collar is no fringe), and they differ enough for a share to be read
+    share = np.clip((guided_filter(hair_b.astype(np.float32), guide.astype(np.float32), r, 0.002) - 0.3) / 0.4, 0, 1)
     disk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
-    near_hair, near_skin = (cv2.dilate(m.astype(np.uint8), disk) > 0 for m in (hair, skin))
-    change = ((hair & near_skin) | (skin & near_hair)) & face & ~is_line & (gap > 64.0)
+    change = (cv2.dilate(contact[box].astype(np.uint8), disk) > 0) & face[box] & ~line_b & (gap > 64.0)
+    on_hair, on_skin = change & hair_b, change & skin_b
+    if not on_hair.any() and not on_skin.any():
+        return out
+    paint = out[box]
     res = out.copy()
-    on_hair, on_skin = change & hair, change & skin
-    res[on_hair] = (out * share[..., None] + rc_.nearest_colour(out, skin & ~is_line) * (1 - share[..., None]))[on_hair]
-    res[on_skin] = (out * (1 - share[..., None]) + rc_.nearest_colour(out, hair & ~is_line) * share[..., None])[on_skin]
+    part = res[box]
+    part[on_hair] = (paint * share[..., None] + rc_.nearest_colour(paint, skin_b & ~line_b) * (1 - share[..., None]))[on_hair]
+    part[on_skin] = (paint * (1 - share[..., None]) + rc_.nearest_colour(paint, hair_b & ~line_b) * share[..., None])[on_skin]
     return res
 
 
