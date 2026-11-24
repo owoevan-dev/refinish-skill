@@ -168,6 +168,8 @@ ANCHOR = {"deep": 4.0, "shadow": 18.0, "base": 62.0, "highlight": 97.0}
 TIE = 0.01                                             # Oklab L: knots anchored closer than this on a part are one
 # the most of a card's part its highlight covers in a cel finish
 HIGHLIGHT_SHARE = 0.1
+# how far, in style units, a pale fringe's border with the skin is softened in a cel finish
+HAIR_EDGE_REACH = 5.0
 
 
 def knots(rec, slots=("deep", "shadow", "base", "highlight")):
@@ -192,6 +194,27 @@ def iris_like(Lab, skin_lab):
 # anything beyond the eye's protected box widened by IRIS_PAD of its size
 IRIS_OPEN = 0.5
 IRIS_PAD = 0.25
+
+
+def hair_can_thin_out(Lab, hair, skin):
+    """Whether hair can fade into the skin with no line at its edge: only hair near the skin's own lightness (silver,
+    blonde, pink). Dark hair against skin is a hard edge as drawn."""
+    return (hair.sum() >= 50 and skin.sum() >= 50
+            and abs(float(np.median(Lab[..., 0][hair])) - float(np.median(Lab[..., 0][skin]))) < 25)
+
+
+def fringe_zone(hair, skin, face, U):
+    """Where a cel finish softens a pale fringe: within HAIR_EDGE_REACH of where the hair touches the skin on the face."""
+    contact = hair & face & (cv2.dilate(skin.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)
+    r = max(2, int(round(U.len(HAIR_EDGE_REACH))))
+    return cv2.dilate(contact.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))) > 0
+
+
+def on_a_blend(Lab, a, b, tol=6.0):
+    """The pixels whose colour lies on the straight line between colours a and b: a mix of the two, in some share."""
+    v = np.asarray(b, np.float32) - np.asarray(a, np.float32)
+    t = np.clip(np.sum((Lab - a) * v, axis=2) / max(float(v @ v), 1.0), 0, 1)
+    return np.linalg.norm(Lab - (a + t[..., None] * v), axis=2) < tol
 
 
 def iris_core(subject, m):

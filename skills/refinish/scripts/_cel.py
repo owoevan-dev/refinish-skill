@@ -267,7 +267,9 @@ def run(subject, style, img, alpha, parts, U, mended=None):
             if r.get("soft", 0) > 0:                   # a softer turn from light to shadow (film styles)
                 a_sh = cv2.GaussianBlur(a_sh, (0, 0), U.len(r["soft"])) * m
             shade = rgb_px(r["shadow_lab"]) if "shadow_lab" in r else _shadow_colour(img, cand, base, r)
-            layer = layer * (1 - a_sh[..., None]) + shade * a_sh[..., None]
+            # (the strength is for this tone's paint: the shape stays whole for the second shadow chosen inside it)
+            k_sh = _drawn_strength(Lf, cand, ref, shade, base) if p["name"] in rec else 1.0
+            layer = layer * (1 - k_sh * a_sh[..., None]) + shade * k_sh * a_sh[..., None]
             if tones >= 3:
                 # the second shadow (二影): the deepest of the drawn shadow, under the chin, inside a collar
                 cand_d = core & (Lf < t_dp) & (a_sh > 0.5)
@@ -279,7 +281,8 @@ def run(subject, style, img, alpha, parts, U, mended=None):
                     s_ = lab_px(shade)
                     dL, da, db = r.get("deep", [-12, 3, -3])
                     deep = rgb_px([max(2.0, s_[0] + dL), s_[1] + da, s_[2] + db])
-                layer = layer * (1 - a_dp[..., None]) + deep * a_dp[..., None]
+                k_dp = _drawn_strength(Lf, cand_d, ref, deep, base) if p["name"] in rec else 1.0
+                layer = layer * (1 - k_dp * a_dp[..., None]) + deep * k_dp * a_dp[..., None]
         if hl_mode != "none":
             cand = core & (Lh > t_hl)
             if hl_mode == "crisp":
@@ -296,6 +299,11 @@ def run(subject, style, img, alpha, parts, U, mended=None):
                 b = lab_px(base)
                 hl_col = (rgb_px(hl["colour_lab"]) if p["name"] in rec and "colour_lab" in hl
                           else rgb_px([b[0] + band.get("lift", 8.0), b[1], b[2] - 2.0]))
+            if p["name"] in rec and cand.any():
+                # a card's light is only as strong against its base as the drawn light was: the faint sheen on pale
+                # hair, carried at the full step of a dark card's highlight, comes out as blotches
+                drawn_step = 100.0 * float(np.percentile(Lv[cand], 90) - np.median(Lv[src_px]))    # (a glint counts)
+                a_hl = a_hl * np.clip(drawn_step / max(lab_px(hl_col)[0] - lab_px(base)[0], 1.0), 0, 1)
             layer = layer * (1 - a_hl[..., None]) + hl_col * a_hl[..., None]
         if drawn:
             # most of the way to the flat tones, the lines left as drawn: the source's fine marks (strands, the
@@ -340,6 +348,7 @@ def run(subject, style, img, alpha, parts, U, mended=None):
                 fill_new = rc_.nearest_colour(out, own if own.any() else within & ~is_line)
                 out[ln_m] = rc_.ink_over(img, fill_src, fill_new, ln_m, ink_L)
         out = rc_.fringe(out, img, alpha, within, rec_mask, is_line, fill_src, ink_L)
+    out = soft_hair_edge(out, img, of_kind("hair") & within, skin & within, face, is_line, U)
 
     # ---- cast shadows: one part's shadow on another (the fringe's on the brow, a side lock's on the cheek) -------------
     for c in style.get("touches", {}).get("cast", []):
@@ -568,6 +577,60 @@ def run(subject, style, img, alpha, parts, U, mended=None):
 _XYZ_TO_RGB = np.array([[3.2404542, -1.5371385, -0.4985314],
                         [-0.9692660, 1.8760108, 0.0415560],
                         [0.0556434, -0.2040259, 1.0572252]], np.float32)
+
+
+def _drawn_strength(Lf, tone, ref, colour, base):
+    """How much of a card's shadow tone to lay: as deep, for the card's base, as the drawn one was for its own. A faint
+    shading on pale hair, painted at the card's full step, comes out as blotches."""
+    if not tone.any():
+        return 1.0
+    drawn = 1 - float(np.median(Lf[tone])) / max(ref, 1e-3)
+    return float(np.clip(drawn / max(1 - lab_px(colour)[0] / max(lab_px(base)[0], 1.0), 1e-3), 0, 1))
+
+
+def guided_filter(mask, guide, radius, eps):
+    """A mask softened to follow the edges of a guide picture (He, Sun and Tang, Guided Image Filtering, 2010). Where a
+    window holds one side only the mask stays as it is, whatever the guide does there."""
+    box = lambda x: cv2.blur(x, (2 * radius + 1, 2 * radius + 1))
+    mean_g, mean_m = box(guide), box(mask)
+    slope = (box(guide * mask) - mean_g * mean_m) / (box(guide * guide) - mean_g * mean_g + eps)
+    return box(slope) * guide + box(mean_m - slope * mean_g)
+
+
+def soft_hair_edge(out, img, hair, skin, face, is_line, U):
+    """A fringe that thins out over the face with no line at its edge: a flat fill ends it in a hard, blunt shape. Where
+    the hair touches the skin, the border is softened to follow the source, and each pixel near it takes the two paints
+    in that share."""
+    zone = rc_.fringe_zone(hair, skin, face, U)
+    if not zone.any():
+        return out
+    r = max(2, int(round(U.len(rc_.HAIR_EDGE_REACH))))
+    ys, xs = np.nonzero(zone)
+    box = (slice(max(0, ys.min() - 3 * r), ys.max() + 3 * r + 1), slice(max(0, xs.min() - 3 * r), xs.max() + 3 * r + 1))
+    f, hair_b, skin_b, line_b = lab(img[box]), hair[box], skin[box], is_line[box]    # (a small face costs a small face)
+    if not rc_.hair_can_thin_out(f, hair_b, skin_b):
+        return out
+
+    def colour_round(m):
+        weight = (m & ~line_b).astype(np.float32)
+        return cv2.GaussianBlur(f * weight[..., None], (0, 0), r) / np.maximum(
+            cv2.GaussianBlur(weight, (0, 0), r)[..., None], 1e-3)
+    hair_c, skin_c = colour_round(hair_b), colour_round(skin_b)
+    axis = hair_c - skin_c
+    gap = np.sum(axis * axis, axis=2)
+    # from the skin (0) to the hair (1), no further: a black line in the window would otherwise flatten the fit
+    guide = np.clip(np.sum((f - skin_c) * axis, axis=2) / np.maximum(gap, 1.0), 0, 1)
+    share = np.clip((guided_filter(hair_b.astype(np.float32), guide.astype(np.float32), r, 0.002) - 0.3) / 0.4, 0, 1)
+    change = zone[box] & face[box] & ~line_b & (gap > 64.0)
+    on_hair, on_skin = change & hair_b, change & skin_b
+    if not on_hair.any() and not on_skin.any():
+        return out
+    paint = out[box]
+    res = out.copy()
+    part = res[box]
+    part[on_hair] = (paint * share[..., None] + rc_.nearest_colour(paint, skin_b & ~line_b) * (1 - share[..., None]))[on_hair]
+    part[on_skin] = (paint * (1 - share[..., None]) + rc_.nearest_colour(paint, hair_b & ~line_b) * share[..., None])[on_skin]
+    return res
 
 
 def _in_gamut(L, a, b, tol=1e-3):

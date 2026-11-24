@@ -25,7 +25,7 @@ picture can point at them.
 import cv2
 import numpy as np
 
-from _core import lab, write_image
+from _core import ellipse_mask, lab, write_image
 from _parts import misfits
 from _style import kind_of
 
@@ -580,6 +580,13 @@ def recolour_checks(subject, img, alpha, parts, out, U, mended=None):
         if kind_of(p) == "eyes":
             core = m if p.get("exact") else rc_.iris_core(subject, m & iris_src) | (m & touched_eyes)
         m2 = (m & ~in_box & ~ink if core is None else core & ~lost_box) & (f[..., 0] >= 25)
+        if kind_of(p) == "hair" and rc_.hair_can_thin_out(fs, m, skin):
+            # (a pale fringe's edge is a mix of the hair's new colour and the skin: no old colour left. Only a mix: an
+            # untouched strip beside the skin is the old colour, and stays counted)
+            near = rc_.fringe_zone(m, skin, ellipse_mask(*m.shape, subject.get("focal", [])) > 0.5, U)
+            skin_c = np.median(f[skin], axis=0)
+            for tone in card.values():                  # (the fringe's paint is any of the card's tones)
+                m2 &= ~(near & rc_.on_a_blend(f, tone, skin_c))
         old = np.median(fs[inner], axis=0)
         old_c = float(np.hypot(old[1], old[2]))
         if old_c >= 8:
