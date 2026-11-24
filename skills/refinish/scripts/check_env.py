@@ -31,6 +31,7 @@ import re
 import shlex
 import sys
 import sysconfig
+import warnings
 from importlib import metadata
 from pathlib import Path
 
@@ -65,11 +66,13 @@ def installed_opencv():
 def try_imports():
     """Each package's version, or why it does not load (a desktop OpenCV without graphics libraries fails here)."""
     versions, errors = {}, {}
-    for name in ("numpy", "scipy", "cv2"):
-        try:
-            versions[name] = __import__(name).__version__
-        except Exception as e:                          # (a broken binary raises more than ImportError)
-            errors[name] = f"{type(e).__name__}: {str(e)[:160]}"
+    with warnings.catch_warnings():                     # (a compatibility warning prints the install's path)
+        warnings.simplefilter("ignore")
+        for name in ("numpy", "scipy", "cv2"):
+            try:
+                versions[name] = __import__(name).__version__
+            except Exception as e:                      # (a broken binary raises more than ImportError)
+                errors[name] = f"{type(e).__name__}: {str(e)[:160]}"
     return versions, errors
 
 
@@ -184,7 +187,7 @@ def report(venv, here=False):
     note = ("two OpenCV packages share one cv2 here, so a separate environment is the safe way" if clash
             else "the commands install the tested versions")
     # (switching OpenCV package in place would leave two of them sharing one cv2)
-    switches = bool(dists) and any("headless" in d for d in dists) != headless
+    switches = bool(dists) and ("opencv-python-headless" if headless else "opencv-python") not in dists
     return plan(out, venv, here and not clash and not switches, headless, "install", note, 2)
 
 

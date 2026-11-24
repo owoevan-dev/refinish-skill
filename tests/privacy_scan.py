@@ -180,7 +180,7 @@ FORBIDDEN_NAME = re.compile(
     r"settings\.local\.json|session_index\.jsonl|rollout-.+\.jsonl|.+\.(?:sqlite3?|db)(?:-wal|-shm)?|"
     r"thumbs\.db|\.ds_store|desktop\.ini|.+\.(?:log|bak|orig|swp|tmp|dmp|ipynb)|.+~)$")
 FORBIDDEN_DIR = re.compile(r"(?i)^(?:.+-workspace|\.venv|venv|node_modules|\.idea|\.vscode|__pycache__|\.pytest_cache|"
-                           r"\.ssh|\.aws|\.claude|\.codex)$")
+                           r"\.ssh|\.aws|\.config|\.claude|\.codex)$")
 # .claude-plugin and .codex-plugin are the plugin's manifests and do not match the two names above.
 
 SVG_RULES = [(rule, re.compile(pattern)) for rule, pattern in (
@@ -284,7 +284,7 @@ def scan_png(data, where, terms=()):
         if kind == b"iCCP":
             try:
                 found += scan_profile(inflate(body.partition(b"\0")[2][1:]), where, terms)
-                found += term_hits(body.partition(b"\0")[0].decode("latin-1"), where, terms)
+                found += scan_text(body.partition(b"\0")[0].decode("latin-1"), where, terms)
             except (zlib.error, ValueError):
                 found.append(Finding("image-metadata", where, 0, "an ICC profile that cannot be read"))
         elif kind not in PNG_PLAIN:
@@ -650,8 +650,9 @@ def scan_history(terms=(), unreachable=False):
             elif kind == "tree":
                 for mode, name in parse_tree(data):
                     entry = f"{where}/{name}"
-                    if mode == "160000":
-                        found.append(Finding("submodule", entry, 0, "its content lives elsewhere"))
+                    if mode in ("160000", "120000"):
+                        rule = "submodule" if mode == "160000" else "link-in-repository"
+                        found.append(Finding(rule, entry, 0, ""))
                     found += [Finding(f.rule, entry, 0, f.hint)
                               for f in scan_name(name + ("/x" if mode == "40000" else ""), terms)]
             else:
